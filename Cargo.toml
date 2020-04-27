@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 prost = "0.6"
+os_pipe = "0.9.1"
