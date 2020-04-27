@@ -1,0 +1,61 @@
+package criu
+
+enum criu_req_type {
+	EMPTY			= 0;
+	DUMP			= 1; /* criu dump */
+	RESTORE			= 2; /* criu restore */
+	CHECK			= 3; /* criu check */
+	PRE_DUMP		= 4; /* criu pre-dump */
+	PAGE_SERVER		= 5; /* criu page-server */
+	NOTIFY          = 6; /* see Notifications below */
+	CPUINFO_DUMP	= 7; /* criu cpuinfo dump */
+	CPUINFO_CHECK	= 8; /* criu cpuinfo check */
+}
+
+message criu_req {
+	required criu_req_type type	= 1;
+	optional criu_opts opts		= 2;
+	optional notify_success     = 3; /* see Notifications below */
+	optional keep_open          = 4; /* for multi-req, below */
+}
+
+message criu_opts {
+	required int32					images_dir_fd = 1;
+
+	/* if not set on dump, will dump requesting process */
+	optional int32					pid	= 2; 
+
+	optional bool					leave_running	= 3;
+	optional bool					ext_unix_sk		= 4;
+	optional bool					tcp_established	= 5;
+	optional bool					evasive_devices	= 6;
+	optional bool					shell_job		= 7;
+	optional bool					file_locks		= 8;
+	optional int32					log_level		= 9 [default = 2];
+
+	/* No subdirs are allowed. Consider using work-dir */
+	optional string					log_file = 10; 
+
+	optional criu_page_server_info	ps = 11;
+
+	optional bool					notify_scripts = 12;
+
+	optional string					root	   = 13;
+	optional string					parent_img = 14;
+	optional bool					track_mem  = 15;
+	optional bool					auto_dedup = 16;
+
+	optional int32					work_dir_fd = 17;
+	optional bool					link_remap  = 18;
+	repeated criu_veth_pair			veths	    = 19;
+
+	optional uint32					cpu_cap		= 20 [default = 0xffffffff];
+	optional bool					force_irmap	= 21;
+	repeated string					exec_cmd	= 22;
+
+	repeated ext_mount_map			ext_mnt		   = 23;
+	optional bool					manage_cgroups = 24;
+	repeated cgroup_root			cg_root		   = 25;
+
+	optional bool					rst_sibling	= 26; /* swrk only */
+
