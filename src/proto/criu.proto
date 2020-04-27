@@ -58,4 +58,60 @@ message criu_opts {
 	repeated cgroup_root			cg_root		   = 25;
 
 	optional bool					rst_sibling	= 26; /* swrk only */
+}
 
+message sage criu_page_server_info {
+    /* bind address -- if not set 0.0.0.0 is used */
+	optional string	address	= 1;
+ 
+	/* bind port -- if not set on request, autobind is used 
+	 * and port is returned in response 
+     */
+	optional int32	port = 2; 
+
+	/* page-server pid -- returned in response */
+	optional int32	pid	= 3; 
+
+	/* could be used to inherit fd by page-server */
+	optional int32	fd = 4; 
+}
+
+message criu_veth_pair {
+	required string	if_in	= 1; /* inside veth device name */
+	required string	if_out	= 2; /* outside veth device name */
+}
+
+message ext_mount_map {
+	required string	key	= 1;
+	required string	val	= 2;
+}
+
+message cgroup_root {
+	optional string	ctrl	= 1;
+	required string	path	= 2;
+}
+
+message criu_resp {
+	required criu_req_type type	   = 1;
+	required bool		   success = 2;
+
+	optional criu_dump_resp		   dump	   = 3;
+	optional criu_restore_resp	   restore = 4;
+	optional criu_notify		   notify  = 5;
+	optional criu_page_server_info ps	   = 6;
+
+    optional int32 cr_errno	= 7;
+}
+
+message criu_dump_resp {
+	optional bool restored = 1;
+}
+
+message criu_restore_resp {
+	required int32 pid = 1;
+}
+
+message criu_notify {
+	optional string script = 1;
+	optional int32	pid	   = 2;
+}
