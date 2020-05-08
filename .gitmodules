@@ -1,3 +1,6 @@
 [submodule "AFLplusplus"]
 	path = AFLplusplus
 	url = git@github.com:derpsteb/AFLplusplus.git
+[submodule "qemu"]
+	path = qemu
+	url = git@github.com:derpsteb/qemu.git
