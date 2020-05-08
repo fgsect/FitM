@@ -2,3 +2,6 @@
 Cargo.lock
 .idea
 *.out
+*.o
+qemu-x86_64
+*.d

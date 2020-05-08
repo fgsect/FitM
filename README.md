@@ -1,6 +1,10 @@
 # FitM
 Fuzzer in the Middle
 
+# Qemu folder
+
+Inlucdes all necessary `.h` files and similar from AFL++ to build a compatible qemu binary. This allows us to no write patch files while developing qemu.
+
 # Git Submodule
 
 A few words about submodules if you are not familiar with it. AFL++ is included as a submodule for easier development.
