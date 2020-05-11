@@ -612,6 +612,9 @@ typedef struct afl_state {
    * they do not call another function */
   u8 *map_tmp_buf;
 
+  char *restore_path;
+  u8    use_restored_qemu;
+
 } afl_state_t;
 
 struct custom_mutator {
