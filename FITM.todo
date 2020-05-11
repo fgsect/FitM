@@ -1,0 +1,13 @@
+- engine that starts a program via afl in qemu
+    - handle unix socket to communicate with qemu [FITM]
+    - communicate whether to run in consolidation mode or not [AFL]
+    - manage freezed proccesses [FITM]
+        - keep track of current/future states to load
+        - communicate the correct state to qemu
+    - save request/responses from send syscall [FITM]
+        - only in consolidation?
+        - unix socket: qemu --> fitm during fuzzing
+        - fitm --> file during consolidation
+    - inject qemu process into AFL run [AFL]
+    
+    - start AFL process with current state [AFL]
