@@ -3,7 +3,10 @@ Fuzzer in the Middle
 
 # Qemu folder
 
-Inlucdes all necessary `.h` files and similar from AFL++ to build a compatible qemu binary. This allows us to no write patch files while developing qemu.
+Inlucdes all necessary `.h` files and similar from AFL++ to build a compatible qemu binary. 
+This allows us to no write patch files while developing qemu.  
+
+Build with: `cd qemu/qemu/ && ./build-for-afl.sh`
 
 # Git Submodule
 
