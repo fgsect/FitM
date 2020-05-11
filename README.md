@@ -8,6 +8,12 @@ This allows us to no write patch files while developing qemu.
 
 Build with: `cd qemu/qemu/ && ./build-for-afl.sh`
 
+# CRIU Build Dependencies
+## Arch
+
+To compile CRIU from source these packages need to be installed:
+`protobuf protobuf-c`
+
 # Git Submodule
 
 A few words about submodules if you are not familiar with it. AFL++ is included as a submodule for easier development.
