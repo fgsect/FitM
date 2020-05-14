@@ -1,10 +1,6 @@
 //
 // Created by hirnheiner on 11.05.20.
-// Need to create symbolic link to criu's rpc.proto for compilation
-// Compile with:
-// cc -g -Werror -Wall -I.   -c -o self-dump.o self-dump.c
-// cc -g -Werror -Wall -I.   -c -o rpc.pb-c.o rpc.pb-c.c
-// cc self-dump.o rpc.pb-c.o  -lprotobuf-c -o self-dump
+// Checkout the Makefile
 
 #include "rpc.pb-c.h"
 #include <stdlib.h>
@@ -17,7 +13,6 @@
 #include <unistd.h>
 
 #define MAX_MSG_SIZE 1024
-
 
 static int send_req(int socket_fd, CriuReq *req)
 {
@@ -61,10 +56,7 @@ int do_criu(){
     }
 
     criu_opts__init(req.opts);
-    req.opts->has_leave_running	= true;
-    req.opts->leave_running		= true;
     req.opts->images_dir_fd		= dir_fd;
-    req.opts->has_log_level		= true;
     req.opts->log_level		= 4;
 
     fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
@@ -76,7 +68,7 @@ int do_criu(){
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_LOCAL;
 
-    strcpy(addr.sun_path, "/home/hirnheiner/repos/criu/criu_service.socket");
+    strcpy(addr.sun_path, "/tmp/criu_service.socket");
 
     addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family);
 
@@ -95,9 +87,11 @@ int do_criu(){
         goto exit;
     }
 
+
 exit:
-    close(fd);
-    close(dir_fd);
+    // Closing the socket FD before the process is dumped breaks CRIU
+//    close(fd);
+//    close(dir_fd);
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
     return ret;
@@ -106,18 +100,17 @@ exit:
 
 int main(int argc, char *argv[]) {
     int state = 0;
-    while(1){
-        if (state >= 3) {
-            break;
-        }
+    while(state < 2){
         printf("%i\n", state++);
         sleep(1);
     }
+    puts("requesting process dump");
+
     // request selfdump
     do_criu();
 
-    puts("restored.\n");
-    while(1){
+    puts("continue...");
+    while(state < 10){
         printf("%i\n", state++);
         sleep(1);
     }

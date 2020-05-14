@@ -1,8 +1,8 @@
 run: symlink
 	mkdir -p /tmp/criu_snapshot
 	protoc-c --proto_path=. --c_out=. rpc.proto
-	cc -g -Werror -Wall -I.   -c -o self-dump.o self-dump.c
-	cc -g -Werror -Wall -I.   -c -o rpc.pb-c.o rpc.pb-c.c
+	cc -g -Wall -I.   -c -o self-dump.o self-dump.c
+	cc -g -Wall -I.   -c -o rpc.pb-c.o rpc.pb-c.c
 	cc self-dump.o rpc.pb-c.o  -lprotobuf-c -o self-dump
 
 clean:
