@@ -58,6 +58,7 @@ int do_criu(){
     criu_opts__init(req.opts);
     req.opts->images_dir_fd		= dir_fd;
     req.opts->log_level		= 4;
+    req.opts->shell_job = 1;
 
     fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
     if (fd == -1) {
