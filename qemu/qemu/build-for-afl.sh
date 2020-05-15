@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ./configure --disable-system --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
             --enable-capstone=internal --target-list="x86_64-linux-user" --disable-bsd-user \
             --disable-guest-agent --disable-strip --disable-werror --disable-gcrypt \
@@ -12,4 +14,4 @@
             --disable-vte --disable-xen --disable-xen-pci-passthrough --disable-xfsctl \
             --disable-system --disable-blobs --disable-tools
 
-make
+make -j$(nproc)
