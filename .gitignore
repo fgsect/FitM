@@ -5,3 +5,6 @@ Cargo.lock
 *.o
 qemu-x86_64
 *.d
+self-dump
+*/tmp/*
+rpc.*
