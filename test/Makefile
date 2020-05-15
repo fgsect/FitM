@@ -8,6 +8,6 @@ run: symlink
 clean:
 	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h rpc.proto
 
-# Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos
+# Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
 symlink:
-	ln -s $(CRIUPATH)/criu/images/rpc.proto
+	ln -s $(CRIUPATH)/images/rpc.proto || true
