@@ -1792,578 +1792,16 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
 static abi_long do_setsockopt(int sockfd, int level, int optname,
                               abi_ulong optval_addr, socklen_t optlen)
 {
-    abi_long ret;
-    int val;
-    struct ip_mreqn *ip_mreq;
-    struct ip_mreq_source *ip_mreq_source;
-
-    switch(level) {
-    case SOL_TCP:
-        /* TCP options all take an 'int' value.  */
-        if (optlen < sizeof(uint32_t))
-            return -TARGET_EINVAL;
-
-        if (get_user_u32(val, optval_addr))
-            return -TARGET_EFAULT;
-        ret = get_errno(setsockopt(sockfd, level, optname, &val, sizeof(val)));
-        break;
-    case SOL_IP:
-        switch(optname) {
-        case IP_TOS:
-        case IP_TTL:
-        case IP_HDRINCL:
-        case IP_ROUTER_ALERT:
-        case IP_RECVOPTS:
-        case IP_RETOPTS:
-        case IP_PKTINFO:
-        case IP_MTU_DISCOVER:
-        case IP_RECVERR:
-        case IP_RECVTTL:
-        case IP_RECVTOS:
-#ifdef IP_FREEBIND
-        case IP_FREEBIND:
-#endif
-        case IP_MULTICAST_TTL:
-        case IP_MULTICAST_LOOP:
-            val = 0;
-            if (optlen >= sizeof(uint32_t)) {
-                if (get_user_u32(val, optval_addr))
-                    return -TARGET_EFAULT;
-            } else if (optlen >= 1) {
-                if (get_user_u8(val, optval_addr))
-                    return -TARGET_EFAULT;
-            }
-            ret = get_errno(setsockopt(sockfd, level, optname, &val, sizeof(val)));
-            break;
-        case IP_ADD_MEMBERSHIP:
-        case IP_DROP_MEMBERSHIP:
-            if (optlen < sizeof (struct target_ip_mreq) ||
-                optlen > sizeof (struct target_ip_mreqn))
-                return -TARGET_EINVAL;
-
-            ip_mreq = (struct ip_mreqn *) alloca(optlen);
-            target_to_host_ip_mreq(ip_mreq, optval_addr, optlen);
-            ret = get_errno(setsockopt(sockfd, level, optname, ip_mreq, optlen));
-            break;
-
-        case IP_BLOCK_SOURCE:
-        case IP_UNBLOCK_SOURCE:
-        case IP_ADD_SOURCE_MEMBERSHIP:
-        case IP_DROP_SOURCE_MEMBERSHIP:
-            if (optlen != sizeof (struct target_ip_mreq_source))
-                return -TARGET_EINVAL;
-
-            ip_mreq_source = lock_user(VERIFY_READ, optval_addr, optlen, 1);
-            ret = get_errno(setsockopt(sockfd, level, optname, ip_mreq_source, optlen));
-            unlock_user (ip_mreq_source, optval_addr, 0);
-            break;
-
-        default:
-            goto unimplemented;
-        }
-        break;
-    case SOL_IPV6:
-        switch (optname) {
-        case IPV6_MTU_DISCOVER:
-        case IPV6_MTU:
-        case IPV6_V6ONLY:
-        case IPV6_RECVPKTINFO:
-        case IPV6_UNICAST_HOPS:
-        case IPV6_MULTICAST_HOPS:
-        case IPV6_MULTICAST_LOOP:
-        case IPV6_RECVERR:
-        case IPV6_RECVHOPLIMIT:
-        case IPV6_2292HOPLIMIT:
-        case IPV6_CHECKSUM:
-            val = 0;
-            if (optlen < sizeof(uint32_t)) {
-                return -TARGET_EINVAL;
-            }
-            if (get_user_u32(val, optval_addr)) {
-                return -TARGET_EFAULT;
-            }
-            ret = get_errno(setsockopt(sockfd, level, optname,
-                                       &val, sizeof(val)));
-            break;
-        case IPV6_PKTINFO:
-        {
-            struct in6_pktinfo pki;
-
-            if (optlen < sizeof(pki)) {
-                return -TARGET_EINVAL;
-            }
-
-            if (copy_from_user(&pki, optval_addr, sizeof(pki))) {
-                return -TARGET_EFAULT;
-            }
-
-            pki.ipi6_ifindex = tswap32(pki.ipi6_ifindex);
-
-            ret = get_errno(setsockopt(sockfd, level, optname,
-                                       &pki, sizeof(pki)));
-            break;
-        }
-        default:
-            goto unimplemented;
-        }
-        break;
-    case SOL_ICMPV6:
-        switch (optname) {
-        case ICMPV6_FILTER:
-        {
-            struct icmp6_filter icmp6f;
-
-            if (optlen > sizeof(icmp6f)) {
-                optlen = sizeof(icmp6f);
-            }
-
-            if (copy_from_user(&icmp6f, optval_addr, optlen)) {
-                return -TARGET_EFAULT;
-            }
-
-            for (val = 0; val < 8; val++) {
-                icmp6f.data[val] = tswap32(icmp6f.data[val]);
-            }
-
-            ret = get_errno(setsockopt(sockfd, level, optname,
-                                       &icmp6f, optlen));
-            break;
-        }
-        default:
-            goto unimplemented;
-        }
-        break;
-    case SOL_RAW:
-        switch (optname) {
-        case ICMP_FILTER:
-        case IPV6_CHECKSUM:
-            /* those take an u32 value */
-            if (optlen < sizeof(uint32_t)) {
-                return -TARGET_EINVAL;
-            }
-
-            if (get_user_u32(val, optval_addr)) {
-                return -TARGET_EFAULT;
-            }
-            ret = get_errno(setsockopt(sockfd, level, optname,
-                                       &val, sizeof(val)));
-            break;
-
-        default:
-            goto unimplemented;
-        }
-        break;
-    case TARGET_SOL_SOCKET:
-        switch (optname) {
-        case TARGET_SO_RCVTIMEO:
-        {
-                struct timeval tv;
-
-                optname = SO_RCVTIMEO;
-
-set_timeout:
-                if (optlen != sizeof(struct target_timeval)) {
-                    return -TARGET_EINVAL;
-                }
-
-                if (copy_from_user_timeval(&tv, optval_addr)) {
-                    return -TARGET_EFAULT;
-                }
-
-                ret = get_errno(setsockopt(sockfd, SOL_SOCKET, optname,
-                                &tv, sizeof(tv)));
-                return ret;
-        }
-        case TARGET_SO_SNDTIMEO:
-                optname = SO_SNDTIMEO;
-                goto set_timeout;
-        case TARGET_SO_ATTACH_FILTER:
-        {
-                struct target_sock_fprog *tfprog;
-                struct target_sock_filter *tfilter;
-                struct sock_fprog fprog;
-                struct sock_filter *filter;
-                int i;
-
-                if (optlen != sizeof(*tfprog)) {
-                    return -TARGET_EINVAL;
-                }
-                if (!lock_user_struct(VERIFY_READ, tfprog, optval_addr, 0)) {
-                    return -TARGET_EFAULT;
-                }
-                if (!lock_user_struct(VERIFY_READ, tfilter,
-                                      tswapal(tfprog->filter), 0)) {
-                    unlock_user_struct(tfprog, optval_addr, 1);
-                    return -TARGET_EFAULT;
-                }
-
-                fprog.len = tswap16(tfprog->len);
-                filter = g_try_new(struct sock_filter, fprog.len);
-                if (filter == NULL) {
-                    unlock_user_struct(tfilter, tfprog->filter, 1);
-                    unlock_user_struct(tfprog, optval_addr, 1);
-                    return -TARGET_ENOMEM;
-                }
-                for (i = 0; i < fprog.len; i++) {
-                    filter[i].code = tswap16(tfilter[i].code);
-                    filter[i].jt = tfilter[i].jt;
-                    filter[i].jf = tfilter[i].jf;
-                    filter[i].k = tswap32(tfilter[i].k);
-                }
-                fprog.filter = filter;
-
-                ret = get_errno(setsockopt(sockfd, SOL_SOCKET,
-                                SO_ATTACH_FILTER, &fprog, sizeof(fprog)));
-                g_free(filter);
-
-                unlock_user_struct(tfilter, tfprog->filter, 1);
-                unlock_user_struct(tfprog, optval_addr, 1);
-                return ret;
-        }
-	case TARGET_SO_BINDTODEVICE:
-	{
-		char *dev_ifname, *addr_ifname;
-
-		if (optlen > IFNAMSIZ - 1) {
-		    optlen = IFNAMSIZ - 1;
-		}
-		dev_ifname = lock_user(VERIFY_READ, optval_addr, optlen, 1);
-		if (!dev_ifname) {
-		    return -TARGET_EFAULT;
-		}
-		optname = SO_BINDTODEVICE;
-		addr_ifname = alloca(IFNAMSIZ);
-		memcpy(addr_ifname, dev_ifname, optlen);
-		addr_ifname[optlen] = 0;
-		ret = get_errno(setsockopt(sockfd, SOL_SOCKET, optname,
-                                           addr_ifname, optlen));
-		unlock_user (dev_ifname, optval_addr, 0);
-		return ret;
-	}
-        case TARGET_SO_LINGER:
-        {
-                struct linger lg;
-                struct target_linger *tlg;
-
-                if (optlen != sizeof(struct target_linger)) {
-                    return -TARGET_EINVAL;
-                }
-                if (!lock_user_struct(VERIFY_READ, tlg, optval_addr, 1)) {
-                    return -TARGET_EFAULT;
-                }
-                __get_user(lg.l_onoff, &tlg->l_onoff);
-                __get_user(lg.l_linger, &tlg->l_linger);
-                ret = get_errno(setsockopt(sockfd, SOL_SOCKET, SO_LINGER,
-                                &lg, sizeof(lg)));
-                unlock_user_struct(tlg, optval_addr, 0);
-                return ret;
-        }
-            /* Options with 'int' argument.  */
-        case TARGET_SO_DEBUG:
-		optname = SO_DEBUG;
-		break;
-        case TARGET_SO_REUSEADDR:
-		optname = SO_REUSEADDR;
-		break;
-#ifdef SO_REUSEPORT
-        case TARGET_SO_REUSEPORT:
-                optname = SO_REUSEPORT;
-                break;
-#endif
-        case TARGET_SO_TYPE:
-		optname = SO_TYPE;
-		break;
-        case TARGET_SO_ERROR:
-		optname = SO_ERROR;
-		break;
-        case TARGET_SO_DONTROUTE:
-		optname = SO_DONTROUTE;
-		break;
-        case TARGET_SO_BROADCAST:
-		optname = SO_BROADCAST;
-		break;
-        case TARGET_SO_SNDBUF:
-		optname = SO_SNDBUF;
-		break;
-        case TARGET_SO_SNDBUFFORCE:
-                optname = SO_SNDBUFFORCE;
-                break;
-        case TARGET_SO_RCVBUF:
-		optname = SO_RCVBUF;
-		break;
-        case TARGET_SO_RCVBUFFORCE:
-                optname = SO_RCVBUFFORCE;
-                break;
-        case TARGET_SO_KEEPALIVE:
-		optname = SO_KEEPALIVE;
-		break;
-        case TARGET_SO_OOBINLINE:
-		optname = SO_OOBINLINE;
-		break;
-        case TARGET_SO_NO_CHECK:
-		optname = SO_NO_CHECK;
-		break;
-        case TARGET_SO_PRIORITY:
-		optname = SO_PRIORITY;
-		break;
-#ifdef SO_BSDCOMPAT
-        case TARGET_SO_BSDCOMPAT:
-		optname = SO_BSDCOMPAT;
-		break;
-#endif
-        case TARGET_SO_PASSCRED:
-		optname = SO_PASSCRED;
-		break;
-        case TARGET_SO_PASSSEC:
-                optname = SO_PASSSEC;
-                break;
-        case TARGET_SO_TIMESTAMP:
-		optname = SO_TIMESTAMP;
-		break;
-        case TARGET_SO_RCVLOWAT:
-		optname = SO_RCVLOWAT;
-		break;
-        default:
-            goto unimplemented;
-        }
-	if (optlen < sizeof(uint32_t))
-            return -TARGET_EINVAL;
-
-	if (get_user_u32(val, optval_addr))
-            return -TARGET_EFAULT;
-	ret = get_errno(setsockopt(sockfd, SOL_SOCKET, optname, &val, sizeof(val)));
-        break;
-    default:
-    unimplemented:
-        gemu_log("Unsupported setsockopt level=%d optname=%d\n", level, optname);
-        ret = -TARGET_ENOPROTOOPT;
-    }
-    return ret;
+    printf("DEBUG: do_setsockopt\n");
+    return 0;
 }
 
 /* do_getsockopt() Must return target values and target errnos. */
 static abi_long do_getsockopt(int sockfd, int level, int optname,
                               abi_ulong optval_addr, abi_ulong optlen)
 {
-    abi_long ret;
-    int len, val;
-    socklen_t lv;
-
-    switch(level) {
-    case TARGET_SOL_SOCKET:
-        level = SOL_SOCKET;
-        switch (optname) {
-        /* These don't just return a single integer */
-        case TARGET_SO_RCVTIMEO:
-        case TARGET_SO_SNDTIMEO:
-        case TARGET_SO_PEERNAME:
-            goto unimplemented;
-        case TARGET_SO_PEERCRED: {
-            struct ucred cr;
-            socklen_t crlen;
-            struct target_ucred *tcr;
-
-            if (get_user_u32(len, optlen)) {
-                return -TARGET_EFAULT;
-            }
-            if (len < 0) {
-                return -TARGET_EINVAL;
-            }
-
-            crlen = sizeof(cr);
-            ret = get_errno(getsockopt(sockfd, level, SO_PEERCRED,
-                                       &cr, &crlen));
-            if (ret < 0) {
-                return ret;
-            }
-            if (len > crlen) {
-                len = crlen;
-            }
-            if (!lock_user_struct(VERIFY_WRITE, tcr, optval_addr, 0)) {
-                return -TARGET_EFAULT;
-            }
-            __put_user(cr.pid, &tcr->pid);
-            __put_user(cr.uid, &tcr->uid);
-            __put_user(cr.gid, &tcr->gid);
-            unlock_user_struct(tcr, optval_addr, 1);
-            if (put_user_u32(len, optlen)) {
-                return -TARGET_EFAULT;
-            }
-            break;
-        }
-        case TARGET_SO_LINGER:
-        {
-            struct linger lg;
-            socklen_t lglen;
-            struct target_linger *tlg;
-
-            if (get_user_u32(len, optlen)) {
-                return -TARGET_EFAULT;
-            }
-            if (len < 0) {
-                return -TARGET_EINVAL;
-            }
-
-            lglen = sizeof(lg);
-            ret = get_errno(getsockopt(sockfd, level, SO_LINGER,
-                                       &lg, &lglen));
-            if (ret < 0) {
-                return ret;
-            }
-            if (len > lglen) {
-                len = lglen;
-            }
-            if (!lock_user_struct(VERIFY_WRITE, tlg, optval_addr, 0)) {
-                return -TARGET_EFAULT;
-            }
-            __put_user(lg.l_onoff, &tlg->l_onoff);
-            __put_user(lg.l_linger, &tlg->l_linger);
-            unlock_user_struct(tlg, optval_addr, 1);
-            if (put_user_u32(len, optlen)) {
-                return -TARGET_EFAULT;
-            }
-            break;
-        }
-        /* Options with 'int' argument.  */
-        case TARGET_SO_DEBUG:
-            optname = SO_DEBUG;
-            goto int_case;
-        case TARGET_SO_REUSEADDR:
-            optname = SO_REUSEADDR;
-            goto int_case;
-#ifdef SO_REUSEPORT
-        case TARGET_SO_REUSEPORT:
-            optname = SO_REUSEPORT;
-            goto int_case;
-#endif
-        case TARGET_SO_TYPE:
-            optname = SO_TYPE;
-            goto int_case;
-        case TARGET_SO_ERROR:
-            optname = SO_ERROR;
-            goto int_case;
-        case TARGET_SO_DONTROUTE:
-            optname = SO_DONTROUTE;
-            goto int_case;
-        case TARGET_SO_BROADCAST:
-            optname = SO_BROADCAST;
-            goto int_case;
-        case TARGET_SO_SNDBUF:
-            optname = SO_SNDBUF;
-            goto int_case;
-        case TARGET_SO_RCVBUF:
-            optname = SO_RCVBUF;
-            goto int_case;
-        case TARGET_SO_KEEPALIVE:
-            optname = SO_KEEPALIVE;
-            goto int_case;
-        case TARGET_SO_OOBINLINE:
-            optname = SO_OOBINLINE;
-            goto int_case;
-        case TARGET_SO_NO_CHECK:
-            optname = SO_NO_CHECK;
-            goto int_case;
-        case TARGET_SO_PRIORITY:
-            optname = SO_PRIORITY;
-            goto int_case;
-#ifdef SO_BSDCOMPAT
-        case TARGET_SO_BSDCOMPAT:
-            optname = SO_BSDCOMPAT;
-            goto int_case;
-#endif
-        case TARGET_SO_PASSCRED:
-            optname = SO_PASSCRED;
-            goto int_case;
-        case TARGET_SO_TIMESTAMP:
-            optname = SO_TIMESTAMP;
-            goto int_case;
-        case TARGET_SO_RCVLOWAT:
-            optname = SO_RCVLOWAT;
-            goto int_case;
-        case TARGET_SO_ACCEPTCONN:
-            optname = SO_ACCEPTCONN;
-            goto int_case;
-        default:
-            goto int_case;
-        }
-        break;
-    case SOL_TCP:
-        /* TCP options all take an 'int' value.  */
-    int_case:
-        if (get_user_u32(len, optlen))
-            return -TARGET_EFAULT;
-        if (len < 0)
-            return -TARGET_EINVAL;
-        lv = sizeof(lv);
-        ret = get_errno(getsockopt(sockfd, level, optname, &val, &lv));
-        if (ret < 0)
-            return ret;
-        if (optname == SO_TYPE) {
-            val = host_to_target_sock_type(val);
-        }
-        if (len > lv)
-            len = lv;
-        if (len == 4) {
-            if (put_user_u32(val, optval_addr))
-                return -TARGET_EFAULT;
-        } else {
-            if (put_user_u8(val, optval_addr))
-                return -TARGET_EFAULT;
-        }
-        if (put_user_u32(len, optlen))
-            return -TARGET_EFAULT;
-        break;
-    case SOL_IP:
-        switch(optname) {
-        case IP_TOS:
-        case IP_TTL:
-        case IP_HDRINCL:
-        case IP_ROUTER_ALERT:
-        case IP_RECVOPTS:
-        case IP_RETOPTS:
-        case IP_PKTINFO:
-        case IP_MTU_DISCOVER:
-        case IP_RECVERR:
-        case IP_RECVTOS:
-#ifdef IP_FREEBIND
-        case IP_FREEBIND:
-#endif
-        case IP_MULTICAST_TTL:
-        case IP_MULTICAST_LOOP:
-            if (get_user_u32(len, optlen))
-                return -TARGET_EFAULT;
-            if (len < 0)
-                return -TARGET_EINVAL;
-            lv = sizeof(lv);
-            ret = get_errno(getsockopt(sockfd, level, optname, &val, &lv));
-            if (ret < 0)
-                return ret;
-            if (len < sizeof(int) && len > 0 && val >= 0 && val < 255) {
-                len = 1;
-                if (put_user_u32(len, optlen)
-                    || put_user_u8(val, optval_addr))
-                    return -TARGET_EFAULT;
-            } else {
-                if (len > sizeof(int))
-                    len = sizeof(int);
-                if (put_user_u32(len, optlen)
-                    || put_user_u32(val, optval_addr))
-                    return -TARGET_EFAULT;
-            }
-            break;
-        default:
-            ret = -TARGET_ENOPROTOOPT;
-            break;
-        }
-        break;
-    default:
-    unimplemented:
-        gemu_log("getsockopt level=%d optname=%d not yet supported\n",
-                 level, optname);
-        ret = -TARGET_EOPNOTSUPP;
-        break;
-    }
-    return ret;
+    printf("DEBUG: do_getsockopt\n");
+    return 0;
 }
 
 /* Convert target low/high pair representing file offset into the host
@@ -2546,95 +1984,43 @@ static int sock_flags_fixup(int fd, int target_type)
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
-    int target_type = type;
-    int ret;
+    // int ret;
+    // char *rnd_buf[0x5];
+    // char *name_buf[0x10];
 
-    ret = target_to_host_sock_type(&type);
-    if (ret) {
-        return ret;
-    }
+    // getrandom(rnd_buf, 0x5, NULL);
 
-    if (domain == PF_NETLINK && !(
-#ifdef CONFIG_RTNETLINK
-         protocol == NETLINK_ROUTE ||
-#endif
-         protocol == NETLINK_KOBJECT_UEVENT ||
-         protocol == NETLINK_AUDIT)) {
-        return -EPFNOSUPPORT;
-    }
+    // for (int x = 0; x < 0x5; i++) {
+    //     if (rnd_buf/0x10 < 10)
+    //         name_buf[x*2] = (char)(rnd_buf/0x10 + 0x30); // 0-9
+    //     else
+    //         name_buf[x*2] = (char)(rnd_buf/0x10 + 0x51); // a-f
 
-    if (domain == AF_PACKET ||
-        (domain == AF_INET && type == SOCK_PACKET)) {
-        protocol = tswap16(protocol);
-    }
+    //     if (rnd_buf%0x10 < 10)
+    //         name_buf[x*2+1] = (char)((rnd_buf%0x10) + 0x30); // 0-9
+    //     else
+    //         name_buf[x*2+1] = (char)((rnd_buf%0x10) + 0x51); // a-f
+    // }
 
-    ret = get_errno(socket(domain, type, protocol));
-    if (ret >= 0) {
-        ret = sock_flags_fixup(ret, target_type);
-        if (type == SOCK_PACKET) {
-            /* Manage an obsolete case :
-             * if socket type is SOCK_PACKET, bind by name
-             */
-            fd_trans_register(ret, &target_packet_trans);
-        } else if (domain == PF_NETLINK) {
-            switch (protocol) {
-#ifdef CONFIG_RTNETLINK
-            case NETLINK_ROUTE:
-                fd_trans_register(ret, &target_netlink_route_trans);
-                break;
-#endif
-            case NETLINK_KOBJECT_UEVENT:
-                /* nothing to do: messages are strings */
-                break;
-            case NETLINK_AUDIT:
-                fd_trans_register(ret, &target_netlink_audit_trans);
-                break;
-            default:
-                g_assert_not_reached();
-            }
-        }
-    }
-    return ret;
+    // return open();
+    printf("DEBUG: do_socket\n");
+    return 3;
 }
 
 /* do_bind() Must return target values and target errnos. */
 static abi_long do_bind(int sockfd, abi_ulong target_addr,
                         socklen_t addrlen)
 {
-    void *addr;
-    abi_long ret;
-
-    if ((int)addrlen < 0) {
-        return -TARGET_EINVAL;
-    }
-
-    addr = alloca(addrlen+1);
-
-    ret = target_to_host_sockaddr(sockfd, addr, target_addr, addrlen);
-    if (ret)
-        return ret;
-
-    return get_errno(bind(sockfd, addr, addrlen));
+    printf("DEBUG: do_bind\n");
+    return 0;
 }
 
 /* do_connect() Must return target values and target errnos. */
 static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
-    void *addr;
-    abi_long ret;
-
-    if ((int)addrlen < 0) {
-        return -TARGET_EINVAL;
-    }
-
-    addr = alloca(addrlen+1);
-
-    ret = target_to_host_sockaddr(sockfd, addr, target_addr, addrlen);
-    if (ret)
-        return ret;
-
-    return get_errno(safe_connect(sockfd, addr, addrlen));
+    printf("DEBUG: do_connect\n");
+    return 0;
 }
 
 /* do_sendrecvmsg_locked() Must return target values and target errnos. */
@@ -2811,37 +2197,8 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    socklen_t addrlen;
-    void *addr;
-    abi_long ret;
-    int host_flags;
-
-    host_flags = target_to_host_bitmask(flags, fcntl_flags_tbl);
-
-    if (target_addr == 0) {
-        return get_errno(safe_accept4(fd, NULL, NULL, host_flags));
-    }
-
-    /* linux returns EINVAL if addrlen pointer is invalid */
-    if (get_user_u32(addrlen, target_addrlen_addr))
-        return -TARGET_EINVAL;
-
-    if ((int)addrlen < 0) {
-        return -TARGET_EINVAL;
-    }
-
-    if (!access_ok(VERIFY_WRITE, target_addr, addrlen))
-        return -TARGET_EINVAL;
-
-    addr = alloca(addrlen);
-
-    ret = get_errno(safe_accept4(fd, addr, &addrlen, host_flags));
-    if (!is_error(ret)) {
-        host_to_target_sockaddr(target_addr, addr, addrlen);
-        if (put_user_u32(addrlen, target_addrlen_addr))
-            ret = -TARGET_EFAULT;
-    }
-    return ret;
+    printf("DEBUG: do_accept4\n");
+    return 4;
 }
 
 /* do_getpeername() Must return target values and target errnos. */
@@ -2924,44 +2281,8 @@ static abi_long do_socketpair(int domain, int type, int protocol,
 static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
-    void *addr;
-    void *host_msg;
-    void *copy_msg = NULL;
-    abi_long ret;
-
-    if ((int)addrlen < 0) {
-        return -TARGET_EINVAL;
-    }
-
-    host_msg = lock_user(VERIFY_READ, msg, len, 1);
-    if (!host_msg)
-        return -TARGET_EFAULT;
-    if (fd_trans_target_to_host_data(fd)) {
-        copy_msg = host_msg;
-        host_msg = g_malloc(len);
-        memcpy(host_msg, copy_msg, len);
-        ret = fd_trans_target_to_host_data(fd)(host_msg, len);
-        if (ret < 0) {
-            goto fail;
-        }
-    }
-    if (target_addr) {
-        addr = alloca(addrlen+1);
-        ret = target_to_host_sockaddr(fd, addr, target_addr, addrlen);
-        if (ret) {
-            goto fail;
-        }
-        ret = get_errno(safe_sendto(fd, host_msg, len, flags, addr, addrlen));
-    } else {
-        ret = get_errno(safe_sendto(fd, host_msg, len, flags, NULL, 0));
-    }
-fail:
-    if (copy_msg) {
-        g_free(host_msg);
-        host_msg = copy_msg;
-    }
-    unlock_user(host_msg, msg, 0);
-    return ret;
+    printf("DEBUG: do_sendto\n");
+    return 0;
 }
 
 /* do_recvfrom() Must return target values and target errnos. */
@@ -2969,52 +2290,8 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
-    socklen_t addrlen;
-    void *addr;
-    void *host_msg;
-    abi_long ret;
-
-    host_msg = lock_user(VERIFY_WRITE, msg, len, 0);
-    if (!host_msg)
-        return -TARGET_EFAULT;
-    if (target_addr) {
-        if (get_user_u32(addrlen, target_addrlen)) {
-            ret = -TARGET_EFAULT;
-            goto fail;
-        }
-        if ((int)addrlen < 0) {
-            ret = -TARGET_EINVAL;
-            goto fail;
-        }
-        addr = alloca(addrlen);
-        ret = get_errno(safe_recvfrom(fd, host_msg, len, flags,
-                                      addr, &addrlen));
-    } else {
-        addr = NULL; /* To keep compiler quiet.  */
-        ret = get_errno(safe_recvfrom(fd, host_msg, len, flags, NULL, 0));
-    }
-    if (!is_error(ret)) {
-        if (fd_trans_host_to_target_data(fd)) {
-            abi_long trans;
-            trans = fd_trans_host_to_target_data(fd)(host_msg, MIN(ret, len));
-            if (is_error(trans)) {
-                ret = trans;
-                goto fail;
-            }
-        }
-        if (target_addr) {
-            host_to_target_sockaddr(target_addr, addr, addrlen);
-            if (put_user_u32(addrlen, target_addrlen)) {
-                ret = -TARGET_EFAULT;
-                goto fail;
-            }
-        }
-        unlock_user(host_msg, msg, len);
-    } else {
-fail:
-        unlock_user(host_msg, msg, 0);
-    }
-    return ret;
+    printf("DEBUG: do_recvfrom\n");
+    return 0;
 }
 
 #ifdef TARGET_NR_socketcall
