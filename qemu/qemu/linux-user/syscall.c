@@ -2021,7 +2021,8 @@ static abi_long do_socket(int domain, int type, int protocol)
 static abi_long do_bind(int sockfd, abi_ulong target_addr,
                         socklen_t addrlen)
 {
-    printf("DEBUG: do_bind\n");
+    // Adress binding always works as we are only writing to a file
+    // check: https://github.com/zardus/preeny/blob/master/src/desock.c#L259
     return 0;
 }
 
