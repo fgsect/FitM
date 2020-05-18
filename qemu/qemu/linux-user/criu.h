@@ -34,6 +34,27 @@ static int send_req(int socket_fd, CriuReq *req)
     return 0;
 }
 
+static CriuResp *recv_resp(int socket_fd)
+{
+	unsigned char buf[MAX_MSG_SIZE];
+	int len;
+	CriuResp *msg = 0;
+
+	len = read(socket_fd, buf, MAX_MSG_SIZE);
+	if (len == -1) {
+		perror("Can't read response");
+		return NULL;
+	}
+
+	msg = criu_resp__unpack(NULL, len, buf);
+	if (!msg) {
+		perror("Failed unpacking response");
+		return NULL;
+	}
+
+	return msg;
+}
+
 int do_criu(){
     CriuReq req		= CRIU_REQ__INIT;
     CriuResp *resp		= NULL;
@@ -58,7 +79,6 @@ int do_criu(){
     criu_opts__init(req.opts);
     req.opts->images_dir_fd		= dir_fd;
     req.opts->log_level		= 4;
-    req.opts->shell_job = 1;
 
     fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
     if (fd == -1) {
@@ -88,11 +108,41 @@ int do_criu(){
         goto exit;
     }
 
+    /*
+	 * Recv response
+	 */
+	resp = recv_resp(fd);
+	if (!resp) {
+		perror("Can't recv response");
+		ret = -1;
+		goto exit;
+	}
+
+	if (resp->type != CRIU_REQ_TYPE__DUMP) {
+		perror("Unexpected response type");
+		ret = -1;
+		goto exit;
+	}
+
+	/*
+	 * Check response.
+	 */
+	if (resp->success)
+		puts("Success");
+	else {
+		puts("Fail");
+		ret = -1;
+		goto exit;
+	}
+
+	if (resp->dump->has_restored && resp->dump->restored)
+		puts("Restored");
+
 
 exit:
     // Closing the socket FD before the process is dumped breaks CRIU
-//    close(fd);
-//    close(dir_fd);
+   close(fd);
+   close(dir_fd);
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
     return ret;
