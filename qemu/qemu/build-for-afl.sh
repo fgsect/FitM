@@ -14,4 +14,4 @@
             --disable-vte --disable-xen --disable-xen-pci-passthrough --disable-xfsctl \
             --disable-system --disable-blobs --disable-tools
 
-make -j$(nproc) CFLAGS=-lprotobuf-c
+make -j$(nproc) CFLAGS="-lprotobuf-c -luuid"

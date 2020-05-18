@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <uuid/uuid.h>
+
 
 #define MAX_MSG_SIZE 1024
 
@@ -146,4 +148,14 @@ exit:
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
     return ret;
+}
+
+char* get_uuid(){
+    // Taken from: https://stackoverflow.com/questions/51053568/generating-a-random-uuid-in-c
+    uuid_t binuuid;
+    uuid_generate_random(binuuid);
+
+    char *uuid = malloc(37);
+    uuid_unparse_lower(binuuid, uuid);
+    return uuid;
 }

@@ -47,6 +47,7 @@
 #include <utime.h>
 #include <sys/sysinfo.h>
 #include <sys/signalfd.h>
+#include <stdbool.h>
 //#include <sys/user.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -114,6 +115,10 @@
 #include <linux/sockios.h>
 
 #include "criu.h"
+
+// The next receive after send should create a snapshot
+// Idea is: We're waiting for a return from the other side then
+bool sent = false;
 
 extern unsigned int afl_forksrv_pid;
 
@@ -2006,7 +2011,10 @@ static abi_long do_socket(int domain, int type, int protocol)
 
     // return open();
     printf("DEBUG: do_socket\n");
-    return 3;
+    char* uuid = get_uuid();
+
+    char *state_dir = getenv("STATE_DIR");
+    return open(sprintf("%s/fds/%s", state_dir, uuid), "w");
 }
 
 /* do_bind() Must return target values and target errnos. */
@@ -2021,7 +2029,6 @@ static abi_long do_bind(int sockfd, abi_ulong target_addr,
 static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
-    printf("DEBUG: do_connect\n");
     return 0;
 }
 
@@ -2199,8 +2206,9 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    printf("DEBUG: do_accept4\n");
-    return 4;
+    char* uuid = get_uuid();
+    char *state_dir = getenv("STATE_DIR");
+    return open(sprintf("%s/fds/%s", state_dir, uuid), "w");
 }
 
 /* do_getpeername() Must return target values and target errnos. */
@@ -2283,8 +2291,8 @@ static abi_long do_socketpair(int domain, int type, int protocol,
 static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
-    printf("DEBUG: do_sendto\n");
-    return 0;
+    sent = true;
+    return write(fd, (char *)msg, len);
 }
 
 /* do_recvfrom() Must return target values and target errnos. */
@@ -2292,8 +2300,13 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
-    do_criu();
-    return 0;
+    if(sent){
+//TODO if (!create_snapshot) { exit(0); }
+        sent = false; // After restore, we'll await the next sent before criuin' again
+        do_criu();
+    }
+
+    return read(0, (char *)msg, len);
 }
 
 #ifdef TARGET_NR_socketcall
