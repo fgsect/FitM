@@ -2030,6 +2030,8 @@ static abi_long do_bind(int sockfd, abi_ulong target_addr,
 static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
+    // Connecting to a remote adr. always works as we are only running locally
+    // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275 
     return 0;
 }
 
