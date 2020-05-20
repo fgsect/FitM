@@ -763,19 +763,11 @@ safe_syscall5(ssize_t, preadv, int, fd, const struct iovec *, iov, int, iovcnt,
               unsigned long, pos_l, unsigned long, pos_h)
 safe_syscall5(ssize_t, pwritev, int, fd, const struct iovec *, iov, int, iovcnt,
               unsigned long, pos_l, unsigned long, pos_h)
-safe_syscall3(int, connect, int, fd, const struct sockaddr *, addr,
-              socklen_t, addrlen)
-safe_syscall6(ssize_t, sendto, int, fd, const void *, buf, size_t, len,
-              int, flags, const struct sockaddr *, addr, socklen_t, addrlen)
-safe_syscall6(ssize_t, recvfrom, int, fd, void *, buf, size_t, len,
-              int, flags, struct sockaddr *, addr, socklen_t *, addrlen)
 safe_syscall3(ssize_t, sendmsg, int, fd, const struct msghdr *, msg, int, flags)
 safe_syscall3(ssize_t, recvmsg, int, fd, struct msghdr *, msg, int, flags)
 safe_syscall2(int, flock, int, fd, int, operation)
 safe_syscall4(int, rt_sigtimedwait, const sigset_t *, these, siginfo_t *, uinfo,
               const struct timespec *, uts, size_t, sigsetsize)
-safe_syscall4(int, accept4, int, fd, struct sockaddr *, addr, socklen_t *, len,
-              int, flags)
 safe_syscall2(int, nanosleep, const struct timespec *, req,
               struct timespec *, rem)
 #ifdef TARGET_NR_clock_nanosleep
@@ -1973,48 +1965,16 @@ static inline int target_to_host_sock_type(int *type)
     return 0;
 }
 
-/* Try to emulate socket type flags after socket creation.  */
-static int sock_flags_fixup(int fd, int target_type)
-{
-#if !defined(SOCK_NONBLOCK) && defined(O_NONBLOCK)
-    if (target_type & TARGET_SOCK_NONBLOCK) {
-        int flags = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, O_NONBLOCK | flags) == -1) {
-            close(fd);
-            return -TARGET_EINVAL;
-        }
-    }
-#endif
-    return fd;
-}
 
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
-    // int ret;
-    // char *rnd_buf[0x5];
-    // char *name_buf[0x10];
-
-    // getrandom(rnd_buf, 0x5, NULL);
-
-    // for (int x = 0; x < 0x5; i++) {
-    //     if (rnd_buf/0x10 < 10)
-    //         name_buf[x*2] = (char)(rnd_buf/0x10 + 0x30); // 0-9
-    //     else
-    //         name_buf[x*2] = (char)(rnd_buf/0x10 + 0x51); // a-f
-
-    //     if (rnd_buf%0x10 < 10)
-    //         name_buf[x*2+1] = (char)((rnd_buf%0x10) + 0x30); // 0-9
-    //     else
-    //         name_buf[x*2+1] = (char)((rnd_buf%0x10) + 0x51); // a-f
-    // }
-
-    // return open();
-    printf("DEBUG: do_socket\n");
-    char* uuid = get_uuid();
+    char *uuid = get_new_uuid();
 
     char *state_dir = getenv("STATE_DIR");
-    return open(sprintf("%s/fds/%s", state_dir, uuid), "w");
+    char path[100] = "%s/fds/%s";
+    sprintf(path, state_dir, uuid);
+    return open(path, 'w');
 }
 
 /* do_bind() Must return target values and target errnos. */
@@ -2031,7 +1991,7 @@ static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
     // Connecting to a remote adr. always works as we are only running locally
-    // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275 
+    // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275
     return 0;
 }
 
@@ -2209,9 +2169,11 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    char* uuid = get_uuid();
+    char* uuid = get_new_uuid();
     char *state_dir = getenv("STATE_DIR");
-    return open(sprintf("%s/fds/%s", state_dir, uuid), "w");
+    char path[100] = "%s/fds/%s";
+    sprintf(path, state_dir, uuid);
+    return open(path, 'w');
 }
 
 /* do_getpeername() Must return target values and target errnos. */

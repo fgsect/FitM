@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
-void do_syscall(){
+void do_syscall(void){
     // Should generate file with name <uuid> at <STATE_DIR>/fds/<uuid> and return FD
     printf("SOCKET: %d\n", socket(0, 0, 0));
-    // Should always return 0 
+    // Should always return 0
     printf("BIND: %d\n", bind(0, 0, 0));
     // Should always return 0
     printf("CONNECT: %d\n", connect(0, 0, 0));
@@ -20,7 +20,7 @@ void do_syscall(){
     printf("RECV: %d\n", recv(0, 0, 0, 0));
 }
 
-int main() {
+int main(void) {
     int state = 0;
     while(state < 2){
         printf("%i\n", state);

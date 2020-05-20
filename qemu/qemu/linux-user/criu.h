@@ -16,6 +16,9 @@
 
 #define MAX_MSG_SIZE 1024
 
+char* get_new_uuid(void);
+int do_criu(void);
+
 static int send_req(int socket_fd, CriuReq *req)
 {
     unsigned char buf[MAX_MSG_SIZE];
@@ -57,7 +60,7 @@ static CriuResp *recv_resp(int socket_fd)
 	return msg;
 }
 
-int do_criu(){
+int do_criu(void){
     CriuReq req		= CRIU_REQ__INIT;
     CriuResp *resp		= NULL;
     int fd, dir_fd;
@@ -150,7 +153,7 @@ exit:
     return ret;
 }
 
-char* get_uuid(){
+char* get_new_uuid(void){
     // Taken from: https://stackoverflow.com/questions/51053568/generating-a-random-uuid-in-c
     uuid_t binuuid;
     uuid_generate_random(binuuid);
