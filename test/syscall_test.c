@@ -9,7 +9,9 @@ void do_syscall(void){
     printf("BIND: %d\n", bind(0, 0, 0));
     // Should always return 0
     printf("CONNECT: %d\n", connect(0, 0, 0));
+    // Should always return 0
     printf("SETSOCKOPT: %d\n", setsockopt(0, 0, 0, 0, 0));
+    // Should always return 0
     printf("GETSOCKOPT: %d\n", getsockopt(0, 0, 0, 0, 0));
     // Should generate file with name <uuid> at <STATE_DIR>/fds/<uuid> and return FD
     // Maybe we need to handle a connection queue or copy stuff to peer adr.
