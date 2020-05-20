@@ -116,12 +116,16 @@
 
 #include "criu.h"
 
+char* concat3(char *first, char *second, char *third);
+
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
 bool sent = true;
 // every position in this bitstring is interpreted as a fd. pos x == fd x
 // If a position holds a 1 it is a socket
 long long int is_socket = 0;
+
+
 
 extern unsigned int afl_forksrv_pid;
 
@@ -1966,16 +1970,20 @@ static inline int target_to_host_sock_type(int *type)
     return 0;
 }
 
+char* concat3(char *first, char *second, char *third){
+    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+1, 1);
+    strncpy(ret, first, strlen(first)+1);
+    strncat(ret, second, strlen(second)+1);
+    strncat(ret, third, strlen(third)+1);
+    return ret;
+}
 
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
     char *uuid = get_new_uuid();
     char *state_dir = getenv("STATE_DIR");
-    char *path = (char *)calloc(strlen(state_dir)+5+strlen(uuid)+1, 1);
-    strncpy(path, state_dir, strlen(state_dir)+1);
-    strncat(path, "/fds/", strlen("/fds/")+1);
-    strncat(path, uuid, strlen(uuid)+1);
+    char *path = concat3(state_dir, "/fds/", uuid);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
@@ -2177,14 +2185,10 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 {
     char* uuid = get_new_uuid();
     char *state_dir = getenv("STATE_DIR");
-    char *path = (char *)calloc(strlen(state_dir)+5+strlen(uuid)+1, 1);
-    strncpy(path, state_dir, strlen(state_dir)+1);
-    strncat(path, "/fds/", strlen("/fds/")+1);
-    strncat(path, uuid, strlen(uuid)+1);
+    char *path = concat3(state_dir, "/fds/", uuid);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
-    printf("%s %d\n", path, new_fd);
 
     return new_fd;
 }
