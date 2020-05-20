@@ -118,7 +118,10 @@
 
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
-bool sent = false;
+bool sent = true;
+// every position in this bitstring is interpreted as a fd. pos x == fd x
+// If a position holds a 1 it is a socket
+long long int is_socket = 0;
 
 extern unsigned int afl_forksrv_pid;
 
@@ -1791,7 +1794,6 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
 static abi_long do_setsockopt(int sockfd, int level, int optname,
                               abi_ulong optval_addr, socklen_t optlen)
 {
-    printf("DEBUG: do_setsockopt\n");
     return 0;
 }
 
@@ -1799,7 +1801,6 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
 static abi_long do_getsockopt(int sockfd, int level, int optname,
                               abi_ulong optval_addr, abi_ulong optlen)
 {
-    printf("DEBUG: do_getsockopt\n");
     return 0;
 }
 
@@ -1970,11 +1971,16 @@ static inline int target_to_host_sock_type(int *type)
 static abi_long do_socket(int domain, int type, int protocol)
 {
     char *uuid = get_new_uuid();
-
     char *state_dir = getenv("STATE_DIR");
-    char path[100] = "%s/fds/%s";
-    sprintf(path, state_dir, uuid);
-    return open(path, 'w');
+    char *path = (char *)calloc(strlen(state_dir)+5+strlen(uuid)+1, 1);
+    strncpy(path, state_dir, strlen(state_dir)+1);
+    strncat(path, "/fds/", strlen("/fds/")+1);
+    strncat(path, uuid, strlen(uuid)+1);
+
+    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    is_socket |= 1 << new_fd;
+
+    return new_fd;
 }
 
 /* do_bind() Must return target values and target errnos. */
@@ -2171,9 +2177,16 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 {
     char* uuid = get_new_uuid();
     char *state_dir = getenv("STATE_DIR");
-    char path[100] = "%s/fds/%s";
-    sprintf(path, state_dir, uuid);
-    return open(path, 'w');
+    char *path = (char *)calloc(strlen(state_dir)+5+strlen(uuid)+1, 1);
+    strncpy(path, state_dir, strlen(state_dir)+1);
+    strncat(path, "/fds/", strlen("/fds/")+1);
+    strncat(path, uuid, strlen(uuid)+1);
+
+    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    is_socket |= 1 << new_fd;
+    printf("%s %d\n", path, new_fd);
+
+    return new_fd;
 }
 
 /* do_getpeername() Must return target values and target errnos. */
@@ -2327,7 +2340,7 @@ static abi_long do_socketcall(int num, abi_ulong vptr)
     case TARGET_SYS_CONNECT: /* sockfd, addr, addrlen */
         return do_connect(a[0], a[1], a[2]);
     case TARGET_SYS_LISTEN: /* sockfd, backlog */
-        return get_errno(listen(a[0], a[1]));
+        return 0;
     case TARGET_SYS_ACCEPT: /* sockfd, addr, addrlen */
         return do_accept4(a[0], a[1], a[2], 0);
     case TARGET_SYS_GETSOCKNAME: /* sockfd, addr, addrlen */
@@ -2345,6 +2358,7 @@ static abi_long do_socketcall(int num, abi_ulong vptr)
     case TARGET_SYS_RECVFROM: /* sockfd, msg, len, flags, addr, addrlen */
         return do_recvfrom(a[0], a[1], a[2], a[3], a[4], a[5]);
     case TARGET_SYS_SHUTDOWN: /* sockfd, how */
+        is_socket &= ~(long long int)(1 << arg1);
         return get_errno(shutdown(a[0], a[1]));
     case TARGET_SYS_SETSOCKOPT: /* sockfd, level, optname, optval, optlen */
         return do_setsockopt(a[0], a[1], a[2], a[3], a[4]);
@@ -6212,6 +6226,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         if (arg3 == 0) {
             return 0;
         } else {
+            if(sent && (is_socket >> arg1) & 1){
+                //TODO if (!create_snapshot) { exit(0); }
+                sent = false; // After restore, we'll await the next sent before criuin' again
+                do_criu();
+            }
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 return -TARGET_EFAULT;
             ret = get_errno(safe_read(arg1, p, arg3));
@@ -6223,6 +6242,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         }
         return ret;
     case TARGET_NR_write:
+        if ((is_socket >> arg1) & 1){
+            sent = true;
+        }
         if (arg2 == 0 && arg3 == 0) {
             return get_errno(safe_write(arg1, 0, 0));
         }
@@ -7853,7 +7875,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 #endif
 #ifdef TARGET_NR_listen
     case TARGET_NR_listen:
-        return get_errno(listen(arg1, arg2));
+        return 0;
 #endif
 #ifdef TARGET_NR_recv
     case TARGET_NR_recv:
@@ -7887,6 +7909,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 #endif
 #ifdef TARGET_NR_shutdown
     case TARGET_NR_shutdown:
+        is_socket &= ~(long long int)(1 << arg1);
         return get_errno(shutdown(arg1, arg2));
 #endif
 #if defined(TARGET_NR_getrandom) && defined(__NR_getrandom)
