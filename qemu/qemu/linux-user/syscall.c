@@ -2279,7 +2279,8 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
                             abi_ulong target_addrlen)
 {
     if(sent){
-//TODO if (!create_snapshot) { exit(0); }
+        if (!getenv("LETS_DO_THE_TIMEWARP_AGAIN"))
+            exit(0);
         sent = false; // After restore, we'll await the next sent before criuin' again
         do_criu();
     }
@@ -6227,7 +6228,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             return 0;
         } else {
             if(sent && (is_socket >> arg1) & 1){
-                //TODO if (!create_snapshot) { exit(0); }
+                if (!getenv("LETS_DO_THE_TIMEWARP_AGAIN"))
+                    exit(0);
                 sent = false; // After restore, we'll await the next sent before criuin' again
                 do_criu();
             }
