@@ -116,7 +116,6 @@
 
 #include "criu.h"
 
-char* concat3(char *first, char *second, char *third);
 
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
@@ -1970,20 +1969,13 @@ static inline int target_to_host_sock_type(int *type)
     return 0;
 }
 
-char* concat3(char *first, char *second, char *third){
-    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+1, 1);
-    strncpy(ret, first, strlen(first)+1);
-    strncat(ret, second, strlen(second)+1);
-    strncat(ret, third, strlen(third)+1);
-    return ret;
-}
-
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
     char *uuid = get_new_uuid();
-    char *state_dir = getenv("STATE_DIR");
-    char *path = concat3(state_dir, "/fds/", uuid);
+    char *state_dir = getenv_from_file("STATE_DIR");
+    char fds[6] = "/fds/";
+    char *path = concat3(state_dir, fds, uuid);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
@@ -2184,8 +2176,9 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
     char* uuid = get_new_uuid();
-    char *state_dir = getenv("STATE_DIR");
-    char *path = concat3(state_dir, "/fds/", uuid);
+    char *state_dir = getenv_from_file("STATE_DIR");
+    char fds[6] = "/fds/";
+    char *path = concat3(state_dir, fds, uuid);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
@@ -2283,10 +2276,11 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
                             abi_ulong target_addrlen)
 {
     if(sent){
-        if (!getenv("LETS_DO_THE_TIMEWARP_AGAIN"))
+        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
             exit(0);
         sent = false; // After restore, we'll await the next sent before criuin' again
         do_criu();
+        // afl_setup()
     }
 
     return read(0, (char *)msg, len);
@@ -6054,7 +6048,7 @@ static int do_openat(void *cpu_env, int dirfd, const char *pathname, int flags, 
         int fd, r;
 
         /* create temporary file to map stat to */
-        tmpdir = getenv("TMPDIR");
+        tmpdir = getenv_from_file("TMPDIR");
         if (!tmpdir)
             tmpdir = "/tmp";
         snprintf(filename, sizeof(filename), "%s/qemu-open.XXXXXX", tmpdir);
@@ -6232,7 +6226,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             return 0;
         } else {
             if(sent && (is_socket >> arg1) & 1){
-                if (!getenv("LETS_DO_THE_TIMEWARP_AGAIN"))
+                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
                     exit(0);
                 sent = false; // After restore, we'll await the next sent before criuin' again
                 do_criu();

@@ -18,6 +18,9 @@
 
 char* get_new_uuid(void);
 int do_criu(void);
+char *getenv_from_file(const char *);
+char* concat3(char *first, char *second, char *third);
+
 
 static int send_req(int socket_fd, CriuReq *req)
 {
@@ -161,4 +164,56 @@ char* get_new_uuid(void){
     char *uuid = malloc(37);
     uuid_unparse_lower(binuuid, uuid);
     return uuid;
+}
+
+char *getenv_from_file(const char *var) {
+    char *found = NULL;
+
+    // https://stackoverflow.com/questions/14002954/c-programming-how-to-read-the-whole-file-contents-into-a-buffer
+    // Read the entire env file
+    FILE *f = fopen("./envfile", "r");
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
+
+    char *string = malloc(fsize + 1);
+    fread(string, 1, fsize, f);
+    fclose(f);
+
+    char *tmp = string;
+
+    while (!found && tmp) {
+        if (!strncmp(var, tmp, strlen(var)))
+            found = tmp;
+        tmp = strchr(tmp, '\n');
+        if (tmp) {
+            *tmp = '\0';
+            tmp++;
+        }
+    }
+
+    if (!found) {
+        free(string);
+        return NULL;
+    }
+
+    found = strchr(found, '=');
+    if (!found) {
+        free(string);
+        return NULL;
+    }
+
+    found++;
+    char *ret = (char *)malloc(strlen(found));
+    strncpy(ret, found, strlen(found));
+    free(string);
+    return ret;
+}
+
+char* concat3(char *first, char *second, char *third){
+    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+1, 1);
+    strncpy(ret, first, strlen(first)+1);
+    strncat(ret, second, strlen(second)+1);
+    strncat(ret, third, strlen(third)+1);
+    return ret;
 }
