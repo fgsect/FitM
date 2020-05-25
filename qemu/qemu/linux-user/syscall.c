@@ -1973,7 +1973,7 @@ static inline int target_to_host_sock_type(int *type)
 static abi_long do_socket(int domain, int type, int protocol)
 {
     char *uuid = get_new_uuid();
-    char *state_dir = getenv_from_file("STATE_DIR");
+    char state_dir[2] = ".";
     char fds[6] = "/fds/";
     char *path = concat3(state_dir, fds, uuid);
 
@@ -2176,7 +2176,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
     char* uuid = get_new_uuid();
-    char *state_dir = getenv_from_file("STATE_DIR");
+    char state_dir[2] = ".";
     char fds[6] = "/fds/";
     char *path = concat3(state_dir, fds, uuid);
 
