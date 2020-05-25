@@ -2174,7 +2174,7 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    char* uuid = get_new_uuid();
+    char *uuid = get_new_uuid();
     char path[44] = "./fds/";
     strncat(path, uuid, 37);
 
