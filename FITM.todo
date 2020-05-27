@@ -11,3 +11,5 @@
     ☐ inject qemu process into AFL run [AFL]
     
     ☐ start AFL process with current state [AFL]
+
+qemu basic block cache flushen
