@@ -128,15 +128,14 @@ static inline TranslationBlock *tb_find(CPUState *, TranslationBlock *, int,
 static inline void              tb_add_jump(TranslationBlock *tb, int n,
                                             TranslationBlock *tb_next);
 
+
 /*************************
  * ACTUAL IMPLEMENTATION *
  *************************/
 
 /* Set up SHM region and initialize other stuff. */
 
-void afl_setup(void) {
-
-  char *id_str = getenv(SHM_ENV_VAR), *inst_r = getenv("AFL_INST_RATIO");
+void afl_setup(char *id_str, char *inst_r) {
 
   int shm_id;
 
