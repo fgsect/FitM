@@ -2273,7 +2273,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
 }
 
 /* do_recvfrom() Must return target values and target errnos. */
-static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
+static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, int flags,
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
@@ -2282,7 +2282,10 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
             exit(0);
         sent = false; // After restore, we'll await the next sent before criuin' again
         do_criu();
-        // afl_setup()
+        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+            afl_setup(getenv_from_file(SHM_ENV_VAR), getenv_from_file("AFL_INST_RATIO"));
+            afl_forkserver(cpu);
+        }
     }
 
     return read(0, (char *)msg, len);
@@ -2290,7 +2293,7 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
 
 #ifdef TARGET_NR_socketcall
 /* do_socketcall() must return target values and target errnos. */
-static abi_long do_socketcall(int num, abi_ulong vptr)
+static abi_long do_socketcall(CPUState *cpu, int num, abi_ulong vptr)
 {
     static const unsigned nargs[] = { /* number of arguments per operation */
         [TARGET_SYS_SOCKET] = 3,      /* domain, type, protocol */
@@ -2353,11 +2356,11 @@ static abi_long do_socketcall(int num, abi_ulong vptr)
     case TARGET_SYS_SEND: /* sockfd, msg, len, flags */
         return do_sendto(a[0], a[1], a[2], a[3], 0, 0);
     case TARGET_SYS_RECV: /* sockfd, msg, len, flags */
-        return do_recvfrom(a[0], a[1], a[2], a[3], 0, 0);
+        return do_recvfrom(cpu, a[0], a[1], a[2], a[3], 0, 0);
     case TARGET_SYS_SENDTO: /* sockfd, msg, len, flags, addr, addrlen */
         return do_sendto(a[0], a[1], a[2], a[3], a[4], a[5]);
     case TARGET_SYS_RECVFROM: /* sockfd, msg, len, flags, addr, addrlen */
-        return do_recvfrom(a[0], a[1], a[2], a[3], a[4], a[5]);
+        return do_recvfrom(cpu, a[0], a[1], a[2], a[3], a[4], a[5]);
     case TARGET_SYS_SHUTDOWN: /* sockfd, how */
         is_socket &= ~(long long int)(1 << arg1);
         return get_errno(shutdown(a[0], a[1]));
@@ -6232,6 +6235,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     exit(0);
                 sent = false; // After restore, we'll await the next sent before criuin' again
                 do_criu();
+                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+                    afl_setup(getenv_from_file(SHM_ENV_VAR), getenv_from_file("AFL_INST_RATIO"));
+                    afl_forkserver(cpu);
+                }
             }
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 return -TARGET_EFAULT;
@@ -7845,7 +7852,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 #endif
 #ifdef TARGET_NR_socketcall
     case TARGET_NR_socketcall:
-        return do_socketcall(arg1, arg2);
+        return do_socketcall(cpu, arg1, arg2);
 #endif
 #ifdef TARGET_NR_accept
     case TARGET_NR_accept:
@@ -7881,11 +7888,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 #endif
 #ifdef TARGET_NR_recv
     case TARGET_NR_recv:
-        return do_recvfrom(arg1, arg2, arg3, arg4, 0, 0);
+        return do_recvfrom(cpu, arg1, arg2, arg3, arg4, 0, 0);
 #endif
 #ifdef TARGET_NR_recvfrom
     case TARGET_NR_recvfrom:
-        return do_recvfrom(arg1, arg2, arg3, arg4, arg5, arg6);
+        return do_recvfrom(cpu, arg1, arg2, arg3, arg4, arg5, arg6);
 #endif
 #ifdef TARGET_NR_recvmsg
     case TARGET_NR_recvmsg:
