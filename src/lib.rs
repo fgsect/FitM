@@ -1,4 +1,4 @@
-use std::process::{Command, Output};
+use std::process::{Command, Output, Child, ExitStatus};
 use std::error::Error;
 
 struct AFLRun {
@@ -20,7 +20,7 @@ impl AFLRun {
         AFLRun{ in_path, out_path, mem_limit, rst_path, server_bin, snapshot_env }
     }
 
-    fn run_q(&self, failure_msg: &str) -> Output{
+    fn run_restore(&self, failure_msg: &str) -> Output{
         Command::new("AFLplusplus/afl-fuzz")
             .args(&[format!("-i {}", self.in_path),
                 format!("-o {}", self.out_path),
@@ -34,23 +34,45 @@ impl AFLRun {
             .output()
             .expect(failure_msg)
     }
+
+    fn run_qemu(&self, failure_msg: &str) -> Child{
+        Command::new("AFLplusplus/afl-fuzz")
+            .args(&["-i", &self.in_path,
+                "-o", &self.out_path,
+                "-m", &self.mem_limit,
+                "-d",
+                "-Q",
+                "--", &self.server_bin,
+                "@@"])
+            .env(&self.snapshot_env, "")
+            .spawn().ok()
+            .expect(failure_msg)
+    }
 }
 pub fn run() -> Result<(), Box<dyn Error>>{
 
-    let afl_run: AFLRun = AFLRun::new("/tmp/fitm-in".to_string(),
-                "/tmp/fitm-out".to_string(),
+    let afl: AFLRun = AFLRun::new("fitm-in".to_string(),
+                "fitm-out".to_string(),
                 "none".to_string(),
-                "/tmp/fitm-c0s0".to_string(),
-                "~/repos/libxml2/xmllint".to_string(),
+                "fitm-c0s0".to_string(),
+                "test/fsrv_test".to_string(),
                 "LETS_DO_THE_TIMEWARP_AGAIN".to_string());
 
-    let output: Output = afl_run.run_q("failed to execute afl");
+    let mut afl_child = afl.run_qemu("failed to execute afl");
 
-    let hello = output.stdout;
-    match String::from_utf8(hello) {
-        Ok(msg) =>     print!("{:?}", msg),
-        Err(msg) => print!("Error while converting from bytes: {:?}", msg)
-    }
+    let the_status = afl_child.wait()
+        .ok().expect("Couldn't wait for process.");
+    // Output some exit information.
+    // match the_status {
+    //     ExitStatus(x) => println!("Exited with status {}", x),
+    // };
+    // tmp match {
+    //     Ok(Child) => println!("Spawned AFL"),
+    //     Err(Child) => println!("Error spawning AFL")
+    // }
+
+    // let hello = output.stdout;
+    // print!("{}", String::from_utf8_lossy(&hello));
 
     Ok(())
 }
