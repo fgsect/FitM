@@ -44,3 +44,17 @@ git clone --recurse-submodules <FitM-URL> # Update/init submodules while cloning
     git config alias.supdate 'submodule update --remote --merge'
     ```
 - If you didn't set the recurse option above, witching branches in the main modules fucks up submodules if the submodules state is different on each branch
+
+# Tests
+
+## Forkserver test
+
+```
+gcc -o forkserver_test forkserver_test.c
+```
+
+To execute AFL
+
+```
+AFL_DEBUG_CHILD_OUTPUT=1 LETS_DO_THE_TIMEWARP_AGAIN=1 ../AFLplusplus/afl-fuzz -i in -o out -Q -m 10000 -- ./forkserver_test
+```
