@@ -96,8 +96,8 @@ void translator_loop(const TranslatorOps *ops, DisasContextBase *db,
         }
         
         if (db->pc_next == afl_entry_point) {
-          afl_setup();
-          gen_helper_afl_entry_routine(cpu_env);
+        //   afl_setup();
+        //   gen_helper_afl_entry_routine(cpu_env);
         }
 
         /* Disassemble one instruction.  The translate_insn hook should
