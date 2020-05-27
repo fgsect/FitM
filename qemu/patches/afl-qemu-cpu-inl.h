@@ -123,8 +123,6 @@ struct afl_chain {
 
 /* Some forward decls: */
 
-TranslationBlock *tb_htable_lookup(CPUState *, target_ulong, target_ulong,
-                                   uint32_t, uint32_t);
 static inline TranslationBlock *tb_find(CPUState *, TranslationBlock *, int,
                                         uint32_t);
 static inline void              tb_add_jump(TranslationBlock *tb, int n,
@@ -277,7 +275,7 @@ void afl_setup(void) {
 
 static void print_mappings(void) {
 
-  u8    buf[MAX_LINE];
+  char buf[MAX_LINE];
   FILE *f = fopen("/proc/self/maps", "r");
 
   if (!f) return;
