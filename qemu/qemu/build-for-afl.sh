@@ -15,3 +15,4 @@
             --disable-system --disable-blobs --disable-tools
 
 make -j$(nproc) CFLAGS="-lprotobuf-c -luuid"
+cp ./x86_64-linux-user/qemu-x86_64 ../../AFLplusplus/afl-qemu-trace
