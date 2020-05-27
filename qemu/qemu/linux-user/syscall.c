@@ -115,7 +115,11 @@
 #include <linux/sockios.h>
 
 #include "criu.h"
+#include "fitm.h"
 
+#include "tcg/tcg-op.h"
+
+#include "../../patches/afl-qemu-common.h"
 
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
