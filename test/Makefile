@@ -9,7 +9,11 @@ syscall:
 	gcc -o syscall syscall_test.c
 
 clean:
-	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h rpc.proto syscall
+	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h rpc.proto syscall getenv_from_file_test
+
+test: clean
+	gcc -o getenv_from_file_test getenv_from_file_test.c
+	./getenv_from_file_test
 
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
 symlink:
