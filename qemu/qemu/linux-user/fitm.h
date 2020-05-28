@@ -5,6 +5,11 @@
 
 char *getenv_from_file(const char *var);
 
+/*
+ * Checks if an `envfile` is present. If not checks getenv for the variable.
+ * Note: env is not checked if the file is present.
+ * Also need to handle NULL as return value in the caller
+*/
 char *getenv_from_file(const char *var) {
     char *found = NULL;
 
