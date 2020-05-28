@@ -1,6 +1,38 @@
 # FitM
 Fuzzer in the Middle
 
+# Building
+
+`make build` can be used to run our build script to build our custom qemu patches
+
+# Testing
+
+`sh test.sh` can be used to correctly dump a qemu process outside of AFL and then try to restore it inside AFL.
+
+## Forkserver test
+
+When testing the forkserver starting in `do_recv` remember the following things:
+- Don't have a `envfile` in your current working dir
+- Don't have `LETS_DO_THE_TIMEWARP_AGAIN` set
+- Have the following lines disabled in your `syscall.c` and rebuild after disabling
+    ```c
+    if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+        exit(0);
+    }
+    sent = false; // After restore, we'll await the next sent before criuin' again
+    do_criu();
+    ```
+
+```
+gcc -o forkserver_test forkserver_test.c
+```
+
+To execute AFL
+```
+AFL_DEBUG_CHILD_OUTPUT=1 LETS_DO_THE_TIMEWARP_AGAIN=1 ../AFLplusplus/afl-fuzz -i in -o out -Q -m 10000 -- ./forkserver_test
+```
+
+
 # Qemu folder
 
 Inlucdes all necessary `.h` files and similar from AFL++ to build a compatible qemu binary. 
@@ -44,29 +76,3 @@ git clone --recurse-submodules <FitM-URL> # Update/init submodules while cloning
     git config alias.supdate 'submodule update --remote --merge'
     ```
 - If you didn't set the recurse option above, witching branches in the main modules fucks up submodules if the submodules state is different on each branch
-
-# Tests
-
-## Forkserver test
-
-When testing the forkserver starting in `do_recv` remember the following things:
-- Don't have a `envfile` in your current working dir
-- Don't have `LETS_DO_THE_TIMEWARP_AGAIN` set
-- Have the following lines disabled in your `syscall.c` and rebuild after disabling
-    ```c
-    if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
-        exit(0);
-    }
-    sent = false; // After restore, we'll await the next sent before criuin' again
-    do_criu();
-    ```
-
-```
-gcc -o forkserver_test forkserver_test.c
-```
-
-To execute AFL
-
-```
-AFL_DEBUG_CHILD_OUTPUT=1 LETS_DO_THE_TIMEWARP_AGAIN=1 ../AFLplusplus/afl-fuzz -i in -o out -Q -m 10000 -- ./forkserver_test
-```
