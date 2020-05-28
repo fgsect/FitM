@@ -2285,11 +2285,11 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
-            if(shm_env_var && afl_inst_ratio){
+            if(shm_env_var){
                 afl_setup(shm_env_var, afl_inst_ratio);
                 afl_forkserver(cpu);
             } else {
-                puts("Forkserver not started, since SHM_ENV_VAR or AFL_INST_RATIO env variable is missing");
+                puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
             }
         }
     }
@@ -6244,11 +6244,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
                     char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
                     char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
-                    if(shm_env_var && afl_inst_ratio){
+                    if(shm_env_var){
                         afl_setup(shm_env_var, afl_inst_ratio);
                         afl_forkserver(cpu);
                     } else {
-                        puts("Forkserver not started, since SHM_ENV_VAR or AFL_INST_RATIO env variable is missing");
+                        puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
                     }
                 }
             }
