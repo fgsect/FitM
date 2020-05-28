@@ -12,7 +12,7 @@ clean(){
 	rm -rf /tmp/log
 }
 
-test(){
+test_restore(){
   export LETS_DO_THE_TIMEWARP_AGAIN=1
   export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
   export AFL_SKIP_CPUFREQ=1
@@ -26,4 +26,4 @@ test(){
 }
 
 clean
-test
+test_restore

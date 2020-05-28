@@ -13,3 +13,6 @@
     ☐ start AFL process with current state [AFL]
 
 qemu basic block cache flushen
+
+Restoring of qemu processes currently breaks when attaching the child's memory to the caller.
+afl-qemu-cpu-inl.h:162

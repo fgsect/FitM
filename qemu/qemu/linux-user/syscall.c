@@ -2278,20 +2278,30 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addrlen)
 {
     if(sent){
+        puts("01");
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
             exit(0);
         sent = false; // After restore, we'll await the next sent before criuin' again
+        puts("02");
         do_criu();
+        puts("03");
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
+            puts("04");
+            system("env");
             if(shm_env_var){
+                puts("05");
                 afl_setup(shm_env_var, afl_inst_ratio);
+                puts("055");
                 afl_forkserver(cpu);
+                puts("0555");
             } else {
                 puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
             }
+            puts("06");
         }
+        puts("07");
     }
 
     return read(0, (char *)msg, len);
@@ -6237,6 +6247,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             return 0;
         } else {
             if(sent && (is_socket >> arg1) & 1){
+                puts("should not be here");
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
                     exit(0);
                 sent = false; // After restore, we'll await the next sent before criuin' again

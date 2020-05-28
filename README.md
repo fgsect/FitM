@@ -8,6 +8,9 @@ Fuzzer in the Middle
 # Testing
 
 `sh test.sh` can be used to correctly dump a qemu process outside of AFL and then try to restore it inside AFL.
+The process output is found in `/tmp/log`. The restore log is found in `/tmp/criu_snapshot/restore.log`.
+You may need to disable line 1206 + 1207 in `AFLplusplus/src/afl-fuzz.c`. I think it breaks restoring prematurely but 
+I'm not sure anymore.
 
 ## Forkserver test
 
