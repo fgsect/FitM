@@ -2283,8 +2283,14 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         sent = false; // After restore, we'll await the next sent before criuin' again
         do_criu();
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
-            afl_setup(getenv_from_file(SHM_ENV_VAR), getenv_from_file("AFL_INST_RATIO"));
-            afl_forkserver(cpu);
+            char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
+            char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
+            if(shm_env_var && afl_inst_ratio){
+                afl_setup(shm_env_var, afl_inst_ratio);
+                afl_forkserver(cpu);
+            } else {
+                puts("Forkserver not started, since SHM_ENV_VAR or AFL_INST_RATIO env variable is missing");
+            }
         }
     }
 
@@ -6236,8 +6242,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 sent = false; // After restore, we'll await the next sent before criuin' again
                 do_criu();
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
-                    afl_setup(getenv_from_file(SHM_ENV_VAR), getenv_from_file("AFL_INST_RATIO"));
-                    afl_forkserver(cpu);
+                    char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
+                    char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
+                    if(shm_env_var && afl_inst_ratio){
+                        afl_setup(shm_env_var, afl_inst_ratio);
+                        afl_forkserver(cpu);
+                    } else {
+                        puts("Forkserver not started, since SHM_ENV_VAR or AFL_INST_RATIO env variable is missing");
+                    }
                 }
             }
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
