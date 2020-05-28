@@ -16,9 +16,9 @@ char *getenv_from_file(const char *var) {
     // https://stackoverflow.com/questions/14002954/c-programming-how-to-read-the-whole-file-contents-into-a-buffer
     // Read the entire env file
     FILE *f = fopen("./envfile", "r");
-
-    if (!f)
+    if (!f) {
         return getenv(var);
+    }
 
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
