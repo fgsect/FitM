@@ -49,6 +49,18 @@ git clone --recurse-submodules <FitM-URL> # Update/init submodules while cloning
 
 ## Forkserver test
 
+When testing the forkserver starting in `do_recv` remember the following things:
+- Don't have a `envfile` in your current working dir
+- Don't have `LETS_DO_THE_TIMEWARP_AGAIN` set
+- Have the following lines disabled in your `syscall.c` and rebuild after disabling
+    ```c
+    if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+        exit(0);
+    }
+    sent = false; // After restore, we'll await the next sent before criuin' again
+    do_criu();
+    ```
+
 ```
 gcc -o forkserver_test forkserver_test.c
 ```
