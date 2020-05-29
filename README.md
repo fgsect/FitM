@@ -35,6 +35,10 @@ To execute AFL
 AFL_DEBUG_CHILD_OUTPUT=1 LETS_DO_THE_TIMEWARP_AGAIN=1 ../AFLplusplus/afl-fuzz -i in -o out -Q -m 10000 -- ./forkserver_test
 ```
 
+# Execution
+
+Because criu needs root privs and the restored process needs root privs to access the shared memory from AFL everything has to be run as root.
+So please execute everything with `sudo`.
 
 # Qemu folder
 
