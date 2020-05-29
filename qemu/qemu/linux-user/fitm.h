@@ -24,7 +24,7 @@ char *getenv_from_file(const char *var) {
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
 
-    char *string = malloc(fsize + 1);
+    char *string = calloc(fsize + 1, 1);
     fread(string, 1, fsize, f);
     fclose(f);
 
@@ -52,7 +52,7 @@ char *getenv_from_file(const char *var) {
     }
 
     found++;
-    char *ret = (char *)malloc(strlen(found));
+    char *ret = (char *)calloc(strlen(found), 1);
     strncpy(ret, found, strlen(found));
     free(string);
     return ret;
