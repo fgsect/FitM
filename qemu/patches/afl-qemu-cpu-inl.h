@@ -136,7 +136,7 @@ static inline void              tb_add_jump(TranslationBlock *tb, int n,
 /* Set up SHM region and initialize other stuff. */
 
 void afl_setup(char *id_str, char *inst_r) {
-    puts("afl_setup: 01");
+
   int shm_id;
 
   if (inst_r) {
@@ -151,16 +151,16 @@ void afl_setup(char *id_str, char *inst_r) {
     afl_inst_rms = MAP_SIZE * r / 100;
 
   }
-    puts("afl_setup: 02");
 
   if (id_str) {
 
       shm_id = atoi(id_str);
       afl_area_ptr = shmat(shm_id, NULL, 0);
 
-      puts("afl_setup: 022");
-      if (afl_area_ptr == (void *)-1) exit(1);
-      puts("afl_setup: 023");
+      if (afl_area_ptr == (void *)-1) {
+        perror("SHMAT didn't work");
+        exit(1);
+      };
 
       /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
          so that the parent doesn't give up on us. */
@@ -208,7 +208,6 @@ void afl_setup(char *id_str, char *inst_r) {
   /* pthread_atfork() seems somewhat broken in util/rcu.c, and I'm
      not entirely sure what is the cause. This disables that
      behaviour, and seems to work alright? */
-    puts("afl_setup: 03");
 
   rcu_disable_atfork();
 
@@ -238,7 +237,6 @@ void afl_setup(char *id_str, char *inst_r) {
     exit(1);
 
 #else
-      puts("afl_setup: 04");
 
     persistent_save_gpr = 1;
 
@@ -274,8 +272,6 @@ void afl_setup(char *id_str, char *inst_r) {
     afl_persistent_cnt = strtoll(getenv("AFL_QEMU_PERSISTENT_CNT"), NULL, 0);
   else
     afl_persistent_cnt = PERSISTENT_DEFAULT_MAX_CNT;
-
-  puts("afl_setup: 05");
 
 }
 
