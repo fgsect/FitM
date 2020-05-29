@@ -1,29 +1,21 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <stdio.h>
+#include <unistd.h>
+
+#include "../qemu/qemu/linux-user/fitm.h"
 
 int main() {
-    printf("HELLO THIS TEST STARTS HERE!!!\n");
 
     char buf[100];
-    puts("pre recv:");
-    char* tmp = getenv("LETS_DO_THE_TIMEWARP_AGAIN");
-    if(tmp){
-        printf("env val: %s\n", tmp);
-    } else{
-        puts("no LDTTA var..");
-    }
 
+    char *buff = calloc(100, 1);
+    sprintf(buff, "ls /proc/%d/fd", getpid());
+    system(buff);
     recv(100, buf, 200, 0);
-
-    puts("post recv:");
-    tmp = getenv("LETS_DO_THE_TIMEWARP_AGAIN");
-    if(tmp){
-        printf("env val: %s\n", tmp);
-    } else{
-        puts("no LDTTA var..");
-    }
-    printf("NEW TEST WHO DIS?\n");
+    memset(buff, 100, 0);
+    sprintf(buff, "ls /proc/%d/fd", getpid());
+    system(buff);
 
     return 0;
 }
