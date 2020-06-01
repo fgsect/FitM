@@ -114,6 +114,8 @@
 #include "fd-trans.h"
 #include <linux/sockios.h>
 
+#include <fcntl.h>
+
 #include "criu.h"
 #include "fitm.h"
 
@@ -2281,7 +2283,20 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
             exit(0);
         sent = false; // After restore, we'll await the next sent before criuin' again
+
+        if (fcntl(198, F_GETFD) == -1) {
+            int fd_pipes[2];
+            if (pipe(fd_pipes) == -1) {
+                printf("QEMU: Could not open AFL Forkserver read pipe!");
+            }
+            dup2(fd_pipes[0], 198);
+            dup2(fd_pipes[1], 199);
+            close(fd_pipes[0]);
+            close(fd_pipes[1]);
+        }
+
         do_criu();
+
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
@@ -6241,6 +6256,16 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
                     exit(0);
                 sent = false; // After restore, we'll await the next sent before criuin' again
+                if (fcntl(198, F_GETFD) == -1) {
+                    int fd_pipes[2];
+                    if (pipe(fd_pipes) == -1) {
+                        printf("QEMU: Could not open AFL Forkserver read pipe!");
+                    }
+                    dup2(fd_pipes[0], 198);
+                    dup2(fd_pipes[1], 199);
+                    close(fd_pipes[0]);
+                    close(fd_pipes[1]);
+                }
                 do_criu();
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
                     char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
