@@ -2285,17 +2285,35 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         sent = false; // After restore, we'll await the next sent before criuin' again
 
         if (fcntl(198, F_GETFD) == -1) {
-            int fd_pipes[2];
-            if (pipe(fd_pipes) == -1) {
+            int read_pipe[2];
+            int write_pipe[2];
+            if (pipe(read_pipe) == -1) {
                 printf("QEMU: Could not open AFL Forkserver read pipe!");
             }
-            dup2(fd_pipes[0], 198);
-            dup2(fd_pipes[1], 199);
-            close(fd_pipes[0]);
-            close(fd_pipes[1]);
+            if (pipe(write_pipe) == -1) {
+                printf("QEMU: Could not open AFL Forkserver read pipe!");
+            }
+            dup2(read_pipe[0], 198);
+            dup2(write_pipe[1], 199);
+            close(read_pipe[0]);
+            close(read_pipe[1]);
+            close(write_pipe[0]);
+            close(write_pipe[1]);
         }
 
+        char *buff = calloc(200, 1);
+        readlink("/proc/self/fd/198", buff, 100);
+        char *tmp = (&buff[strlen(buff)])+1;
+        buff[strlen(buff)] = '\n';
+        readlink("/proc/self/fd/199", tmp, 100);
+        printf("%s\n", buff);
+
         do_criu();
+        puts("QEMU AFTER");
+        system("ls -la /proc/self/fd");
+
+        if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
+            exit(0);
 
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
@@ -6267,6 +6285,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     close(fd_pipes[1]);
                 }
                 do_criu();
+                if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
+                    exit(0);
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
                     char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
                     char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");

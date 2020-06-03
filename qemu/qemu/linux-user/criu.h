@@ -63,10 +63,20 @@ static CriuResp *recv_resp(int socket_fd)
 }
 
 int do_criu(void){
+    // int pid = fork();
+    int ret = 0;
+    // if (pid) {
+    // wait for child
+//     int status;
+//     waitpid(pid, &status, 0);
+//     if (WIFEXITED(status))
+//         status = WEXITSTATUS(status);
+//     if (status)
+//         exit(status);
+// } else {
     CriuReq req		= CRIU_REQ__INIT;
     CriuResp *resp		= NULL;
     int fd, dir_fd;
-    int ret = 0;
     struct sockaddr_un addr;
     socklen_t addr_len;
 
@@ -86,6 +96,7 @@ int do_criu(void){
     criu_opts__init(req.opts);
     req.opts->images_dir_fd		= dir_fd;
     req.opts->log_level		= 4;
+    req.opts->leave_running = true;
 
     fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
     if (fd == -1) {
@@ -107,8 +118,8 @@ int do_criu(void){
     }
 
     /*
-     * Send request
-     */
+    * Send request
+    */
     ret = send_req(fd, &req);
     if (ret == -1) {
         perror("Can't send request");
@@ -116,43 +127,45 @@ int do_criu(void){
     }
 
     /*
-	 * Recv response
-	 */
-	resp = recv_resp(fd);
-	if (!resp) {
-		perror("Can't recv response");
-		ret = -1;
-		goto exit;
-	}
+    * Recv response
+    */
+    resp = recv_resp(fd);
+    if (!resp) {
+        perror("Can't recv response");
+        ret = -1;
+        goto exit;
+    }
 
-	if (resp->type != CRIU_REQ_TYPE__DUMP) {
-		perror("Unexpected response type");
-		ret = -1;
-		goto exit;
-	}
+    if (resp->type != CRIU_REQ_TYPE__DUMP) {
+        perror("Unexpected response type");
+        ret = -1;
+        goto exit;
+    }
 
-	/*
-	 * Check response.
-	 */
-	if (resp->success)
-		puts("Success");
-	else {
-		puts("Fail");
-		ret = -1;
-		goto exit;
-	}
+    /*
+    * Check response.
+    */
+    if (resp->success)
+        puts("Success");
+    else {
+        puts("Fail");
+        ret = -1;
+        goto exit;
+    }
 
-	if (resp->dump->has_restored && resp->dump->restored)
-		puts("Restored");
+    if (resp->dump->has_restored && resp->dump->restored)
+        puts("Restored");
 
 
-exit:
     // Closing the socket FD before the process is dumped breaks CRIU
-   close(fd);
-   close(dir_fd);
+exit:
+    close(fd);
+    close(dir_fd);
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
-    return ret;
+
+// }
+return ret;
 }
 
 char* get_new_uuid(void){
