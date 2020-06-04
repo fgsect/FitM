@@ -38,6 +38,9 @@ impl AFLRun {
         fs::File::create(format!("states/{}/out/.cur_input", state_path))
             .expect("[-] Could not create cur_input file!");
 
+        fs::write(format!("states/{}/in/1", state_path), "init case. thanks afl!")
+            .expect("[-] Could not create initial test case!");
+
         AFLRun{ state_path, target_bin }
     }
 
