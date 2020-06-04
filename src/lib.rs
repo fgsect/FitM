@@ -67,10 +67,10 @@ impl AFLRun {
     fn init_run(&self) -> io::Result<Child> {
         let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
-        let stdout = fs::File::create(format!("states/{}/stdout", self.state_path))
-            .unwrap();
-        let stderr = fs::File::create(format!("states/{}/stderr", self.state_path))
-            .unwrap();
+        let stdout = fs::File::create(format!("states/{}/stdout",
+            self.state_path)).unwrap();
+        let stderr = fs::File::create(format!("states/{}/stderr",
+        self.state_path)).unwrap();
         Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
