@@ -73,8 +73,12 @@ int do_criu(void){
 
     char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_DIR");
 
+    FILE *test = fopen("test.log", "w");
+    fprintf(test, "%s\n", snapshot_dir);
+
     dir_fd = open(snapshot_dir, O_DIRECTORY);
     if (dir_fd == -1) {
+        fprintf(test, "0");
         perror("Can't open snapshot dir");
         return -1;
     }
@@ -91,6 +95,7 @@ int do_criu(void){
     req.opts->log_level		= 4;
     req.opts->leave_running = true;
 
+    fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
     if (fd == -1) {
         perror("Can't create socket");
         return -1;
@@ -156,6 +161,7 @@ exit:
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
 
+    fclose(test);
     return ret;
 }
 
