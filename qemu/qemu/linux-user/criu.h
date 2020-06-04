@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <uuid/uuid.h>
 
+#include "fitm.h"
 
 #define MAX_MSG_SIZE 1024
 
@@ -63,26 +64,18 @@ static CriuResp *recv_resp(int socket_fd)
 }
 
 int do_criu(void){
-    // int pid = fork();
     int ret = 0;
-    // if (pid) {
-    // wait for child
-//     int status;
-//     waitpid(pid, &status, 0);
-//     if (WIFEXITED(status))
-//         status = WEXITSTATUS(status);
-//     if (status)
-//         exit(status);
-// } else {
-    CriuReq req		= CRIU_REQ__INIT;
-    CriuResp *resp		= NULL;
+    CriuReq req	        = CRIU_REQ__INIT;
+    CriuResp *resp      = NULL;
     int fd, dir_fd;
     struct sockaddr_un addr;
     socklen_t addr_len;
 
-    dir_fd = open("/tmp/criu_snapshot", O_DIRECTORY);
+    char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_DIR");
+
+    dir_fd = open(snapshot_dir, O_DIRECTORY);
     if (dir_fd == -1) {
-        perror("Can't open /tmp/criu_snapshot dir");
+        perror("Can't open snapshot dir");
         return -1;
     }
 
@@ -98,7 +91,6 @@ int do_criu(void){
     req.opts->log_level		= 4;
     req.opts->leave_running = true;
 
-    fd = socket(AF_LOCAL, SOCK_SEQPACKET, 0);
     if (fd == -1) {
         perror("Can't create socket");
         return -1;
@@ -164,8 +156,7 @@ exit:
     if (resp)
         criu_resp__free_unpacked(resp, NULL);
 
-// }
-return ret;
+    return ret;
 }
 
 char* get_new_uuid(void){

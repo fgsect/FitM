@@ -119,7 +119,6 @@
 #include <fcntl.h>
 
 #include "criu.h"
-#include "fitm.h"
 
 #include "tcg/tcg-op.h"
 
@@ -2307,7 +2306,6 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         system("readlink /proc/self/fd/199");
 
         do_criu();
-        puts("QEMU AFTER");
 
         if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
             exit(0);
