@@ -89,17 +89,25 @@ impl AFLRun {
     //     return
     // }
 }
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() {
 
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
         "test/forkserver_test".to_string());
 
-    let mut afl_child = afl.init_run().expect("Failed to execute afl");
+    let mut afl_child = afl.init_run().expect("Failed to execute initial afl");
 
-    afl_child.wait().ok().expect("Couldn't wait for process.");
+    afl_child.wait().unwrap_or_else(|x| {
+        println!("Error while waiting for init run: {}", x);
+        std::process::exit(1);
+    });
 
     fs::remove_file(format!("states/{}/out/.cur_input", afl.state_path))
         .expect("[-] Could not remove cur_input file!");
 
-    Ok(())
+    afl_child = afl.fuzz_run().expect("Failed to start fuzz run");
+
+    afl_child.wait().unwrap_or_else(|x| {
+        println!("Error while waiting for fuzz run: {}", x);
+        std::process::exit(1);
+    });
 }
