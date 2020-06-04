@@ -38,9 +38,6 @@ impl AFLRun {
         fs::File::create(format!("states/{}/out/.cur_input", state_path))
             .expect("[-] Could not create cur_input file!");
 
-        fs::File::create(format!("states/{}/log", state_path))
-            .expect("[-] Could not create file!");
-
         AFLRun{ state_path, target_bin }
     }
 
@@ -60,9 +57,9 @@ impl AFLRun {
     fn init_run(&self) -> io::Result<Child> {
         let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
-        let log1 = fs::File::open(format!("states/{}/log", self.state_path))
+        let stdout = fs::File::create(format!("states/{}/stdout", self.state_path))
             .unwrap();
-        let log2 = fs::File::open(format!("states/{}/log", self.state_path))
+        let stderr = fs::File::create(format!("states/{}/stderr", self.state_path))
             .unwrap();
         Command::new("setsid")
             .args(&[
@@ -72,8 +69,8 @@ impl AFLRun {
                 format!("{}", self.target_bin),
             ])
             .stdin(Stdio::from(cur_input))
-            .stdout(Stdio::from(log1))
-            .stderr(Stdio::from(log2))
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
             .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/", 
                 std::env::current_dir().unwrap().display(), self.state_path))
