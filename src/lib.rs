@@ -80,9 +80,9 @@ impl AFLRun {
             .spawn()
     }
 
-    fn consolidation(&self) {
-        return
-    }
+    // fn consolidation(&self) {
+    //     return
+    // }
 }
 pub fn run() -> Result<(), Box<dyn Error>> {
 
