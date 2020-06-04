@@ -1,4 +1,4 @@
-use std::process::{Command, Output, Child, ExitStatus};
+use std::process::{Command, Output, Child};
 use std::error::Error;
 
 struct AFLRun {
@@ -60,8 +60,7 @@ pub fn run() -> Result<(), Box<dyn Error>>{
 
     let mut afl_child = afl.run_qemu("failed to execute afl");
 
-    let the_status = afl_child.wait()
-        .ok().expect("Couldn't wait for process.");
+    afl_child.wait().ok().expect("Couldn't wait for process.");
     // Output some exit information.
     // match the_status {
     //     ExitStatus(x) => println!("Exited with status {}", x),
