@@ -17,7 +17,8 @@ test_restore(){
   export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
   export AFL_SKIP_CPUFREQ=1
   export AFL_DEBUG_CHILD_OUTPUT=1
-  mkdir -p /tmp/criu_snapshot
+  export CRIU_SNAPSHOT_DIR=$(pwd)/snap
+  mkdir snap
   # This throws a weird error(?) but seems to work:
   # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/forkserver_test < /dev/null &> /tmp/log
   setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/forkserver_test < out/.cur_input &> /tmp/log && echo "Initial snap successful"
