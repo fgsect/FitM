@@ -8,3 +8,6 @@ qemu-x86_64
 self-dump
 */tmp/*
 rpc.*
+states/
+in/
+out/
