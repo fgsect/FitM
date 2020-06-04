@@ -1,27 +1,27 @@
-#include <stdlib.h>
-#include <sys/socket.h>
 #include <stdio.h>
-#include <unistd.h>
-
-#include "../qemu/qemu/linux-user/fitm.h"
+#include <sys/socket.h>
+#include <stdlib.h>
 
 int main() {
 
-    char buf[100];
-    // int pipefd[2];
-    // pipe(pipefd);
-    // dup2(pipefd[0], 10);
-    // dup2(pipefd[1], 11);
-    // close(pipefd[0]);
-    // close(pipefd[1]);
+    char *buf = (char *)calloc(100, 1);
 
-    // char *buff = calloc(100, 1);
-    // sprintf(buff, "ls -la /proc/%d/fd", getpid());
-    // system(buff);
-    recv(100, buf, 200, 0);
-    // memset(buff, 100, 0);
-    // sprintf(buff, "ls -la /proc/%d/fd", getpid());
-    // system(buff);
+    recv(100, buf, 100, 0);
+    puts("beep");
+    printf("%s\n", buf);
+
+    if(buf[0] == 'R') {
+        if (buf[1] == 'I') {
+            if (buf[2] == 'P') {
+                char *foo = NULL;
+                printf("%s\n", foo);
+            } else {
+                printf("Got: RI\n");
+            }
+        } else {
+            printf("Got: R\n");
+        }
+    }
 
     return 0;
 }
