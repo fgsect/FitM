@@ -1,6 +1,5 @@
 use std::process::{Command, Child, Stdio};
 use std::path::Path;
-use std::error::Error;
 use std::fs;
 use std::io;
 
@@ -47,11 +46,14 @@ impl AFLRun {
     fn fuzz_run(&self) -> io::Result<Child> {
         Command::new("AFLplusplus/afl-fuzz")
             .args(&[
-                format!("-i states/{}/in", self.state_path),
-                format!("-o states/{}/out", self.state_path),
+                format!("-i"),
+                format!("states/{}/in", self.state_path),
+                format!("-o"),
+                format!("states/{}/out", self.state_path),
                 format!("-m none"),
                 format!("-d"),
-                format!("-r states/{}/snapshot", self.state_path),
+                format!("-r"),
+                format!("states/{}/snapshot", self.state_path),
                 format!("--"),
                 format!("sh"),
                 format!("../restore.sh"),
@@ -80,8 +82,6 @@ impl AFLRun {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/", 
-                std::env::current_dir().unwrap().display(), self.state_path))
             .spawn()
     }
 
