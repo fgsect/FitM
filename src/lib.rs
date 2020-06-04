@@ -1,64 +1,90 @@
-use std::process::{Command, Output, Child};
+use std::process::{Command, Child, Stdio};
+use std::path::Path;
 use std::error::Error;
+use std::fs;
+use std::io;
 
 struct AFLRun {
-    in_path: String,
-    out_path: String,
-    mem_limit: String,
-    rst_path: String,
-    server_bin: String,
-    snapshot_env: String
+    state_path: String,
+    target_bin: String,
 }
 
 impl AFLRun {
-    fn new(in_path: String,
-           out_path: String,
-           mem_limit: String,
-           rst_path: String,
-           server_bin: String,
-           snapshot_env: String) -> AFLRun{
-        AFLRun{ in_path, out_path, mem_limit, rst_path, server_bin, snapshot_env }
+    fn new(state_path: String, target_bin: String) -> AFLRun {
+        if Path::new(&format!("states/{}", state_path)).exists() {
+            println!("[!] states/{} already exists! Recreating..", state_path);
+            let delete = true;
+            if delete {
+                fs::remove_dir(format!("states/{}", state_path))
+                    .expect("[-] Could not remove duplicate state dir!");
+            }
+            let exit_on_dup = false;
+            if exit_on_dup {
+                std::process::exit(1);
+            }
+        }
+        fs::create_dir(format!("states/{}", state_path))
+            .expect("[-] Could not create state dir!");
+
+        fs::create_dir(format!("states/{}/in", state_path))
+            .expect("[-] Could not create in dir!");
+
+        fs::create_dir(format!("states/{}/out", state_path))
+            .expect("[-] Could not create out dir!");
+
+        fs::File::create(format!("states/{}/out/.cur_input", state_path))
+            .expect("[-] Could not create cur_input file!");
+
+        fs::File::create(format!("states/{}/log", state_path))
+            .expect("[-] Could not create file!");
+
+        AFLRun{ state_path, target_bin }
     }
 
-    fn run_restore(&self, failure_msg: &str) -> Output{
+    fn fuzz_run(&self) -> io::Result<Child> {
         Command::new("AFLplusplus/afl-fuzz")
-            .args(&[format!("-i {}", self.in_path),
-                format!("-o {}", self.out_path),
-                format!(" -m {} ", self.mem_limit),
+            .args(&[
+                format!("-i states/{}/in", self.state_path),
+                format!("-o states/{}/out", self.state_path),
+                format!("-m none"),
                 format!("-d"),
-                format!("-r {}", self.rst_path),
+                format!("-r states/{}/snapshot", self.state_path),
                 format!("--"),
-                format!("{}", self.server_bin),
-                format!("@@")])
-            .env(&self.snapshot_env, "")
-            .output()
-            .expect(failure_msg)
+                format!("sh ../restore.sh")
+            ]).spawn()
     }
 
-    fn run_qemu(&self, failure_msg: &str) -> Child{
-        Command::new("AFLplusplus/afl-fuzz")
-            .args(&["-i", &self.in_path,
-                "-o", &self.out_path,
-                "-m", &self.mem_limit,
-                "-d",
-                "-Q",
-                "--", &self.server_bin,
-                "@@"])
-            .env(&self.snapshot_env, "")
-            .spawn().ok()
-            .expect(failure_msg)
+    fn init_run(&self) -> io::Result<Child> {
+        let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
+            self.state_path)).unwrap();
+        let log1 = fs::File::open(format!("states/{}/log", self.state_path))
+            .unwrap();
+        let log2 = fs::File::open(format!("states/{}/log", self.state_path))
+            .unwrap();
+        Command::new("setsid")
+            .args(&[
+                format!("stdbuf"),
+                format!("-oL"),
+                format!("AFLplusplus/afl-qemu-trace"),
+                format!("{}", self.target_bin),
+            ])
+            .stdin(Stdio::from(cur_input))
+            .stdout(Stdio::from(log1))
+            .stderr(Stdio::from(log2))
+            .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+            .spawn()
+    }
+
+    fn consolidation(&self) {
+        return
     }
 }
-pub fn run() -> Result<(), Box<dyn Error>>{
+pub fn run() -> Result<(), Box<dyn Error>> {
 
-    let afl: AFLRun = AFLRun::new("fitm-in".to_string(),
-                "fitm-out".to_string(),
-                "none".to_string(),
-                "fitm-c0s0".to_string(),
-                "test/fsrv_test".to_string(),
-                "LETS_DO_THE_TIMEWARP_AGAIN".to_string());
+    let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
+        "test/forkserver_test".to_string());
 
-    let mut afl_child = afl.run_qemu("failed to execute afl");
+    let mut afl_child = afl.init_run().expect("Failed to execute afl");
 
     afl_child.wait().ok().expect("Couldn't wait for process.");
     // Output some exit information.

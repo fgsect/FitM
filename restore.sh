@@ -4,8 +4,8 @@
 env > ./envfile
 
 # TODO: Clean this up, this looks/is ugly
-PIPE1=$(cat /tmp/log | cut -d$'\n' -f1)
-PIPE2=$(cat /tmp/log | cut -d$'\n' -f2)
+PIPE1=$(cat ./log | cut -d$'\n' -f1)
+PIPE2=$(cat ./log | cut -d$'\n' -f2)
 
 /home/hirnheiner/repos/criu/criu/criu restore -d \
     -vvv \
