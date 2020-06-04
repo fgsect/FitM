@@ -32,6 +32,9 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
+        fs::create_dir(format!("states/{}/snapshot", state_path))
+            .expect("[-] Could not create snapshot dir!");
+
         fs::File::create(format!("states/{}/out/.cur_input", state_path))
             .expect("[-] Could not create cur_input file!");
 
@@ -72,6 +75,8 @@ impl AFLRun {
             .stdout(Stdio::from(log1))
             .stderr(Stdio::from(log2))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/", 
+                std::env::current_dir().unwrap().display(), self.state_path))
             .spawn()
     }
 
@@ -87,17 +92,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut afl_child = afl.init_run().expect("Failed to execute afl");
 
     afl_child.wait().ok().expect("Couldn't wait for process.");
-    // Output some exit information.
-    // match the_status {
-    //     ExitStatus(x) => println!("Exited with status {}", x),
-    // };
-    // tmp match {
-    //     Ok(Child) => println!("Spawned AFL"),
-    //     Err(Child) => println!("Error spawning AFL")
-    // }
 
-    // let hello = output.stdout;
-    // print!("{}", String::from_utf8_lossy(&hello));
+    fs::remove_file(format!("states/{}/out/.cur_input", afl.state_path))
+        .expect("[-] Could not remove cur_input file!");
 
     Ok(())
 }
