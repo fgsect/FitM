@@ -53,8 +53,13 @@ impl AFLRun {
                 format!("-d"),
                 format!("-r states/{}/snapshot", self.state_path),
                 format!("--"),
-                format!("sh ../restore.sh")
-            ]).spawn()
+                format!("sh"),
+                format!("../restore.sh"),
+                format!("{}", self.state_path)
+            ])
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/", 
+                std::env::current_dir().unwrap().display(), self.state_path))
+            .spawn()
     }
 
     fn init_run(&self) -> io::Result<Child> {
