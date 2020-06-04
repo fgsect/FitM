@@ -113,6 +113,8 @@
 #include "qemu.h"
 #include "fd-trans.h"
 #include <linux/sockios.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <fcntl.h>
 
@@ -2301,16 +2303,11 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
             close(write_pipe[1]);
         }
 
-        char *buff = calloc(200, 1);
-        readlink("/proc/self/fd/198", buff, 100);
-        char *tmp = (&buff[strlen(buff)])+1;
-        buff[strlen(buff)] = '\n';
-        readlink("/proc/self/fd/199", tmp, 100);
-        printf("%s\n", buff);
+        system("readlink /proc/self/fd/198");
+        system("readlink /proc/self/fd/199");
 
         do_criu();
         puts("QEMU AFTER");
-        system("ls -la /proc/self/fd");
 
         if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
             exit(0);
@@ -2326,7 +2323,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
             }
         }
     }
-
+    // read did not read anything without setting FD to the beginning of the file.
+    lseek(0, 0, SEEK_SET);
     return read(0, (char *)msg, len);
 }
 
