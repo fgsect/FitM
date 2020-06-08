@@ -2,9 +2,9 @@ use std::process::{Command, Child, Stdio};
 use std::path::Path;
 use std::fs;
 use std::io;
+use std::env;
 // use std::os::unix::fs::PermissionsExt;
 use std::os::unix::fs::OpenOptionsExt;
-
 
 struct AFLRun {
     state_path: String,
@@ -25,6 +25,7 @@ impl AFLRun {
                 std::process::exit(1);
             }
         }
+
         fs::create_dir(format!("states/{}", state_path))
             .expect("[-] Could not create state dir!");
 
@@ -44,7 +45,6 @@ impl AFLRun {
             .open(format!("states/{}/out/.cur_input", state_path))
             .unwrap();
 
-
         AFLRun{ state_path, target_bin }
     }
 
@@ -63,7 +63,6 @@ impl AFLRun {
                 format!("--"),
                 format!("sh"),
                 format!("../restore.sh"),
-                format!("{}", self.state_path)
             ])
             .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
                 std::env::current_dir().unwrap().display(), self.state_path))
@@ -73,34 +72,43 @@ impl AFLRun {
     fn init_run(&self) -> io::Result<Child> {
         fs::write(format!("states/{}/in/1", self.state_path), "init case.")
             .expect("[-] Could not create initial test case!");
+
         let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
         let stdout = fs::File::create(format!("states/{}/stdout",
             self.state_path)).unwrap();
         let stderr = fs::File::create(format!("states/{}/stderr",
         self.state_path)).unwrap();
-        Command::new("setsid")
+
+        env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
+
+        let ret = Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
-                format!("AFLplusplus/afl-qemu-trace"),
-                format!("{}", self.target_bin),
+                format!("../../AFLplusplus/afl-qemu-trace"),
+                format!("../../{}", self.target_bin),
             ])
             .stdin(Stdio::from(cur_input))
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
-                std::env::current_dir().unwrap().display(), self.state_path))
-            .spawn()
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/snapshot/",
+                std::env::current_dir().unwrap().display()))
+            .spawn();
+
+        env::set_current_dir(&Path::new("../../")).unwrap();
+
+        ret
     }
 
     // fn consolidation(&self) {
     //     return
     // }
+
+
 }
 pub fn run() {
-
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
         "test/forkserver_test".to_string());
 

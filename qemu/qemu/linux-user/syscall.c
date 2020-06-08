@@ -2281,8 +2281,9 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addrlen)
 {
     if(sent){
-        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
+        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             exit(0);
+        }
         sent = false; // After restore, we'll await the next sent before criuin' again
 
         if (fcntl(198, F_GETFD) == -1) {
@@ -2306,10 +2307,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         system("readlink /proc/self/fd/199");
 
         do_criu();
-
-        if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
-            exit(0);
-
+        // Weird bug making criu restore crash - this solves it
+        sleep(0.2);
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");

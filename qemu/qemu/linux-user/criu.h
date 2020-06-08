@@ -138,8 +138,9 @@ int do_criu(void){
     /*
     * Check response.
     */
-    if (resp->success)
+    if (resp->success){
         puts("Success");
+    }
     else {
         puts("Fail");
         ret = -1;
