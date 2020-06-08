@@ -25,6 +25,7 @@ test_restore(){
   cd $state_dir
   mkdir out
   touch out/.cur_input
+  chmod 600 out/.cur_input
   touch stderr
   touch stdout
   # This throws a weird error(?) but seems to work:
@@ -35,7 +36,7 @@ test_restore(){
   mkdir -p "in" "out" &> /dev/null || echo "mkdir failed"
   echo "RI" > "in/foobar"
   cd $old_pwd
-  sudo -E AFLplusplus/afl-fuzz -i in -o out -m none -r states/test -- sh restore.sh
+  sudo -E AFLplusplus/afl-fuzz -i $state_dir/in -o $state_dir/out -m none -r states/test -- sh restore.sh
 }
 
 clean
