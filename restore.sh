@@ -6,6 +6,7 @@
 STATE=$(echo $1 | cut -d'/' -f2)
 
 cd states/$STATE
+export INPUT_FILENAME=$2
 env > ./envfile
 PIPE1=$(cat ./stdout | cut -d$'\n' -f1)
 PIPE2=$(cat ./stdout | cut -d$'\n' -f2)
