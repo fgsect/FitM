@@ -2,6 +2,7 @@ use std::process::{Command, Child, Stdio};
 use std::path::Path;
 use std::fs;
 use std::io;
+use std::os::unix::fs::PermissionsExt;
 
 struct AFLRun {
     state_path: String,
@@ -34,8 +35,14 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/snapshot", state_path))
             .expect("[-] Could not create snapshot dir!");
 
-        fs::File::create(format!("states/{}/out/.cur_input", state_path))
+        let cur_input = fs::File::create(format!("states/{}/out/.cur_input", state_path))
             .expect("[-] Could not create cur_input file!");
+
+        let metadata = cur_input.metadata()
+            .expect("[-] Could not read file metadata");
+        let mut permissions = metadata.permissions();
+
+        permissions.set_mode(0o600);
 
         AFLRun{ state_path, target_bin }
     }
@@ -57,7 +64,7 @@ impl AFLRun {
                 format!("../restore.sh"),
                 format!("{}", self.state_path)
             ])
-            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/", 
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
                 std::env::current_dir().unwrap().display(), self.state_path))
             .spawn()
     }
@@ -82,6 +89,8 @@ impl AFLRun {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
+                std::env::current_dir().unwrap().display(), self.state_path))
             .spawn()
     }
 
