@@ -2,7 +2,9 @@ use std::process::{Command, Child, Stdio};
 use std::path::Path;
 use std::fs;
 use std::io;
-use std::os::unix::fs::PermissionsExt;
+// use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::OpenOptionsExt;
+
 
 struct AFLRun {
     state_path: String,
@@ -35,14 +37,13 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/snapshot", state_path))
             .expect("[-] Could not create snapshot dir!");
 
-        let cur_input = fs::File::create(format!("states/{}/out/.cur_input", state_path))
-            .expect("[-] Could not create cur_input file!");
+        fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .mode(0o600)
+            .open(format!("states/{}/out/.cur_input", state_path))
+            .unwrap();
 
-        let metadata = cur_input.metadata()
-            .expect("[-] Could not read file metadata");
-        let mut permissions = metadata.permissions();
-
-        permissions.set_mode(0o600);
 
         AFLRun{ state_path, target_bin }
     }
