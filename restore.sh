@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This file has to write the entire env into the envfile
-
+# Expects relative path to state folder it's supposed to restore as arg
 # TODO: Clean this up, this looks/is ugly
 STATE=$(echo $1 | cut -d'/' -f2)
 
