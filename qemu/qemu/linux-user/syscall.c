@@ -6312,6 +6312,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 system("readlink /proc/self/fd/199");
 
                 do_criu();
+                // Weird bug making criu restore crash - this solves it
+                sleep(0.2);
+
                 if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
                     exit(0);
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
@@ -6329,7 +6332,6 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 // The file is used as stdin
                 char* input = getenv_from_file("INPUT_FILENAME");
                 FILE* input_file = fopen(input, "r");
-
                 if(!input_file){
                     printf("fatal: could not fopen INPUT_FILENAME: %s\n", input);
                     exit(1);
