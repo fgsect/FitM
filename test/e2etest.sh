@@ -10,13 +10,15 @@ clean(){
 
   rm -rf /tmp/criu_snapshot/
   rm -rf /tmp/log
+  rm -rf states/test
 }
 
-test_restore(){
+create_snap(){
   export LETS_DO_THE_TIMEWARP_AGAIN=1
   export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
   export AFL_SKIP_CPUFREQ=1
   export AFL_DEBUG_CHILD_OUTPUT=1
+  export AFL_SKIP_BIN_CHECK=1
 
   old_pwd=$PWD
   state_dir=$(pwd)/states/test
@@ -30,14 +32,24 @@ test_restore(){
   touch stdout
   # This throws a weird error(?) but seems to work:
   # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/forkserver_test < /dev/null &> /tmp/log
-  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/forkserver_test < out/.cur_input 1> ./stdout 2>./stderr && echo "Initial snap successful"
+  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/forkserver_test < /dev/null 1> ./stdout 2> ./stderr && echo "Initial snap successful"
+}
+
+fuzz_snap(){
   unset LETS_DO_THE_TIMEWARP_AGAIN
   sudo rm -f out/* &> /dev/null || echo "rm failed"
   mkdir -p "in" "out" &> /dev/null || echo "mkdir failed"
   echo "RI" > "in/foobar"
   cd $old_pwd
-  sudo -E AFLplusplus/afl-fuzz -i $state_dir/in -o $state_dir/out -m none -r states/test -- sh restore.sh
+  backup_snap
+  sudo -E AFLplusplus/afl-fuzz -i $state_dir/in -o $state_dir/out -m none -- sh restore.sh states/test @@
+}
+
+backup_snap(){
+  sudo rm -rf /tmp/test
+  sudo cp -r $state_dir /tmp/test
 }
 
 clean
-test_restore
+create_snap
+fuzz_snap
