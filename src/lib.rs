@@ -124,8 +124,8 @@ impl AFLRun {
 // Take a string like: fitm-c0s0 and turn it into fitm-c1s0 or fitm-c0s1
 fn next_state_path(state_path: String, inc_server: bool) -> String {
     lazy_static! {
-            static ref REGEX: Regex = Regex::new(r"fitm-c([0-9])+s([0-9])+").unwrap();
-        }
+        static ref REGEX: Regex = Regex::new(r#"fitm-c([0-9])+s([0-9])+"#).unwrap();
+    }
     let caps: regex::Captures = REGEX.captures(&state_path).unwrap();
     // 0 is the whole capture, then 1st group, 2nd group, ...
     let mut server_int: u32 = caps.get(2).unwrap().as_str().parse().unwrap();
