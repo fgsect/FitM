@@ -58,14 +58,15 @@ impl AFLRun {
                 format!("-m"),
                 format!("none"),
                 format!("-d"),
-                format!("-r"),
-                format!("states/{}/snapshot", self.state_path),
                 format!("--"),
                 format!("sh"),
-                format!("../restore.sh"),
+                format!("restore.sh"),
+                format!("states/{}/snapshot", self.state_path),
+                format!("@@")
             ])
             .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
                 std::env::current_dir().unwrap().display(), self.state_path))
+            .env("AFL_SKIP_BIN_CHECK", "1")
             .spawn()
     }
 
@@ -118,9 +119,6 @@ pub fn run() {
         println!("Error while waiting for init run: {}", x);
         std::process::exit(1);
     });
-
-    fs::remove_file(format!("states/{}/out/.cur_input", afl.state_path))
-        .expect("[-] Could not remove cur_input file!");
 
     afl_child = afl.fuzz_run().expect("Failed to start fuzz run");
 
