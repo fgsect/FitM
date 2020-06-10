@@ -6342,7 +6342,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     perror("fatal: could not fileno INPUT_FILENAME");
                     exit(1);
                 }
-                dup2(input_fd, 0);
+                dup2(input_fd, arg1);
                 close(input_fd);
             }
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
