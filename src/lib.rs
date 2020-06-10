@@ -6,8 +6,6 @@ use std::env;
 use std::collections::VecDeque;
 use std::os::unix::fs::OpenOptionsExt;
 
-use std::{thread, time};
-
 struct AFLRun {
     state_path: String,
     target_bin: String,
@@ -75,10 +73,7 @@ impl AFLRun {
             .spawn()
     }
 
-    fn init_run(&self) -> io::Result<Child> {
-        fs::write(format!("states/{}/in/1", self.state_path), "init case.")
-            .expect("[-] Could not create initial test case!");
-
+    fn snapshot_run(&self) -> io::Result<Child> {
         let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
         let stdout = fs::File::create(format!("states/{}/stdout",
@@ -119,10 +114,13 @@ pub fn run() {
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
         "test/forkserver_test".to_string(), cur_timeout.to_string());
 
-    let mut afl_child = afl.init_run().expect("Failed to execute initial afl");
+    fs::write(format!("states/{}/in/1", afl.state_path), "init case.")
+        .expect("[-] Could not create initial test case!");
+
+    let mut afl_child = afl.snapshot_run().expect("Failed to execute initial afl");
 
     afl_child.wait().unwrap_or_else(|x| {
-        println!("Error while waiting for init run: {}", x);
+        println!("Error while waiting for snapshot run: {}", x);
         std::process::exit(1);
     });
 
