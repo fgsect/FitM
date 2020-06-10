@@ -27,11 +27,11 @@ fn main() {
 
     if !Path::new("states").exists() {
         match fs::create_dir("states"){
-         Ok(_) => (),
-         Err(_) => {
-            println!("Could not create the states dir, aborting!");
-            process::exit(0);
-         }
+            Ok(_) => (),
+            Err(_) => {
+                println!("Could not create the states dir, aborting!");
+                process::exit(0);
+            }
         }
     }
 
