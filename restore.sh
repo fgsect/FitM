@@ -7,8 +7,8 @@ STATE=$(echo $1 | cut -d'/' -f2)
 
 export INPUT_FILENAME=$(realpath $2)
 env > states/$STATE/envfile
-PIPE1=$(cat states/$STATE/stdout | cut -d$'\n' -f1)
-PIPE2=$(cat states/$STATE/stdout | cut -d$'\n' -f2)
+PIPE1=$(cat states/$STATE/stdout | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
+PIPE2=$(cat states/$STATE/stdout | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
 ls -la /proc/self/fd
 
