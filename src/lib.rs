@@ -87,10 +87,10 @@ impl AFLRun {
     // In consolidation mode we want to have rather
     // fine grained controller over the input of the run
     fn snapshot_run(&self, stdin: File) -> io::Result<Child> {
-        let stdout = File::create(format!("states/{}/stdout",
-            self.state_path)).unwrap();
-        let stderr = File::create(format!("states/{}/stderr",
-        self.state_path)).unwrap();
+        let stdout = File::create(format!("states/{}/stdout", self.state_path))
+            .unwrap();
+        let stderr = File::create(format!("states/{}/stderr", self.state_path))
+            .unwrap();
 
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
@@ -113,42 +113,42 @@ impl AFLRun {
 
         ret
     }
-
-    // fn consolidation(&self) {
-    //     return
-    // }
-
-
 }
 
 // Take a string like: fitm-c0s0 and turn it into fitm-c1s0 or fitm-c0s1
 fn next_state_path(state_path: String, inc_server: bool) -> String {
     lazy_static! {
-        static ref REGEX: Regex = Regex::new(r#"fitm-c([0-9])+s([0-9])+"#).unwrap();
+        static ref REGEX: Regex = Regex::new(r#"fitm-c([0-9])+s([0-9])+"#)
+            .unwrap();
     }
     let caps: regex::Captures = REGEX.captures(&state_path).unwrap();
     // 0 is the whole capture, then 1st group, 2nd group, ...
     let mut server_int: u32 = caps.get(2).unwrap().as_str().parse().unwrap();
     let mut client_int: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
+
     if inc_server {
         server_int += 1;
     } else {
         client_int += 1;
     }
+
     format!("fitm-c{}s{}", client_int, server_int)
 }
 
 fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
     let mut previous_state: String = previous_run.state_path.clone();
     let mut new_runs: VecDeque<AFLRun> = VecDeque::new();
-    let queue_folder: String = format!("states/{}/out/queue", &previous_run.state_path);
+    let queue_folder: String = format!("states/{}/out/queue", 
+        &previous_run.state_path);
+
     for entry in fs::read_dir(queue_folder)
             .expect("[!] read_dir on previous_run.state_path failed") {
-
-        let entry = entry.expect("[!] Could not read entry from previous_run.state_path");
+        let entry = entry
+            .expect("[!] Could not read entry from previous_run.state_path");
         let path = entry.path();
+
         // skip dirs, only create a new run for each input file
-        if path.is_dir(){
+        if path.is_dir() {
             continue
         }
 
@@ -157,7 +157,8 @@ fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
         "test/forkserver_test".to_string(), 5.to_string());
 
         previous_state = afl.state_path.clone();
-        let seed_file_path = format!("states/{}/in/{}", afl.state_path, random::<u16>());
+        let seed_file_path = format!("states/{}/in/{}", afl.state_path,
+            random::<u16>());
         fs::copy(path, &seed_file_path)
             .expect("[!] Could not copy to new afl.state_path");
 
@@ -170,11 +171,12 @@ fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
         child.wait().expect("[!] Error while waiting for snapshot run");
         new_runs.push_back(afl);
     }
+
     new_runs
 }
 
 pub fn run() {
-    let cur_timeout = 1;
+    let cur_timeout = 60;
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
         "test/forkserver_test".to_string(), cur_timeout.to_string());
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
@@ -193,7 +195,8 @@ pub fn run() {
     // this does not terminate atm as consolidate_poc does not yet minimize anything
     while !queue.is_empty() {
         // kick off new run
-        let afl = queue.pop_front().expect("[*] Queue is empty, no more jobs to be done");
+        let afl = queue.pop_front()
+            .expect("[*] Queue is empty, no more jobs to be done");
         let mut child = afl.fuzz_run().expect("[!] Failed to start fuzz run");
         child.wait().expect("[!] Error while waiting for fuzz run");
         let _tmp = afl.state_path.clone();

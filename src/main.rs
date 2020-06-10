@@ -26,7 +26,7 @@ fn main() {
     env::set_var(child, "1");
 
     if !Path::new("states").exists() {
-        match fs::create_dir("states"){
+        match fs::create_dir("states") {
             Ok(_) => (),
             Err(_) => {
                 println!("Could not create the states dir, aborting!");
@@ -34,8 +34,6 @@ fn main() {
             }
         }
     }
-
-    println!("Welcome to FitM!");
 
     fitm::run();
 }
