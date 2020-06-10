@@ -3,16 +3,19 @@ use std::path::Path;
 use std::fs;
 use std::io;
 use std::env;
-// use std::os::unix::fs::PermissionsExt;
+use std::collections::VecDeque;
 use std::os::unix::fs::OpenOptionsExt;
+
+use std::{thread, time};
 
 struct AFLRun {
     state_path: String,
     target_bin: String,
+    timeout: String
 }
 
 impl AFLRun {
-    fn new(state_path: String, target_bin: String) -> AFLRun {
+    fn new(state_path: String, target_bin: String, timeout: String) -> AFLRun {
         if Path::new(&format!("states/{}", state_path)).exists() {
             println!("[!] states/{} already exists! Recreating..", state_path);
             let delete = true;
@@ -45,7 +48,7 @@ impl AFLRun {
             .open(format!("states/{}/out/.cur_input", state_path))
             .unwrap();
 
-        AFLRun{ state_path, target_bin }
+        AFLRun{ state_path, target_bin, timeout }
     }
 
     fn fuzz_run(&self) -> io::Result<Child> {
@@ -58,6 +61,8 @@ impl AFLRun {
                 format!("-m"),
                 format!("none"),
                 format!("-d"),
+                format!("-V"),
+                format!("{}", self.timeout),
                 format!("--"),
                 format!("sh"),
                 format!("restore.sh"),
@@ -110,8 +115,9 @@ impl AFLRun {
 
 }
 pub fn run() {
+    let cur_timeout = 5;
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
-        "test/forkserver_test".to_string());
+        "test/forkserver_test".to_string(), cur_timeout.to_string());
 
     let mut afl_child = afl.init_run().expect("Failed to execute initial afl");
 
@@ -120,10 +126,30 @@ pub fn run() {
         std::process::exit(1);
     });
 
-    afl_child = afl.fuzz_run().expect("Failed to start fuzz run");
+    // Are there no immutable queue implementations in the standard library?
+    let mut queue: VecDeque<&AFLRun> = VecDeque::new();
+    queue.push_back(&afl);
+    while !queue.is_empty() {
+        // consolidate previous runs here
 
-    afl_child.wait().unwrap_or_else(|x| {
-        println!("Error while waiting for fuzz run: {}", x);
-        std::process::exit(1);
-    });
+        // kick off new run
+        match queue.pop_front() {
+            Some(afl) => {
+                let mut child = afl.fuzz_run().expect("Failed to start fuzz run");
+                child.wait().unwrap_or_else(|x| {
+                    println!("[!] Error while waiting for fuzz run: {}", x);
+                    std::process::exit(1);
+                });
+            }
+            None => {
+                println!("[*] Queue is empty, no more jobs to be done.")
+            }
+        }
+    }
+
+    println!("[*] Reached end of programm. Quitting.");
+
+
+
+
 }
