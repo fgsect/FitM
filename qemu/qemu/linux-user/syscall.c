@@ -1984,7 +1984,7 @@ static inline int target_to_host_sock_type(int *type)
 static abi_long do_socket(int domain, int type, int protocol)
 {
     char *uuid = get_new_uuid();
-    char path[44] = "./fds/";
+    char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
@@ -2186,7 +2186,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
     char *uuid = get_new_uuid();
-    char path[44] = "./fds/";
+    char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
