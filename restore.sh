@@ -12,7 +12,7 @@ PIPE2=$(cat states/$STATE/stdout | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' 
 
 ls -la /proc/self/fd
 
-/home/hirnheiner/repos/criu/criu/criu restore -d \
+criu restore -d \
     -vvv \
     -o ./restore.log \
     --images-dir states/$STATE/snapshot \
