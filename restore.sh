@@ -12,8 +12,8 @@ exec 78< $STATE_DIR/stdout
 exec 79< $STATE_DIR/stderr
 
 env > $STATE_DIR/envfile
-PIPE1=$(cat $STATE_DIR/stdout | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
-PIPE2=$(cat $STATE_DIR/stdout | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
+PIPE1=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
+PIPE2=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
 echo "======="
 ls -la /proc/self/fd
