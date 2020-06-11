@@ -41,9 +41,8 @@ fuzz_snap(){
   sudo rm -f out/* &> /dev/null || echo "rm failed"
   mkdir -p "in" "out" "fd" &> /dev/null || echo "mkdir failed"
   echo "RI" > "in/foobar"
-  cd $old_pwd
   backup_snap
-  sudo -E AFLplusplus/afl-fuzz -i $state_dir/in -o $state_dir/out -m none -- sh restore.sh states/test @@
+  sudo -E ../../AFLplusplus/afl-fuzz -i ./in -o ./out -m none -- sh ../../restore.sh ./test @@
 }
 
 backup_snap(){
