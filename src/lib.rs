@@ -200,6 +200,7 @@ impl AFLRun {
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
             .env("AFL_SKIP_BIN_CHECK", "1")
             .env("AFL_NO_UI", "1")
+            .env("AFL_DEBUG", "1")
             .spawn();
 
         // After spawning showmap command we go back into the base directory
