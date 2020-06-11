@@ -11,24 +11,34 @@ use rand::random;
 use lazy_static::lazy_static;
 use regex::Regex;
 
+/// AFLRun contains all the information for one specific fuzz run.
 struct AFLRun {
+    /// Path to the base directory of the state of the current fuzz run
     state_path: String,
+    /// Binary that is being fuzzed
     target_bin: String,
+    /// Timeout for this run
+    /// TODO: probably should be dynamic based on how interesting this state is.
     timeout: String
 }
 
+/// Implementation of functions for an afl run
 impl AFLRun {
+    /// Create a new afl run instance
     fn new(state_path: String, target_bin: String, timeout: String) -> AFLRun {
+        // If the new state directory already exists we may have old data there
+        // so we optionally delete it
         if Path::new(&format!("states/{}", state_path)).exists() {
             println!("[!] states/{} already exists! Recreating..", state_path);
             let delete = true;
             if delete {
+                // expect already panics so we don't need to exit manually
                 fs::remove_dir(format!("states/{}", state_path))
                     .expect("[-] Could not remove duplicate state dir!");
             }
-            // expect already panics so we don't need to exit manually
         }
 
+        // Create the new directories and files to make afl feel at home
         fs::create_dir(format!("states/{}", state_path))
             .expect("[-] Could not create state dir!");
 
@@ -44,6 +54,8 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/snapshot", state_path))
             .expect("[-] Could not create snapshot dir!");
 
+        // Create a dummy .cur_input because the file has to exist once criu 
+        // restores the process
         fs::OpenOptions::new()
             .create(true)
             .write(true)
@@ -54,7 +66,11 @@ impl AFLRun {
         AFLRun{ state_path, target_bin, timeout }
     }
 
+    /// Start a single fuzz run in afl which gets restored from an earlier
+    /// snapshot. Because we use sh and the restore script we have to skip the
+    /// bin check
     fn fuzz_run(&self) -> io::Result<Child> {
+        // Spawn the afl run in a command
         Command::new("AFLplusplus/afl-fuzz")
             .args(&[
                 format!("-i"),
@@ -78,22 +94,31 @@ impl AFLRun {
             .spawn()
     }
 
+    /// Wrapper for the snapshot run
     fn init_run(&self) -> io::Result<Child> {
+        // create the .cur_input so that criu snapshots a fd connected to
+        // .cur_input
         let cur_input = File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
         self.snapshot_run(cur_input)
     }
 
-    // In consolidation mode we want to have rather
-    // fine grained controller over the input of the run
+    /// Start the target binary for the first time and run until the first recv
+    /// which will trigger the snapshot
     fn snapshot_run(&self, stdin: File) -> io::Result<Child> {
+        // Open a file for stdout and stderr to log to
         let stdout = File::create(format!("states/{}/stdout", self.state_path))
             .unwrap();
         let stderr = File::create(format!("states/{}/stderr", self.state_path))
             .unwrap();
 
+        // Change into our state directory and fuzz from there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
+        // Start the initial snapshot run. We use our patched qemu to emulate
+        // until the first recv of the target is hit. We have to use setsid to
+        // circumvent the --shell-job problem of criu and stdbuf to have the
+        // correct stdin, stdout and stderr file descriptors.
         let ret = Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
@@ -109,14 +134,20 @@ impl AFLRun {
                 std::env::current_dir().unwrap().display()))
             .spawn();
 
+        // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
         ret
     }
 }
 
-// Take a string like: fitm-c0s0 and turn it into fitm-c1s0 or fitm-c0s1
+/// Create the next iteration from a given state directory. If inc_server is set
+/// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
+/// Otherwise we will increment the state for the client from fitm-cXsY to
+/// fitm-cX+1sY
 fn next_state_path(state_path: String, inc_server: bool) -> String {
+    // Create a static regex to find the current state directory
+    // TODO: Is the lazy_static macro even necessary?
     lazy_static! {
         static ref REGEX: Regex = Regex::new(r#"fitm-c([0-9])+s([0-9])+"#)
             .unwrap();
@@ -126,6 +157,7 @@ fn next_state_path(state_path: String, inc_server: bool) -> String {
     let mut server_int: u32 = caps.get(2).unwrap().as_str().parse().unwrap();
     let mut client_int: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
 
+    // If inc_server increment the server state else increment the client state
     if inc_server {
         server_int += 1;
     } else {
@@ -153,8 +185,9 @@ fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
         }
 
         let afl = AFLRun::new(
-        next_state_path(previous_state, true),
-        "test/forkserver_test".to_string(), 5.to_string());
+            next_state_path(previous_state, true),
+            "test/forkserver_test".to_string(), 5.to_string()
+        );
 
         previous_state = afl.state_path.clone();
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
@@ -192,7 +225,8 @@ pub fn run() {
     });
 
     queue.push_back(afl);
-    // this does not terminate atm as consolidate_poc does not yet minimize anything
+    // this does not terminate atm as consolidate_poc does not yet minimize
+    // anything
     while !queue.is_empty() {
         // kick off new run
         let afl = queue.pop_front()
