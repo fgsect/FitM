@@ -73,8 +73,8 @@ impl AFLRun {
         AFLRun{ 
             state_path: state_path,
             target_bin: target_bin,
+            timeout: timeout,
             previous_state_path: previous_path,
-            timeout: timeout
         }
     }
 
