@@ -91,6 +91,7 @@ impl AFLRun {
             .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
                 std::env::current_dir().unwrap().display(), self.state_path))
             .env("AFL_SKIP_BIN_CHECK", "1")
+            .env("AFL_NO_UI", "1")
             .spawn()
     }
 
@@ -132,6 +133,7 @@ impl AFLRun {
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
             .env("CRIU_SNAPSHOT_DIR", format!("{}/snapshot/",
                 std::env::current_dir().unwrap().display()))
+            .env("AFL_NO_UI", "1")
             .spawn();
 
         // After spawning the run we go back into the base directory
@@ -145,33 +147,22 @@ impl AFLRun {
 /// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
 /// Otherwise we will increment the state for the client from fitm-cXsY to
 /// fitm-cX+1sY
-fn next_state_path(state_path: String, inc_server: bool) -> String {
-    // Create a static regex to find the current state directory
-    // TODO: Is the lazy_static macro even necessary?
-    lazy_static! {
-        static ref REGEX: Regex = Regex::new(r#"fitm-c([0-9])+s([0-9])+"#)
-            .unwrap();
-    }
-    let caps: regex::Captures = REGEX.captures(&state_path).unwrap();
-    // 0 is the whole capture, then 1st group, 2nd group, ...
-    let mut server_int: u32 = caps.get(2).unwrap().as_str().parse().unwrap();
-    let mut client_int: u32 = caps.get(1).unwrap().as_str().parse().unwrap();
-
+fn next_state_path(state_path: (u32, u32), inc_server: bool) -> (String, String) {
     // If inc_server increment the server state else increment the client state
     if inc_server {
-        server_int += 1;
+        format!("fitm-c{}s{}", (state_path.0).to_string(), ((state_path.1)+1).to_string())
+
     } else {
-        client_int += 1;
+        format!("fitm-c{}s{}", ((state_path.0)+1).to_string(), ((state_path.1)).to_string())
     }
 
-    format!("fitm-c{}s{}", client_int, server_int)
 }
 
-fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
-    let mut previous_state: String = previous_run.state_path.clone();
+fn consolidate_poc(cur_state: &mut (u32, u32)) -> VecDeque<AFLRun> {
+    let cur_timeout = 1;
     let mut new_runs: VecDeque<AFLRun> = VecDeque::new();
-    let queue_folder: String = format!("states/{}/out/queue", 
-        &previous_run.state_path);
+    let queue_folder: String = format!("states/fitm-c{}s{}/out/queue",
+        cur_state.0, cur_state.1);
 
     for entry in fs::read_dir(queue_folder)
             .expect("[!] read_dir on previous_run.state_path failed") {
@@ -183,13 +174,14 @@ fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
         if path.is_dir() {
             continue
         }
-
+        // Only mutate cur_state in this method. So next_state_path gets a readable copy.
+        // We update cur_state here with a new tuple.
+        cur_state = next_state_path(cur_state, true);
         let afl = AFLRun::new(
-            next_state_path(previous_state, true),
-            "test/forkserver_test".to_string(), 5.to_string()
+            cur_state,
+            "test/forkserver_test".to_string(), cur_timeout.to_string()
         );
 
-        previous_state = afl.state_path.clone();
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
             random::<u16>());
         fs::copy(path, &seed_file_path)
@@ -209,7 +201,8 @@ fn consolidate_poc(previous_run: &AFLRun) -> VecDeque<AFLRun> {
 }
 
 pub fn run() {
-    let cur_timeout = 60;
+    let cur_timeout = 1;
+    let mut cur_state: (u32, u32) = (0, 0);
     let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
         "test/forkserver_test".to_string(), cur_timeout.to_string());
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
@@ -235,7 +228,7 @@ pub fn run() {
         child.wait().expect("[!] Error while waiting for fuzz run");
         let _tmp = afl.state_path.clone();
         // consolidate previous runs here
-        let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&afl);
+        let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
         queue.append(&mut new_runs);
     }
 
