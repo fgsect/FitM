@@ -165,6 +165,16 @@ impl AFLRun {
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
+        fs::remove_file("./out/.cur_input")
+            .expect("[!] Could not remove the old .cur_input file");
+
+        fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .mode(0o600)
+            .open("./out/.cur_input")
+            .unwrap();
+
         // Execute afl-showmap from the state dir. We take all the possible 
         // inputs for the OTHER binary that we created with a call to `send`.
         // We then save the generated maps inside `out/maps` where they are used
