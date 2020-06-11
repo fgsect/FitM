@@ -191,9 +191,9 @@ impl AFLRun {
         let afl = AFLRun::new(
             format!("fitm-c{}s{}", new_state.0, new_state.1),
             target_bin.to_string(),
+            cur_timeout.to_string(),
             // FIXME: Wrong path
-            format!("fitm-c{}s{}", new_state.0, new_state.1),
-            cur_timeout.to_string()
+            format!("fitm-c{}s{}", new_state.0, new_state.1)
         );
 
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
@@ -238,8 +238,8 @@ pub fn run() {
         "fitm-c0s0".to_string(),
         "test/forkserver_test".to_string(),
         // FIXME: Wrong path
-        "fitm-c0s0".to_string(),
-        cur_timeout.to_string()
+        cur_timeout.to_string(),
+        "fitm-c0s0".to_string()
     );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
