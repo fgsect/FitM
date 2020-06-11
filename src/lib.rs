@@ -168,8 +168,10 @@ impl AFLRun {
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
-        fs::remove_file("./out/.cur_input")
-            .expect("[!] Could not remove the old .cur_input file");
+        // Create stdout, stderr and .cur_input to truncate the files so that 
+        // criu can restore the processes
+        fs::File::create("stdout").unwrap();
+        fs::File::create("stderr").unwrap();
 
         fs::OpenOptions::new()
             .create(true)
