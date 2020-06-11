@@ -4,12 +4,12 @@ use std::fs::File;
 use std::fs;
 use std::io;
 use std::env;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, BTreeSet};
 use std::os::unix::fs::OpenOptionsExt;
 use rand::random;
 
-use lazy_static::lazy_static;
-use regex::Regex;
+// client_set: set of afl-showmap on client outputs that are relevant for us
+// server_set: set of afl-showmap on server outputs that are relevant for us
 
 /// AFLRun contains all the information for one specific fuzz run.
 struct AFLRun {
@@ -17,9 +17,13 @@ struct AFLRun {
     state_path: String,
     /// Binary that is being fuzzed
     target_bin: String,
+    /// Path to the state the current state receives input from
+    previous_state_path: String,
     /// Timeout for this run
     /// TODO: probably should be dynamic based on how interesting this state is.
-    timeout: String
+    timeout: String,
+    // All the states that came out of the current state
+    // child_states: Vec<(u32, u32)>
 }
 
 /// Implementation of functions for an afl run
@@ -48,16 +52,19 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
+        fs::create_dir(format!("states/{}/out/showmap", state_path))
+            .expect("[-] Could not create out/showmap dir!");
+
         fs::create_dir(format!("states/{}/fd", state_path))
             .expect("[-] Could not create fd dir!");
 
         fs::create_dir(format!("states/{}/snapshot", state_path))
             .expect("[-] Could not create snapshot dir!");
 
-        // Create a dummy .cur_input because the file has to exist once criu 
+        // Create a dummy .cur_input because the file has to exist once criu
         // restores the process
         fs::OpenOptions::new()
-            .create(true)
+            .create(true)self.state_path
             .write(true)
             .mode(0o600)
             .open(format!("states/{}/out/.cur_input", state_path))
@@ -141,50 +148,50 @@ impl AFLRun {
 
         ret
     }
-}
 
-/// Create the next iteration from a given state directory. If inc_server is set
-/// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
-/// Otherwise we will increment the state for the client from fitm-cXsY to
-/// fitm-cX+1sY
-fn next_state_path(state_path: (u32, u32), inc_server: bool) -> (String, String) {
-    // If inc_server increment the server state else increment the client state
-    if inc_server {
-        format!("fitm-c{}s{}", (state_path.0).to_string(), ((state_path.1)+1).to_string())
-
-    } else {
-        format!("fitm-c{}s{}", ((state_path.0)+1).to_string(), ((state_path.1)).to_string())
+    fn gen_afl_maps(&self) -> Result<Child> {
+        Command::new("AFLplusplus/afl-showmap")
+            .args(&[
+                format!("-i"),
+                format!("states/{}/fd", self.state_path),
+                format!("-o"),
+                format!("states/{}/out/maps", self.state_path),
+                format!("-m"),
+                format!("none"),
+                format!("-d"),
+                format!("-Q"),
+                format!("--"),
+                format!("sh"),
+                format!("restore.sh"),
+                format!("states/{}", self.previous_state_path),
+                format!("@@")
+            ])
+            .env("CRIU_SNAPSHOT_DIR", format!("{}/states/{}/snapshot/",
+                std::env::current_dir().unwrap().display(), self.state_path))
+            .env("AFL_SKIP_BIN_CHECK", "1")
+            .env("AFL_NO_UI", "1")
+            .spawn()
     }
 
-}
 
-fn consolidate_poc(cur_state: &mut (u32, u32)) -> VecDeque<AFLRun> {
-    let cur_timeout = 1;
-    let mut new_runs: VecDeque<AFLRun> = VecDeque::new();
-    let queue_folder: String = format!("states/fitm-c{}s{}/out/queue",
-        cur_state.0, cur_state.1);
+    fn create_from_run(&self, new_state: (u32, u32), input: std::String,
+            target_bin: std::String) -> AFLRun {
+        let cur_timeout = 1;
+        let input_path: String = format!("states/{}/fd/{}",
+            self.state_path, input);
 
-    for entry in fs::read_dir(queue_folder)
-            .expect("[!] read_dir on previous_run.state_path failed") {
-        let entry = entry
-            .expect("[!] Could not read entry from previous_run.state_path");
-        let path = entry.path();
-
-        // skip dirs, only create a new run for each input file
-        if path.is_dir() {
-            continue
-        }
-        // Only mutate cur_state in this method. So next_state_path gets a readable copy.
-        // We update cur_state here with a new tuple.
-        cur_state = next_state_path(cur_state, true);
+        // Only mutate cur_state in this method. So next_state_path gets a
+        // readable copy. We update cur_state here with a new tuple.
+        // cur_state = next_state_path(cur_state, true);
         let afl = AFLRun::new(
-            cur_state,
-            "test/forkserver_test".to_string(), cur_timeout.to_string()
+            format!("fitm-c{}s{}", new_state.0, new_state.1),
+            target_bin.to_string(), cur_timeout.to_string()
         );
 
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
             random::<u16>());
-        fs::copy(path, &seed_file_path)
+
+        fs::copy(input_path, &seed_file_path)
             .expect("[!] Could not copy to new afl.state_path");
 
         let seed_file = File::open(seed_file_path)
@@ -194,11 +201,27 @@ fn consolidate_poc(cur_state: &mut (u32, u32)) -> VecDeque<AFLRun> {
             .expect("Failed to start snapshot run");
 
         child.wait().expect("[!] Error while waiting for snapshot run");
-        new_runs.push_back(afl);
-    }
 
-    new_runs
+        afl
+    }
 }
+
+/// Create the next iteration from a given state directory. If inc_server is set
+/// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
+/// Otherwise we will increment the state for the client from fitm-cXsY to
+/// fitm-cX+1sY
+// fn next_state_path(state_path: (u32, u32), inc_server: bool) -> (String, String) {
+//     // If inc_server increment the server state else increment the client state
+//     if inc_server {
+//         format!("fitm-c{}s{}", (state_path.0).to_string(), ((state_path.1)+1).to_string())
+
+//     } else {
+//         format!("fitm-c{}s{}", ((state_path.0)+1).to_string(), ((state_path.1)).to_string())
+//     }
+
+// }
+
+
 
 pub fn run() {
     let cur_timeout = 1;
