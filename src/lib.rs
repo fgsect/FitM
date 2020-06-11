@@ -52,8 +52,8 @@ impl AFLRun {
         fs::create_dir(format!("states/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
-        fs::create_dir(format!("states/{}/out/showmap", state_path))
-            .expect("[-] Could not create out/showmap dir!");
+        fs::create_dir(format!("states/{}/out/maps", state_path))
+            .expect("[-] Could not create out/maps dir!");
 
         fs::create_dir(format!("states/{}/fd", state_path))
             .expect("[-] Could not create fd dir!");
