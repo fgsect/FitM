@@ -161,6 +161,9 @@ impl AFLRun {
         ret
     }
 
+    /// Generate the maps provided by afl-showmap. This is used to filter out 
+    /// for "interesting" new seeds meaning seeds, that will make the OTHER 
+    /// binary produce paths, which we haven't seen yet.
     fn gen_afl_maps(&self) -> io::Result<Child> {
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
