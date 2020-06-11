@@ -78,7 +78,8 @@ impl AFLRun {
         }
     }
 
-    /// Wrapper for the snapshot run
+    /// Wrapper for the snapshot run and to start the create the initial 
+    /// snapshot of the binary
     fn init_run(&self) -> io::Result<Child> {
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -90,7 +91,7 @@ impl AFLRun {
     /// Start the target binary for the first time and run until the first recv
     /// which will trigger the snapshot
     fn snapshot_run(&self, stdin: fs::File) -> io::Result<Child> {
-        // Change into our state directory and fuzz from there
+        // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
         // Open a file for stdout and stderr to log to
@@ -126,15 +127,18 @@ impl AFLRun {
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
     fn fuzz_run(&self) -> io::Result<Child> {
+        // Change into our state directory and create fuzz run from there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
-        // Spawn the afl run in a command
+        // Spawn the afl run in a command. This run is relative to the state dir
+        // meaning we already are inside the directory. This prevents us from
+        // accidentally using different resources than we expect.
         let ret = Command::new("../../AFLplusplus/afl-fuzz")
             .args(&[
                 format!("-i"),
-                format!("in"),
+                format!("./in"),
                 format!("-o"),
-                format!("out"),
+                format!("./out"),
                 format!("-m"),
                 format!("none"),
                 format!("-d"),
@@ -146,7 +150,7 @@ impl AFLRun {
                 format!("{}", self.state_path),
                 format!("@@")
             ])
-            .env("CRIU_SNAPSHOT_DIR", "snapshot")
+            .env("CRIU_SNAPSHOT_DIR", "./snapshot")
             .env("AFL_SKIP_BIN_CHECK", "1")
             .env("AFL_NO_UI", "1")
             .spawn();
@@ -158,15 +162,19 @@ impl AFLRun {
     }
 
     fn gen_afl_maps(&self) -> io::Result<Child> {
-        // Change into our state directory and fuzz from there
+        // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./states/{}", self.state_path)).unwrap();
 
+        // Execute afl-showmap from the state dir. We take all the possible 
+        // inputs for the OTHER binary that we created with a call to `send`.
+        // We then save the generated maps inside `out/maps` where they are used
+        // later.
         let ret = Command::new("../../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
-                format!("fd"),
+                format!("./fd"),
                 format!("-o"),
-                format!("out/maps"),
+                format!("./out/maps"),
                 format!("-m"),
                 format!("none"),
                 format!("-Q"),
@@ -181,7 +189,7 @@ impl AFLRun {
             .env("AFL_NO_UI", "1")
             .spawn();
 
-        // After spawning the run we go back into the base directory
+        // After spawning showmap command we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
         ret
