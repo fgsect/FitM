@@ -1,6 +1,5 @@
 use std::process::{Command, Child, Stdio};
 use std::path::Path;
-use std::fs::File;
 use std::fs;
 use std::io;
 use std::env;
@@ -29,7 +28,8 @@ struct AFLRun {
 /// Implementation of functions for an afl run
 impl AFLRun {
     /// Create a new afl run instance
-    fn new(state_path: String, target_bin: String, timeout: String) -> AFLRun {
+    fn new(state_path: String, target_bin: String, timeout: String,
+            previous_path: String) -> AFLRun {
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
         if Path::new(&format!("states/{}", state_path)).exists() {
@@ -64,13 +64,18 @@ impl AFLRun {
         // Create a dummy .cur_input because the file has to exist once criu
         // restores the process
         fs::OpenOptions::new()
-            .create(true)self.state_path
+            .create(true)
             .write(true)
             .mode(0o600)
             .open(format!("states/{}/out/.cur_input", state_path))
             .unwrap();
 
-        AFLRun{ state_path, target_bin, timeout }
+        AFLRun{ 
+            state_path: state_path,
+            target_bin: target_bin,
+            previous_state_path: previous_path,
+            timeout: timeout
+        }
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
@@ -106,18 +111,18 @@ impl AFLRun {
     fn init_run(&self) -> io::Result<Child> {
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
-        let cur_input = File::open(format!("states/{}/out/.cur_input",
+        let cur_input = fs::File::open(format!("states/{}/out/.cur_input",
             self.state_path)).unwrap();
         self.snapshot_run(cur_input)
     }
 
     /// Start the target binary for the first time and run until the first recv
     /// which will trigger the snapshot
-    fn snapshot_run(&self, stdin: File) -> io::Result<Child> {
+    fn snapshot_run(&self, stdin: fs::File) -> io::Result<Child> {
         // Open a file for stdout and stderr to log to
-        let stdout = File::create(format!("states/{}/stdout", self.state_path))
+        let stdout = fs::File::create(format!("states/{}/stdout", self.state_path))
             .unwrap();
-        let stderr = File::create(format!("states/{}/stderr", self.state_path))
+        let stderr = fs::File::create(format!("states/{}/stderr", self.state_path))
             .unwrap();
 
         // Change into our state directory and fuzz from there
@@ -149,7 +154,7 @@ impl AFLRun {
         ret
     }
 
-    fn gen_afl_maps(&self) -> Result<Child> {
+    fn gen_afl_maps(&self) -> io::Result<Child> {
         Command::new("AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
@@ -174,8 +179,8 @@ impl AFLRun {
     }
 
 
-    fn create_from_run(&self, new_state: (u32, u32), input: std::String,
-            target_bin: std::String) -> AFLRun {
+    fn create_from_run(&self, new_state: (u32, u32), input: String,
+            target_bin: String) -> AFLRun {
         let cur_timeout = 1;
         let input_path: String = format!("states/{}/fd/{}",
             self.state_path, input);
@@ -185,7 +190,10 @@ impl AFLRun {
         // cur_state = next_state_path(cur_state, true);
         let afl = AFLRun::new(
             format!("fitm-c{}s{}", new_state.0, new_state.1),
-            target_bin.to_string(), cur_timeout.to_string()
+            target_bin.to_string(),
+            // FIXME: Wrong path
+            format!("fitm-c{}s{}", new_state.0, new_state.1),
+            cur_timeout.to_string()
         );
 
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
@@ -194,7 +202,7 @@ impl AFLRun {
         fs::copy(input_path, &seed_file_path)
             .expect("[!] Could not copy to new afl.state_path");
 
-        let seed_file = File::open(seed_file_path)
+        let seed_file = fs::File::open(seed_file_path)
             .expect("[!] Could not create input file");
 
         let mut child = afl.snapshot_run(seed_file)
@@ -226,8 +234,13 @@ impl AFLRun {
 pub fn run() {
     let cur_timeout = 1;
     let mut cur_state: (u32, u32) = (0, 0);
-    let afl: AFLRun = AFLRun::new("fitm-c0s0".to_string(),
-        "test/forkserver_test".to_string(), cur_timeout.to_string());
+    let afl: AFLRun = AFLRun::new(
+        "fitm-c0s0".to_string(),
+        "test/forkserver_test".to_string(),
+        // FIXME: Wrong path
+        "fitm-c0s0".to_string(),
+        cur_timeout.to_string()
+    );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
     fs::write(format!("states/{}/in/1", afl.state_path), "init case.")
@@ -251,8 +264,8 @@ pub fn run() {
         child.wait().expect("[!] Error while waiting for fuzz run");
         let _tmp = afl.state_path.clone();
         // consolidate previous runs here
-        let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
-        queue.append(&mut new_runs);
+        // let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
+        // queue.append(&mut new_runs);
     }
 
     println!("[*] Reached end of programm. Quitting.");
