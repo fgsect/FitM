@@ -26,6 +26,7 @@ create_snap(){
   mkdir -p $CRIU_SNAPSHOT_DIR
   cd $state_dir
   mkdir out
+  mkdir fd
   touch out/.cur_input
   chmod 600 out/.cur_input
   touch stderr
@@ -38,7 +39,7 @@ create_snap(){
 fuzz_snap(){
   unset LETS_DO_THE_TIMEWARP_AGAIN
   sudo rm -f out/* &> /dev/null || echo "rm failed"
-  mkdir -p "in" "out" &> /dev/null || echo "mkdir failed"
+  mkdir -p "in" "out" "fd" &> /dev/null || echo "mkdir failed"
   echo "RI" > "in/foobar"
   echo "supertest" > "in/eintest"
   cd $old_pwd
