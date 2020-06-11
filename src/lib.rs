@@ -260,9 +260,13 @@ pub fn run() {
         // kick off new run
         let afl = queue.pop_front()
             .expect("[*] Queue is empty, no more jobs to be done");
+        println!("[*] Starting the fuzz run");
         let mut child = afl.fuzz_run().expect("[!] Failed to start fuzz run");
         child.wait().expect("[!] Error while waiting for fuzz run");
         let _tmp = afl.state_path.clone();
+        println!("[*] Generating maps");
+        child = afl.gen_afl_maps().expect("[!] Failed to start the showmap run");
+        child.wait().expect("[!] Error while waiting for the showmap run");
         // consolidate previous runs here
         // let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
         // queue.append(&mut new_runs);
