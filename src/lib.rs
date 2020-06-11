@@ -254,8 +254,8 @@ pub fn run() {
     let afl: AFLRun = AFLRun::new(
         "fitm-c0s0".to_string(),
         "test/forkserver_test".to_string(),
-        // FIXME: Wrong path
         cur_timeout.to_string(),
+        // FIXME: Wrong path
         "fitm-c0s0".to_string()
     );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
