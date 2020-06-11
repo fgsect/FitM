@@ -50,6 +50,8 @@ int main() {
 
     char *buf = (char *)calloc(100, 1);
     // recv 1
+    send(new_socket, "RI\0", 3, 0);
+
     recv(new_socket, buf, 100, 0);
     printf("recv #1: %s\n", buf);
 
