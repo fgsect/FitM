@@ -26,6 +26,7 @@ create_snap(){
   mkdir -p $CRIU_SNAPSHOT_DIR
   cd $state_dir
   mkdir out
+  mkdir fd
   touch out/.cur_input
   chmod 600 out/.cur_input
   touch stderr
