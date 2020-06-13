@@ -267,42 +267,62 @@ impl AFLRun {
 pub fn run() {
     let cur_timeout = 1;
     let mut cur_state: (u32, u32) = (0, 0);
-    let afl: AFLRun = AFLRun::new(
-        "fitm-c0s0".to_string(),
+
+    let aflClient: AFLRun = AFLRun::new(
+        "fitm-c1s0".to_string(),
+        "test/pseudoclient".to_string(),
+        cur_timeout.to_string(),
+        // TODO: Need some extra handling for this previous_path value
+        "fitm-c0s0".to_string()
+    );
+
+    let aflServer: AFLRun = AFLRun::new(
+        "fitm-c0s1".to_string(),
         "test/pseudoserver".to_string(),
         cur_timeout.to_string(),
-        // FIXME: Wrong path
-        "fitm-c0s0".to_string()
+        "fitm-c1s0".to_string()
     );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
-    fs::write(format!("states/{}/in/1", afl.state_path), "init case.")
+    fs::write(format!("states/{}/in/1", aflClient.state_path), "init case.")
         .expect("[-] Could not create initial test case!");
 
-    let mut afl_child = afl.init_run().expect("Failed to execute initial afl");
+    let mut afl_server_child = aflServer.init_run().expect("Failed to execute initial afl");
 
-    afl_child.wait().unwrap_or_else(|x| {
+    afl_server_child.wait().unwrap_or_else(|x| {
         println!("Error while waiting for snapshot run: {}", x);
         std::process::exit(1);
     });
 
-    queue.push_back(afl);
+    let mut afl_client_child = aflClient.init_run().expect("Failed to execute initial afl");
+
+    afl_client_child.wait().unwrap_or_else(|x| {
+        println!("Error while waiting for snapshot run: {}", x);
+        std::process::exit(1);
+    });
+
+    queue.push_back(aflClient);
+    // queue.push_back(aflServer);
     // this does not terminate atm as consolidate_poc does not yet minimize
     // anything
     while !queue.is_empty() {
         // kick off new run
-        let afl = queue.pop_front()
+        let aflCurrent = queue.pop_front()
             .expect("[*] Queue is empty, no more jobs to be done");
         println!("[*] Starting the fuzz run");
-        let mut child = afl.fuzz_run().expect("[!] Failed to start fuzz run");
-        child.wait().expect("[!] Error while waiting for fuzz run");
-        let _tmp = afl.state_path.clone();
-        println!("[*] Generating maps");
-        child = afl.gen_afl_maps().expect("[!] Failed to start the showmap run");
-        child.wait().expect("[!] Error while waiting for the showmap run");
-        // consolidate previous runs here
-        // let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
-        // queue.append(&mut new_runs);
+        let mut childFuzz = aflCurrent.fuzz_run().expect("[!] Failed to start fuzz run");
+        childFuzz.wait().expect("[!] Error while waiting for fuzz run");
+        let _tmp = aflCurrent.state_path.clone();
+
+        // TODO: Fancier solution? Is this correct?
+        if aflCurrent.previous_state_path != "fitm-c0s0".to_string() {
+            println!("[*] Generating maps");
+            let mut childMap = aflCurrent.gen_afl_maps().expect("[!] Failed to start the showmap run");
+            childMap.wait().expect("[!] Error while waiting for the showmap run");
+            // consolidate previous runs here
+            // let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
+            // queue.append(&mut new_runs);
+        }
     }
 
     println!("[*] Reached end of programm. Quitting.");

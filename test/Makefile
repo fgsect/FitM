@@ -10,8 +10,7 @@ syscall:
 
 clean:
 	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h \
-	forkserver_test rpc.proto syscall getenv_from_file_test pipe_test \
-	pseudoserver pseudoclient
+	forkserver_test rpc.proto syscall getenv_from_file_test pipe_test
 
 test_getenv: clean
 	gcc -o getenv_from_file_test getenv_from_file_test.c
