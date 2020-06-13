@@ -32,18 +32,17 @@ create_snap(){
   touch stderr
   touch stdout
   # This throws a weird error(?) but seems to work:
-  # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/forkserver_test < /dev/null &> /tmp/log
-  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/forkserver_test < /dev/null 1> ./stdout 2> ./stderr && echo "Initial snap successful"
+  # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/pseudoserver < /dev/null &> /tmp/log
+  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/pseudoserver < /dev/null 1> ./stdout 2> ./stderr && echo "Initial snap successful"
 }
 
 fuzz_snap(){
   unset LETS_DO_THE_TIMEWARP_AGAIN
   sudo rm -f out/* &> /dev/null || echo "rm failed"
-  mkdir -p "in" "out" &> /dev/null || echo "mkdir failed"
+  mkdir -p "in" "out" "fd" &> /dev/null || echo "mkdir failed"
   echo "RI" > "in/foobar"
-  cd $old_pwd
   backup_snap
-  sudo -E AFLplusplus/afl-fuzz -i $state_dir/in -o $state_dir/out -m none -- sh restore.sh states/test @@
+  sudo -E ../../AFLplusplus/afl-fuzz -i ./in -o ./out -m none -- sh ../../restore.sh ./test @@
 }
 
 backup_snap(){
