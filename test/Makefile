@@ -20,9 +20,9 @@ test_pipe: clean
 	gcc -o pipe_test pipe_test.c
 	setsid stdbuf -oL ../AFLplusplus/afl-qemu-trace ./pipe_test < /dev/null &> pipe_test.out
 
-test_forksrv: clean
-	gcc -o forkserver_test forkserver_test.c
-	../AFLplusplus/afl-qemu-trace ./forkserver_test
+pseudoserver: clean
+	gcc -o pseudoserver pseudoserver.c
+	../AFLplusplus/afl-qemu-trace ./pseudoserver
 
 test_criupipe: clean
 	gcc -o pipe pipe.c

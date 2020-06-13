@@ -265,11 +265,11 @@ impl AFLRun {
 
 
 pub fn run() {
-    let cur_timeout = 10;
+    let cur_timeout = 1;
     let mut cur_state: (u32, u32) = (0, 0);
     let afl: AFLRun = AFLRun::new(
         "fitm-c0s0".to_string(),
-        "test/forkserver_test".to_string(),
+        "test/pseudoserver".to_string(),
         cur_timeout.to_string(),
         // FIXME: Wrong path
         "fitm-c0s0".to_string()

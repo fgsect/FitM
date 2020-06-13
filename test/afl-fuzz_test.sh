@@ -32,8 +32,8 @@ create_snap(){
   touch stderr
   touch stdout
   # This throws a weird error(?) but seems to work:
-  # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/forkserver_test < /dev/null &> /tmp/log
-  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/forkserver_test < /dev/null 1> ./stdout 2> ./stderr && echo "Initial snap successful"
+  # test.sh: line 15: 608344 Killed    setsid stdbuf -oL AFLplusplus/afl-qemu-trace test/pseudoserver < /dev/null &> /tmp/log
+  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../../test/pseudoserver < /dev/null 1> ./stdout 2> ./stderr && echo "Initial snap successful"
 }
 
 fuzz_snap(){
