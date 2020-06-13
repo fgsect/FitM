@@ -10,7 +10,8 @@ syscall:
 
 clean:
 	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h \
-	forkserver_test rpc.proto syscall getenv_from_file_test pipe_test
+	forkserver_test rpc.proto syscall getenv_from_file_test pipe_test \
+	pseudoserver pseudoclient
 
 test_getenv: clean
 	gcc -o getenv_from_file_test getenv_from_file_test.c
@@ -23,6 +24,10 @@ test_pipe: clean
 pseudoserver: clean
 	gcc -o pseudoserver pseudoserver.c
 	../AFLplusplus/afl-qemu-trace ./pseudoserver
+
+pseudoclient: clean
+	gcc -o pseudoclient pseudoclient.c
+	../AFLplusplus/afl-qemu-trace ./pseudoclient
 
 test_criupipe: clean
 	gcc -o pipe pipe.c
