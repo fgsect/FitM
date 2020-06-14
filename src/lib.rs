@@ -23,13 +23,16 @@ struct AFLRun {
     timeout: String,
     // All the states that came out of the current state
     // child_states: Vec<(u32, u32)>
+    /// Used to determine wether to increase first or second value of state tuple
+    /// Hope this is not too broken
+    server: bool
 }
 
 /// Implementation of functions for an afl run
 impl AFLRun {
     /// Create a new afl run instance
     fn new(state_path: String, target_bin: String, timeout: String,
-            previous_path: String) -> AFLRun {
+            previous_state_path: String, server: bool) -> AFLRun {
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
         if Path::new(&format!("states/{}", state_path)).exists() {
@@ -71,10 +74,11 @@ impl AFLRun {
             .unwrap();
 
         AFLRun{ 
-            state_path: state_path,
-            target_bin: target_bin,
-            timeout: timeout,
-            previous_state_path: previous_path,
+            state_path,
+            target_bin,
+            timeout,
+            previous_state_path,
+            server
         }
     }
 
@@ -184,6 +188,7 @@ impl AFLRun {
         // inputs for the OTHER binary that we created with a call to `send`.
         // We then save the generated maps inside `out/maps` where they are used
         // later.
+        // For the first run fitm-c1s0 "previous_state_path" actually is the upcoming state.
         let ret = Command::new("../../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
@@ -213,7 +218,7 @@ impl AFLRun {
 
 
     fn create_from_run(&self, new_state: (u32, u32), input: String,
-            target_bin: String) -> AFLRun {
+            target_bin: String, server: bool) -> AFLRun {
         let cur_timeout = 1;
         let input_path: String = format!("states/{}/fd/{}",
             self.state_path, input);
@@ -226,7 +231,8 @@ impl AFLRun {
             target_bin.to_string(),
             cur_timeout.to_string(),
             // FIXME: Wrong path
-            format!("fitm-c{}s{}", new_state.0, new_state.1)
+            format!("fitm-c{}s{}", new_state.0, new_state.1),
+            server
         );
 
         let seed_file_path = format!("states/{}/in/{}", afl.state_path,
@@ -251,36 +257,38 @@ impl AFLRun {
 /// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
 /// Otherwise we will increment the state for the client from fitm-cXsY to
 /// fitm-cX+1sY
-// fn next_state_path(state_path: (u32, u32), inc_server: bool) -> (String, String) {
-//     // If inc_server increment the server state else increment the client state
-//     if inc_server {
-//         format!("fitm-c{}s{}", (state_path.0).to_string(), ((state_path.1)+1).to_string())
+fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32) {
+    // If inc_server increment the server state else increment the client state
+    if cur_is_server {
+        ((state_path.0)+1, state_path.1)
+    } else {
+        (state_path.0, (state_path.1)+1)
+    }
 
-//     } else {
-//         format!("fitm-c{}s{}", ((state_path.0)+1).to_string(), ((state_path.1)).to_string())
-//     }
-
-// }
+}
 
 
 
 pub fn run() {
     let cur_timeout = 1;
-    let mut cur_state: (u32, u32) = (0, 0);
+    let mut cur_state: (u32, u32) = (1, 0);
+    let mut client_maps: BTreeSet<String> = BTreeSet::new();
 
     let aflClient: AFLRun = AFLRun::new(
         "fitm-c1s0".to_string(),
         "test/pseudoclient".to_string(),
         cur_timeout.to_string(),
         // TODO: Need some extra handling for this previous_path value
-        "fitm-c0s0".to_string()
+        "fitm-c0s1".to_string(),
+        false
     );
 
     let aflServer: AFLRun = AFLRun::new(
         "fitm-c0s1".to_string(),
         "test/pseudoserver".to_string(),
         cur_timeout.to_string(),
-        "fitm-c1s0".to_string()
+        "fitm-c1s0".to_string(),
+        true
     );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
@@ -302,26 +310,64 @@ pub fn run() {
     });
 
     queue.push_back(aflClient);
-    // queue.push_back(aflServer);
+    queue.push_back(aflServer);
     // this does not terminate atm as consolidate_poc does not yet minimize
     // anything
     while !queue.is_empty() {
         // kick off new run
         let aflCurrent = queue.pop_front()
             .expect("[*] Queue is empty, no more jobs to be done");
-        println!("[*] Starting the fuzz run");
+        println!("[*] Starting the fuzz run of: {}", aflCurrent.state_path);
         let mut childFuzz = aflCurrent.fuzz_run().expect("[!] Failed to start fuzz run");
         childFuzz.wait().expect("[!] Error while waiting for fuzz run");
         let _tmp = aflCurrent.state_path.clone();
 
         // TODO: Fancier solution? Is this correct?
-        if aflCurrent.previous_state_path != "fitm-c0s0".to_string() {
-            println!("[*] Generating maps");
-            let mut childMap = aflCurrent.gen_afl_maps().expect("[!] Failed to start the showmap run");
-            childMap.wait().expect("[!] Error while waiting for the showmap run");
-            // consolidate previous runs here
-            // let mut new_runs: VecDeque<AFLRun> = consolidate_poc(&mut cur_state);
-            // queue.append(&mut new_runs);
+        println!("[*] Generating maps for: {}", aflCurrent.state_path);
+        let mut childMap = aflCurrent.gen_afl_maps().expect("[!] Failed to start the showmap run");
+        childMap.wait().expect("[!] Error while waiting for the showmap run");
+        // consolidate previous runs here
+        let path = format!("states/{}/out/maps", aflCurrent.state_path);
+        for entry in fs::read_dir(path)
+            .expect("[!] Could not read maps dir while consolidating") {
+            let entry_path = entry.unwrap().path();
+            let new_map = fs::read_to_string(entry_path.clone())
+                .expect("[!] Could not read map file while consolidating");
+            if !client_maps.contains(new_map.as_str()){
+                client_maps.insert(new_map);
+
+                // Consolidating binary 1 will yield more runs on binary 2
+                cur_state = next_state_path(cur_state, aflCurrent.server);
+                let state_path = format!("fitm-c{}s{}", cur_state.0, cur_state.1);
+                let target_bin = if aflCurrent.server{
+                    "test/pseudoclient".to_string()
+                } else {
+                    "test/pseudoserver".to_string()
+                };
+
+                let next_run = if aflCurrent.previous_state_path == "fitm-c0s1".to_string() {
+                    queue.pop_front()
+                        .expect("[!] Could not get first server aflRun from qeuue")
+
+                } else {
+                    AFLRun::new(
+                        state_path,
+                        target_bin,
+                        cur_timeout.to_string(),
+                        "fitm-c1s0".to_string(),
+                        !aflCurrent.server
+                    )
+                };
+
+                let in_file = entry_path.file_name().unwrap().to_str().unwrap();
+                let from = format!("states/{}/fd/{}", aflCurrent.state_path, in_file);
+                fs::copy(from, format!("states/{}/in/{}", next_run.state_path, in_file));
+
+                queue.push_back(next_run);
+
+
+
+            }
         }
     }
 
