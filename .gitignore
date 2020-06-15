@@ -13,3 +13,5 @@ in/
 out/
 active-state/
 saved-states/
+pseudoclient
+pseudoserver
