@@ -6,7 +6,7 @@
 
 export INPUT_FILENAME=$(realpath $2)
 
-STATE_DIR=../../states/$1
+STATE_DIR=../../active-state/$1
 
 env > $STATE_DIR/envfile
 PIPE1=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
