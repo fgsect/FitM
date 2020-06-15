@@ -19,9 +19,9 @@ fn mv(from: String, to: String) {
     .expect("[!] Could not start moving dirs")
     .wait()
     .expect(format!("[!] Moving dir failed To: {} From: {}", to, from)
-        .as_str());
+    .as_str());
 }
-
+    
 fn copy(from: String, to: String) {
     Command::new("cp").args(&[
         String::from("-r"),
@@ -36,6 +36,7 @@ fn copy(from: String, to: String) {
 }
 
 /// AFLRun contains all the information for one specific fuzz run.
+#[derive(Clone)]
 struct AFLRun {
     /// Path to the base directory of the state of the current fuzz run
     state_path: String,
@@ -306,7 +307,6 @@ fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32) {
     } else {
         (state_path.0, (state_path.1)+1)
     }
-
 }
 
 
@@ -321,7 +321,7 @@ pub fn run() {
         "test/pseudoclient".to_string(),
         cur_timeout.to_string(),
         // TODO: Need some extra handling for this previous_path value
-        "fitm-c0s1".to_string(),
+        "".to_string(),
         false
     );
 
@@ -357,10 +357,12 @@ pub fn run() {
 
         // TODO: Fancier solution? Is this correct?
         println!("[*] Generating maps for: {}", afl_current.state_path);
-        let mut child_map = afl_current.gen_afl_maps()
-            .expect("[!] Failed to start the showmap run");
-            
-        child_map.wait().expect("[!] Error while waiting for the showmap run");
+        if afl_current.previous_state_path != "" {
+            let mut child_map = afl_current.gen_afl_maps()
+                .expect("[!] Failed to start the showmap run");
+
+            child_map.wait().expect("[!] Error while waiting for the showmap run");
+        }
 
         // consolidate previous runs here
         let path = format!("active-state/{}/out/maps", afl_current.state_path);
@@ -371,7 +373,7 @@ pub fn run() {
             let new_map = fs::read_to_string(entry_path.clone())
                 .expect("[!] Could not read map file while consolidating");
                 
-            if !client_maps.contains(new_map.as_str()){
+            if !client_maps.contains(new_map.as_str()) {
                 client_maps.insert(new_map);
 
                 // Consolidating binary 1 will yield more runs on binary 2
@@ -380,34 +382,40 @@ pub fn run() {
                 let in_file = entry_path.file_name().unwrap().to_str().unwrap();
 
                 // if afl_current == first binary, first run
-                let next_run = if afl_current.previous_state_path == "fitm-c0s1"
+                let next_run = if afl_current.previous_state_path == ""
                         .to_string() {
-                    queue.pop_front()
-                        .expect("[!] Could not get second afl_run from queue")
+                    let tmp = queue.pop_front()
+                        .expect("[!] Could not get second afl_run from queue");
+
+                    let from = format!("active-state/{}/fd/{}",
+                        afl_current.state_path, in_file);
+                    let to   = format!("saved-states/{}/in/{}", tmp.state_path,
+                        in_file);
+                    
+                    fs::copy(from, to)
+                        .expect("[!] Could not copy in file to new state");
+
+                    tmp
                 } else {
                     afl_current.create_new_run(cur_state, String::from(in_file))
                 };
 
-                let from = format!("active-state/{}/fd/{}", 
-                    afl_current.state_path, in_file);
-                let to   = format!("active-state/{}/in/{}", next_run.state_path,
-                    in_file);
-                fs::copy(from, to)
-                    .expect("[!] Could not copy in file to new state");
-
                 queue.push_back(next_run);
+                println!("DEBUG POST QUEUE: {:?}", queue);
 
                 let _ = Command::new("rm").args(&[
                     format!("-rf"),
                     format!("./active-state/{}", afl_current.state_path),
                     format!("./active-state/{}", 
-                        afl_current.previous_state_path)
+                        afl_current.previous_state_path.clone())
                 ])
                 .spawn()
                 .expect("[!] Could not start removing active-states folders")
                 .wait()
                 .expect("[!] Removing state folder from active-state failed");
             }
+
+            queue.push_back(afl_current.clone());
         }
     }
 
