@@ -1,6 +1,7 @@
 use std::process::{Command, Child, Stdio};
 use std::path::Path;
 use std::fs;
+use std::fmt;
 use std::io;
 use std::env;
 use std::collections::{VecDeque, BTreeSet};
@@ -50,6 +51,18 @@ struct AFLRun {
     /// Used to determine wether to increase first or second value of state 
     /// tuple. Hope this is not too broken
     server: bool
+}
+
+impl fmt::Debug for AFLRun {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AFLRun")
+            .field("state_path", &self.state_path)
+            .field("target_bin", &self.target_bin)
+            .field("previous_state_path", &self.previous_state_path)
+            .field("timeout", &self.timeout)
+            .field("server", &self.server)
+            .finish()
+    }
 }
 
 /// Implementation of functions for an afl run
