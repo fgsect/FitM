@@ -18,6 +18,13 @@ echo "======="
 
 echo -n "" > ./out/.cur_input
 
+if [[ -z "${__AFL_SHM_ID}" ]]; then
+  exec 198< /dev/null
+  exec 199> /dev/null
+else
+  echo "Running in AFL, no dummy FDs necessary"
+fi
+
 criu restore -d \
     -vvv \
     -o ./restore.log \
