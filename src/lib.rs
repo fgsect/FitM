@@ -132,8 +132,7 @@ impl AFLRun {
         }
     }
 
-    /// Wrapper for the snapshot run and to start the create the initial 
-    /// snapshot of the binary
+    /// Needed for the two initial snapshots created based on the target binaries
     fn init_run(&self) -> () {
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -338,11 +337,10 @@ impl AFLRun {
 
         afl.snapshot_run(seed_file_path);
 
-        afl.snapshot_run(seed_file);
+
 
         afl
     }
-
 }
 
 /// Create the next iteration from a given state directory. If inc_server is set
