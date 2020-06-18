@@ -128,8 +128,8 @@ impl AFLRun {
             } else {
                 format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
             };
-            let from = format!("saved-states/{}/snapshot", previous_state);
-            let to = format!("active-state/{}/snapshot", state_path);
+            let from = format!("./saved-states/{}/snapshot", previous_state);
+            let to = format!("./active-state/{}/", state_path);
 
             // Check fs_extra docs for different copy options
             let options = CopyOptions::new();
