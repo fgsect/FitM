@@ -10,7 +10,7 @@ clean(){
 
   rm -rf /tmp/criu_snapshot/
   rm -rf /tmp/log
-  rm -rf states/test
+  rm -rf active-state/test
 }
 
 create_snap(){
@@ -21,7 +21,7 @@ create_snap(){
   export AFL_SKIP_BIN_CHECK=1
 
   old_pwd=$PWD
-  state_dir=$(pwd)/states/test
+  state_dir=$(pwd)/active-state/test
   export CRIU_SNAPSHOT_DIR=$state_dir/snapshot
   mkdir -p $CRIU_SNAPSHOT_DIR
   cd $state_dir
