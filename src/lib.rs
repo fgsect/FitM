@@ -186,11 +186,11 @@ impl AFLRun {
 
     /// Create a new snapshot based on a given snapshot
     fn snapshot_run(&self, stdin: String) -> () {
-        let stdin_file = fs::File::open(stdin.clone()).unwrap();
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
+        let stdin_file = fs::File::open(stdin.clone()).unwrap();
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout").unwrap();
         let stderr = fs::File::create("stderr").unwrap();
@@ -204,7 +204,7 @@ impl AFLRun {
                 format!("stdbuf"),
                 format!("-oL"),
                 format!("../../restore.sh"),
-                format!("../../{}", self.state_path),
+                format!("{}", self.state_path),
                 stdin,
             ])
             .stdin(Stdio::from(stdin_file))
@@ -305,7 +305,7 @@ impl AFLRun {
                 format!("{}", self.previous_state_path),
                 format!("@@"),
             ])
-            .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+            .env("CRIU_SNAPSHOT_DIR", "./snapshot") // which folder a snapshot will be saved to
             .env("AFL_SKIP_BIN_CHECK", "1")
             .env("AFL_NO_UI", "1")
             .env("AFL_DEBUG", "1")
@@ -352,7 +352,7 @@ impl AFLRun {
         // let seed_file = fs::File::open(seed_file_path)
         //     .expect("[!] Could not create input file");
 
-        afl.snapshot_run(seed_file_path);
+        afl.snapshot_run(format!("in/{}", input));
 
         afl
     }
@@ -426,8 +426,8 @@ pub fn run() {
         }
 
         // TODO: Fancier solution? Is this correct?
-        println!("[*] Generating maps for: {}", afl_current.state_path);
         if afl_current.previous_state_path != "".to_string() {
+            println!("[*] Generating maps for: {}", afl_current.state_path);
             let mut child_map = afl_current
                 .gen_afl_maps()
                 .expect("[!] Failed to start the showmap run");
