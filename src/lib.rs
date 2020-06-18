@@ -7,6 +7,7 @@ use std::env;
 use std::collections::{VecDeque, BTreeSet};
 use std::os::unix::fs::OpenOptionsExt;
 
+
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
@@ -15,11 +16,11 @@ fn mv(from: String, to: String) {
         from.clone(),
         to.clone()
     ])
-    .spawn()
-    .expect("[!] Could not start moving dirs")
-    .wait()
-    .expect(format!("[!] Moving dir failed To: {} From: {}", to, from)
-    .as_str());
+        .spawn()
+        .expect("[!] Could not start moving dirs")
+        .wait()
+        .expect(format!("[!] Moving dir failed To: {} From: {}", to, from)
+            .as_str());
 }
 
 fn copy(from: String, to: String) {
@@ -28,11 +29,11 @@ fn copy(from: String, to: String) {
         from.clone(),
         to.clone()
     ])
-    .spawn()
-    .expect("[!] Could not start copying dirs")
-    .wait()
-    .expect(format!("[!] Copying dir failed To: {} From: {}", to, from)
-        .as_str());
+        .spawn()
+        .expect("[!] Could not start copying dirs")
+        .wait()
+        .expect(format!("[!] Copying dir failed To: {} From: {}", to, from)
+            .as_str());
 }
 
 fn rm(target: String) {
@@ -123,7 +124,7 @@ impl AFLRun {
             .open(format!("active-state/{}/out/.cur_input", state_path))
             .unwrap();
 
-        AFLRun{ 
+        AFLRun{
             state_path,
             target_bin,
             timeout,
@@ -260,8 +261,8 @@ impl AFLRun {
         ret
     }
 
-    /// Generate the maps provided by afl-showmap. This is used to filter out 
-    /// for "interesting" new seeds meaning seeds, that will make the OTHER 
+    /// Generate the maps provided by afl-showmap. This is used to filter out
+    /// for "interesting" new seeds meaning seeds, that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
     fn gen_afl_maps(&self) -> io::Result<Child> {
         copy(format!("./saved-states/{}", self.previous_state_path),
@@ -271,7 +272,7 @@ impl AFLRun {
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
-        // Execute afl-showmap from the state dir. We take all the possible 
+        // Execute afl-showmap from the state dir. We take all the possible
         // inputs for the OTHER binary that we created with a call to `send`.
         // We then save the generated maps inside `out/maps` where they are used
         // later.
@@ -434,7 +435,7 @@ pub fn run() {
             let entry_path = entry.unwrap().path();
             let new_map = fs::read_to_string(entry_path.clone())
                 .expect("[!] Could not read map file while consolidating");
-                
+
             if !client_maps.contains(new_map.as_str()) {
                 client_maps.insert(new_map);
 
@@ -445,15 +446,15 @@ pub fn run() {
 
                 // if afl_current == first binary, first run
                 let next_run = if afl_current.previous_state_path == ""
-                        .to_string() {
+                    .to_string() {
                     let tmp = queue.pop_front()
                         .expect("[!] Could not get second afl_run from queue");
 
                     let from = format!("active-state/{}/fd/{}",
-                        afl_current.state_path, in_file);
+                                       afl_current.state_path, in_file);
                     let to   = format!("saved-states/{}/in/{}", tmp.state_path,
-                        in_file);
-                    
+                                       in_file);
+
                     fs::copy(from, to)
                         .expect("[!] Could not copy in file to new state");
 
