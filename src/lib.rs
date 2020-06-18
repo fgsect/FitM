@@ -128,13 +128,21 @@ impl AFLRun {
             } else {
                 format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
             };
-            let from = format!("./saved-states/{}/snapshot", previous_state);
-            let to = format!("./active-state/{}/", state_path);
+            // copy old snapshot folder for criu
+            let old_snapshot =
+                format!("./saved-states/{}/snapshot", previous_state);
+            let new_snapshot = format!("./active-state/{}/", state_path);
 
             // Check fs_extra docs for different copy options
             let options = CopyOptions::new();
-            fs_extra::dir::copy(from, to, &options)
+            fs_extra::dir::copy(old_snapshot, new_snapshot, &options)
                 .expect("[!] Could not copy snapshot dir from previous state");
+
+            // copy old pipes file so restore.sh knows which pipes are open
+            let old_pipes = format!("./saved-states/{}/pipes", previous_state);
+            let new_pipes = format!("./active-state/{}/pipes", state_path);
+            fs::copy(old_pipes, new_pipes)
+                .expect("[!] Could not copy old pipes file to new state-dir");
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
