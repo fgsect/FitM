@@ -7,6 +7,9 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
+extern crate fs_extra;
+use fs_extra::dir::*;
+
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
@@ -77,12 +80,14 @@ impl fmt::Debug for AFLRun {
 impl AFLRun {
     /// Create a new afl run instance
     fn new(
-        state_path: String,
+        new_state: (u32, u32),
         target_bin: String,
         timeout: u32,
         previous_state_path: String,
         server: bool,
+        from_snapshot: bool,
     ) -> AFLRun {
+        let state_path = format!("fitm-c{}s{}", new_state.0, new_state.1);
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
         if Path::new(&format!("active-state/{}", state_path)).exists() {
@@ -114,8 +119,26 @@ impl AFLRun {
         fs::create_dir(format!("active-state/{}/fd", state_path))
             .expect("[-] Could not create fd dir!");
 
-        fs::create_dir(format!("active-state/{}/snapshot", state_path))
-            .expect("[-] Could not create snapshot dir!");
+        if from_snapshot {
+            // This seems overly complicated, but even in the main loop we don't
+            // which state was the previous for this particular binary. Thus we
+            // reconstruct it here
+            let previous_state = if server {
+                format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
+            } else {
+                format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
+            };
+            let from = format!("saved-states/{}/snapshot", previous_state);
+            let to = format!("active-state/{}/snapshot", state_path);
+
+            // Check fs_extra docs for different copy options
+            let options = CopyOptions::new();
+            fs_extra::dir::copy(from, to, &options)
+                .expect("[!] Could not copy snapshot dir from previous state");
+        } else {
+            fs::create_dir(format!("active-state/{}/snapshot", state_path))
+                .expect("[-] Could not create snapshot dir!");
+        }
 
         // Create a dummy .cur_input because the file has to exist once criu
         // restores the process
@@ -322,6 +345,7 @@ impl AFLRun {
         new_state: (u32, u32),
         input: String,
         timeout: u32,
+        from_snapshot: bool,
     ) -> AFLRun {
         let input_path: String =
             format!("active-state/{}/fd/{}", self.state_path, input);
@@ -336,11 +360,12 @@ impl AFLRun {
         // readable copy. We update cur_state here with a new tuple.
         // cur_state = next_state_path(cur_state, true);
         let afl = AFLRun::new(
-            format!("fitm-c{}s{}", new_state.0, new_state.1),
+            new_state,
             target_bin.to_string(),
             timeout,
             self.state_path.clone(),
             !self.server,
+            from_snapshot,
         );
 
         let seed_file_path =
@@ -377,20 +402,22 @@ pub fn run() {
     let mut client_maps: BTreeSet<String> = BTreeSet::new();
 
     let afl_client: AFLRun = AFLRun::new(
-        "fitm-c1s0".to_string(),
+        (1, 0),
         "test/pseudoclient".to_string(),
         cur_timeout,
         // TODO: Need some extra handling for this previous_path value
         "".to_string(),
         false,
+        false,
     );
 
     let afl_server: AFLRun = AFLRun::new(
-        "fitm-c0s1".to_string(),
+        (0, 1),
         "test/pseudoserver".to_string(),
         cur_timeout,
         "fitm-c1s0".to_string(),
         true,
+        false,
     );
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
@@ -497,6 +524,7 @@ pub fn run() {
                             cur_state,
                             String::from(in_file),
                             afl_current.timeout.into(),
+                            true,
                         ))
                     };
 
