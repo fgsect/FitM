@@ -6315,8 +6315,15 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     close(write_pipe[1]);
                 }
 
-                system("readlink /proc/self/fd/198");
-                system("readlink /proc/self/fd/199");
+                FILE *f = fopen("./pipes", "w");
+                char *buff = calloc(200, 1);
+                readlink("/proc/self/fd/198", buff, 100);
+                char *tmp = (&buff[strlen(buff)])+1;
+                buff[strlen(buff)] = '\n';
+                readlink("/proc/self/fd/199", tmp, 100);
+                fprintf(f, "%s\n", buff);
+                free(buff);
+                fclose(f);
 
                 do_criu();
                 // Weird bug making criu restore crash - this solves it
