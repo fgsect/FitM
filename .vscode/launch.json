@@ -8,9 +8,10 @@
             "name": "Debug",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceRoot}/debug/fitm",
+            "program": "${workspaceRoot}/target/debug/fitm",
+            "preLaunchTask": "Debug Prep",
             "args": [],
-            "cwd": "${workspaceRoot}",
+            "cwd": "${workspaceRoot}"
         }
     ]
 }

@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Remove old state dirs",
+            "command": "sudo",
+            "args": ["rm", "-rf", "active-state/", "saved-states/"],
+            "type": "shell"
+        },
+        {
+            "label": "Cargo build",
+            "command": "cargo",
+            "args": ["build"],
+            "type": "shell"
+        },
+        {
+            "label": "Debug Prep",
+            "dependsOrder": "sequence",
+            "dependsOn": ["Remove old state dirs", "Cargo build"]
+        },
+    ]
+}
