@@ -271,6 +271,10 @@ impl AFLRun {
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
+        // Open a file for stdout and stderr to log to
+        fs::File::create("stdout").unwrap();
+        fs::File::create("stderr").unwrap();
+
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
@@ -314,6 +318,10 @@ impl AFLRun {
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
+
+        // Open a file for stdout and stderr to log to
+        fs::File::create("stdout").unwrap();
+        fs::File::create("stderr").unwrap();
 
         // Execute afl-showmap from the state dir. We take all the possible
         // inputs for the OTHER binary that we created with a call to `send`.
