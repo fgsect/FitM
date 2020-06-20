@@ -3,7 +3,6 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
@@ -148,15 +147,6 @@ impl AFLRun {
                 .expect("[-] Could not create snapshot dir!");
         }
 
-        // Create a dummy .cur_input because the file has to exist once criu
-        // restores the process
-        fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .mode(0o600)
-            .open(format!("active-state/{}/out/.cur_input", state_path))
-            .unwrap();
-
         AFLRun {
             state_path,
             target_bin,
@@ -170,10 +160,7 @@ impl AFLRun {
     fn init_run(&self) -> () {
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
-        let stdin = fs::File::open(format!(
-            "active-state/{}/out/.cur_input",
-            self.state_path
-        ))
+        let stdin = fs::File::open("/dev/null")
         .unwrap();
 
         // Change into our state directory and create the snapshot from there
