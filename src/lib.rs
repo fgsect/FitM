@@ -61,9 +61,13 @@ fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
         .expect("[!] Could not copy old pipes file to new state-dir");
 }
 
-fn create_restore_sh() {
+fn create_restore_sh(afl: &AFLRun) {
     let _ = Command::new("python3")
-        .args(&[format!("create_restore.py")])
+        .args(&[
+            "create_restore.py".to_string(),
+            afl.base_state.to_string(),
+            afl.state_path.to_string(),
+        ])
         .spawn()
         .expect("[!] Could not spawn create_restore.py")
         .wait()
@@ -202,7 +206,7 @@ impl AFLRun {
 
     /// Needed for the two initial snapshots created based on the target binaries
     fn init_run(&self) -> () {
-        create_restore_sh();
+        create_restore_sh(self);
 
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -254,7 +258,7 @@ impl AFLRun {
         // otherwise criu can't restore
         if self.base_state != "".to_string() {
             self.copy_base_state();
-            create_restore_sh();
+            create_restore_sh(self);
         }
 
         // Change into our state directory and create the snapshot from there

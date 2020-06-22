@@ -5,36 +5,34 @@ from subprocess import call
 
 import json
 
+# execute from fitm/
 def main():
-    if not argv[1]:
-        return
-
-    # execute from fitm/
-
-    base_state = f"{getcwd()}/active-state/{argv[1]}"[1:]
-    cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
 
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
-    lines.append(f"    --inherit-fd \"fd[1]:{base_state}/stdout\" \\")
-    lines.append(f"    --inherit-fd \"fd[2]:{base_state}/stderr\" \\")
+    if argv[1]:
+        base_state = f"{getcwd()}/active-state/{argv[1]}"[1:]
+        cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
 
-    call(f"crit decode -i /{base_state}/snapshot/files.img --pretty -o ./file".split())
-    call(f"crit decode -i /{base_state}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
+        lines.append(f"    --inherit-fd \"fd[1]:{base_state}/stdout\" \\")
+        lines.append(f"    --inherit-fd \"fd[2]:{base_state}/stderr\" \\")
 
-    file_info = json.load(open("./file", "r"))
-    fd_info = json.load(open("./fdinfo", "r"))
+        call(f"crit decode -i /{base_state}/snapshot/files.img --pretty -o ./file".split())
+        call(f"crit decode -i /{base_state}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
 
-    files = filter(lambda x: "reg" in x.keys() and "/fd/" in x["reg"]["name"], file_info["entries"])
-    files = map(lambda x: (x["id"], x["reg"]["name"]) , files)
+        file_info = json.load(open("./file", "r"))
+        fd_info = json.load(open("./fdinfo", "r"))
 
-    mapping = []
+        files = filter(lambda x: "reg" in x.keys() and "/fd/" in x["reg"]["name"], file_info["entries"])
+        files = map(lambda x: (x["id"], x["reg"]["name"]) , files)
 
-    for f in files:
-        fd = list(filter(lambda x: x["id"] == f[0], fd_info["entries"]))[0]
-        mapping.append((fd["fd"], f[1]))
+        mapping = []
 
-    for m in mapping:
-        lines.append(f"    --inherit-fd \"fd[{m[0]}]:{m[1][1:]}\" \\")
+        for f in files:
+            fd = list(filter(lambda x: x["id"] == f[0], fd_info["entries"]))[0]
+            mapping.append((fd["fd"], f[1]))
+
+        for m in mapping:
+            lines.append(f"    --inherit-fd \"fd[{m[0]}]:{m[1][1:]}\" \\")
 
     lines.append("    && echo 'OK'")
 
