@@ -44,6 +44,36 @@ fn rm(target: String) {
         .expect("[!] Removing state folder from active-state failed");
 }
 
+fn copy_base_state(
+    server: bool,
+    new_state: (u32, u32),
+    state_path: &String,
+) -> String {
+    // This seems overly complicated, but even in the main loop we don't
+    // which state was the previous for this particular binary. Thus we
+    // reconstruct it here
+    let base_state = if server {
+        format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
+    } else {
+        format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
+    };
+    // copy old snapshot folder for criu
+    let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
+    let new_snapshot = format!("./active-state/{}/", state_path);
+
+    // Check fs_extra docs for different copy options
+    let options = CopyOptions::new();
+    fs_extra::dir::copy(old_snapshot, new_snapshot, &options)
+        .expect("[!] Could not copy snapshot dir from previous state");
+
+    // copy old pipes file so restore.sh knows which pipes are open
+    let old_pipes = format!("./saved-states/{}/pipes", base_state);
+    let new_pipes = format!("./active-state/{}/pipes", state_path);
+    fs::copy(old_pipes, new_pipes)
+        .expect("[!] Could not copy old pipes file to new state-dir");
+    base_state
+}
+
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
 struct AFLRun {
@@ -61,6 +91,9 @@ struct AFLRun {
     /// Used to determine whether to increase first or second value of state
     /// tuple. Hope this is not too broken
     server: bool,
+    /// State folder name of the state from which this object's snapshot was created
+    /// Empty if created from binary
+    base_state: String,
 }
 
 impl fmt::Debug for AFLRun {
@@ -118,34 +151,13 @@ impl AFLRun {
         fs::create_dir(format!("active-state/{}/fd", state_path))
             .expect("[-] Could not create fd dir!");
 
-        if from_snapshot {
-            // This seems overly complicated, but even in the main loop we don't
-            // which state was the previous for this particular binary. Thus we
-            // reconstruct it here
-            let previous_state = if server {
-                format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
-            } else {
-                format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
-            };
-            // copy old snapshot folder for criu
-            let old_snapshot =
-                format!("./saved-states/{}/snapshot", previous_state);
-            let new_snapshot = format!("./active-state/{}/", state_path);
-
-            // Check fs_extra docs for different copy options
-            let options = CopyOptions::new();
-            fs_extra::dir::copy(old_snapshot, new_snapshot, &options)
-                .expect("[!] Could not copy snapshot dir from previous state");
-
-            // copy old pipes file so restore.sh knows which pipes are open
-            let old_pipes = format!("./saved-states/{}/pipes", previous_state);
-            let new_pipes = format!("./active-state/{}/pipes", state_path);
-            fs::copy(old_pipes, new_pipes)
-                .expect("[!] Could not copy old pipes file to new state-dir");
+        let base_state = if from_snapshot {
+            copy_base_state(server, new_state, &state_path)
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
-        }
+            "".to_string()
+        };
 
         AFLRun {
             state_path,
@@ -153,6 +165,7 @@ impl AFLRun {
             timeout,
             previous_state_path,
             server,
+            base_state,
         }
     }
 
@@ -160,8 +173,7 @@ impl AFLRun {
     fn init_run(&self) -> () {
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
-        let stdin = fs::File::open("/dev/null")
-        .unwrap();
+        let stdin = fs::File::open("/dev/null").unwrap();
 
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
