@@ -44,19 +44,7 @@ fn rm(target: String) {
         .expect("[!] Removing state folder from active-state failed");
 }
 
-fn copy_base_state(
-    server: bool,
-    new_state: (u32, u32),
-    state_path: &String,
-) -> String {
-    // This seems overly complicated, but even in the main loop we don't
-    // which state was the previous for this particular binary. Thus we
-    // reconstruct it here
-    let base_state = if server {
-        format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
-    } else {
-        format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
-    };
+fn copy_base_state(base_state: &String, state_path: &String) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("./active-state/{}/", state_path);
@@ -71,7 +59,6 @@ fn copy_base_state(
     let new_pipes = format!("./active-state/{}/pipes", state_path);
     fs::copy(old_pipes, new_pipes)
         .expect("[!] Could not copy old pipes file to new state-dir");
-    base_state
 }
 
 /// AFLRun contains all the information for one specific fuzz run.
@@ -152,7 +139,16 @@ impl AFLRun {
             .expect("[-] Could not create fd dir!");
 
         let base_state = if from_snapshot {
-            copy_base_state(server, new_state, &state_path)
+            // TODO: This is not correct.
+            // The base_state may be i, while this run is already i+10.
+            // Thus the logic "new_state - 1" is not sufficient
+            let base_state = if server {
+                format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
+            } else {
+                format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
+            };
+            copy_base_state(&base_state, &state_path);
+            base_state
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
