@@ -165,6 +165,32 @@ impl AFLRun {
         }
     }
 
+    fn copy_base_state(&self) -> () {
+        // Cleanstill existing base state folders in active-state
+        let existing_path = format!("./active-state/{}", self.base_state);
+
+        // remove_dir_all panics if the target does not exist.
+        // To still catch errors if sth goes wrong a match is used here.
+        match std::fs::remove_dir_all(existing_path.clone()) {
+            Result::Ok(_) => {
+                println!("[!] Successfully deleted path: {}", existing_path)
+            }
+            Result::Err(err) => println!(
+                "[!] Error while deleting old base state folder: {}",
+                err
+            ),
+        }
+
+        // copy old snapshot folder for criu
+        let from = format!("./saved-states/{}", self.base_state);
+        let to = format!("./active-state/");
+
+        // Check fs_extra docs for different copy options
+        let options = CopyOptions::new();
+        fs_extra::dir::copy(from, to, &options)
+            .expect("[!] Could not copy base state dir from saved-states");
+    }
+
     /// Needed for the two initial snapshots created based on the target binaries
     fn init_run(&self) -> () {
         // create the .cur_input so that criu snapshots a fd connected to
@@ -212,6 +238,13 @@ impl AFLRun {
 
     /// Create a new snapshot based on a given snapshot
     fn snapshot_run(&self, stdin: String) -> () {
+        // Create a copy of the state folder in `active-state`
+        // from which the "to-be-fuzzed" state was snapshotted from,
+        // otherwise criu can't restore
+        if self.base_state != "".to_string() {
+            self.copy_base_state();
+        }
+
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
@@ -257,10 +290,19 @@ impl AFLRun {
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
     fn fuzz_run(&self) -> io::Result<Child> {
+        // If not currently needed, all states should reside in `saved-state`.
+        // Thus they need to be copied to be fuzzed
         copy(
             format!("./saved-states/{}", self.state_path),
             String::from("./active-state/"),
         );
+
+        // Create a copy of the state folder in `active-state`
+        // from which the "to-be-fuzzed" state was snapshotted from,
+        // otherwise criu can't restore
+        if self.base_state != "".to_string() {
+            self.copy_base_state();
+        }
 
         // Change into our state directory and create fuzz run from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -305,10 +347,19 @@ impl AFLRun {
     /// for "interesting" new seeds meaning seeds, that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
     fn gen_afl_maps(&self) -> io::Result<Child> {
+        // If not currently needed, all states should reside in `saved-state`.
+        // Thus they need to be copied to be fuzzed
         copy(
             format!("./saved-states/{}", self.previous_state_path),
             String::from("./active-state/"),
         );
+
+        // Create a copy of the state folder in `active-state`
+        // from which the "to-be-fuzzed" state was snapshotted from,
+        // otherwise criu can't restore
+        if self.base_state != "".to_string() {
+            self.copy_base_state();
+        }
 
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -449,7 +500,10 @@ pub fn run() {
         // kick off new run
         let afl_current = queue.pop_front().unwrap();
 
-        println!("[*] Starting the fuzz run of: {}", afl_current.state_path);
+        println!(
+            "==== [*] Starting the fuzz run of: {} ====",
+            afl_current.state_path
+        );
 
         if afl_current.previous_state_path != "".to_string()
             || afl_current.state_path != "fitm-c0s1".to_string()
@@ -465,7 +519,10 @@ pub fn run() {
 
         // TODO: Fancier solution? Is this correct?
         if afl_current.previous_state_path != "".to_string() {
-            println!("[*] Generating maps for: {}", afl_current.state_path);
+            println!(
+                "==== [*] Generating maps for: {} ====",
+                afl_current.state_path
+            );
             let mut child_map = afl_current
                 .gen_afl_maps()
                 .expect("[!] Failed to start the showmap run");
