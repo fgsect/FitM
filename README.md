@@ -3,6 +3,12 @@ Fuzzer in the Middle
 
 ## Building
 
+**NOTE**:   
+We use criu's `crit` tool to parse snapshot images. There is a bug in the tool that needs fixing.
+Replace L360 in `criu/lib/py/images/pb2dict.py` with the following code:  
+`d[field.name] = d_val.decode() if type(d_val) == bytes else d_val`
+
+
 `make build` can be used to run our build script to build our custom qemu patches
 
 ## Testing
