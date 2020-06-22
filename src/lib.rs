@@ -61,6 +61,15 @@ fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
         .expect("[!] Could not copy old pipes file to new state-dir");
 }
 
+fn create_restore_sh() {
+    let _ = Command::new("python3")
+        .args(&[format!("test.py")])
+        .spawn()
+        .expect("[!] Could not spawn create_restore.py")
+        .wait()
+        .expect("[!] Could not create restore.sh with python");
+}
+
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
 struct AFLRun {
@@ -193,6 +202,8 @@ impl AFLRun {
 
     /// Needed for the two initial snapshots created based on the target binaries
     fn init_run(&self) -> () {
+        create_restore_sh();
+
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
         let stdin = fs::File::open("/dev/null").unwrap();
@@ -243,6 +254,7 @@ impl AFLRun {
         // otherwise criu can't restore
         if self.base_state != "".to_string() {
             self.copy_base_state();
+            create_restore_sh();
         }
 
         // Change into our state directory and create the snapshot from there
