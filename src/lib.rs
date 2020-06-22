@@ -148,8 +148,8 @@ impl AFLRun {
         fs::create_dir(format!("active-state/{}/out/maps", state_path))
             .expect("[-] Could not create out/maps dir!");
 
-        fs::create_dir(format!("active-state/{}/fd", state_path))
-            .expect("[-] Could not create fd dir!");
+        let fd_path = format!("active-state/{}/fd", state_path);
+        fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         let base_state = if from_snapshot {
             // TODO: This is not correct.
@@ -167,6 +167,13 @@ impl AFLRun {
                 .expect("[-] Could not create snapshot dir!");
             "".to_string()
         };
+
+        if base_state != "" {
+            // copy old fd folder for new state
+            let from = format!("./saved-states/{}/fd", base_state);
+            let to = format!("./active-state/{}/", state_path);
+            copy(from, to);
+        }
 
         AFLRun {
             state_path,
