@@ -44,7 +44,7 @@ fn rm(target: String) {
         .expect("[!] Removing state folder from active-state failed");
 }
 
-fn copy_base_state(base_state: &String, state_path: &String) -> () {
+fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("./active-state/{}/", state_path);
@@ -147,7 +147,7 @@ impl AFLRun {
             } else {
                 format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
             };
-            copy_base_state(&base_state, &state_path);
+            copy_snapshot_base(&base_state, &state_path);
             base_state
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
