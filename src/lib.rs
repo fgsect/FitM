@@ -63,7 +63,7 @@ fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
 
 fn create_restore_sh() {
     let _ = Command::new("python3")
-        .args(&[format!("test.py")])
+        .args(&[format!("create_restore.py")])
         .spawn()
         .expect("[!] Could not spawn create_restore.py")
         .wait()
