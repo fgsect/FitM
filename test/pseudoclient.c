@@ -36,10 +36,9 @@ int main()
     }
     // TODO: This is a quick fix for our init_run being developed only with server binaries in mind
     // I am not sure atm if `recv` is the right point to snapshot the client.
-    recv(sock, msg, strlen(msg), 0);
     send(sock , msg , strlen(msg) , 0 );
     printf("Client sent: %s\n", msg);
-    read( sock , buffer, 1024);
+    recv(sock, msg, strlen(msg), 0);
     printf("%s\n",buffer );
     return 0;
 }
