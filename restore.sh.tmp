@@ -25,6 +25,8 @@ else
   echo "Running in AFL, no dummy FDs necessary"
 fi
 
+## TEMPLATE ##
+
 criu restore -d \
     -vvv \
     -o ./restore.log \

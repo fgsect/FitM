@@ -7,6 +7,7 @@ import json
 
 # execute from fitm/
 def main():
+    open_fds = ""
 
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
     if argv[1]:
@@ -23,7 +24,7 @@ def main():
         fd_info = json.load(open("./fdinfo", "r"))
 
         files = filter(lambda x: "reg" in x.keys() and "/fd/" in x["reg"]["name"], file_info["entries"])
-        files = map(lambda x: (x["id"], x["reg"]["name"]) , files)
+        files = map(lambda x: (x["id"], x["reg"]["name"]), files)
 
         mapping = []
 
@@ -32,11 +33,12 @@ def main():
             mapping.append((fd["fd"], f[1]))
 
         for m in mapping:
+            open_fds += f"exec {m[0]}< {m[1].replace(argv[1], argv[2])}\n"
             lines.append(f"    --inherit-fd \"fd[{m[0]}]:{m[1][1:]}\" \\")
 
     lines.append("    && echo 'OK'")
 
-    open("./restore.sh", "w").write("\n".join(lines))
+    open("./restore.sh", "w").write("\n".join(lines).replace("## TEMPLATE ##", open_fds))
 
 if __name__ == "__main__":
     main()
