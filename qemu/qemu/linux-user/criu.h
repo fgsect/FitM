@@ -106,7 +106,7 @@ int do_criu(void){
 
     ret = connect(fd, (struct sockaddr *) &addr, addr_len);
     if (ret == -1) {
-        perror("Can't connect to socket");
+        perror("Otto, mach mal CRIU an!");
         goto exit;
     }
 

@@ -218,10 +218,10 @@ impl AFLRun {
     /// Needed for the two initial snapshots created based on the target binaries
     fn init_run(&self) -> () {
         create_restore_sh(self);
-
+        let dev_null = "/dev/null";
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
-        let stdin = fs::File::open("/dev/null").unwrap();
+        let stdin = fs::File::open(dev_null).unwrap();
 
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -247,6 +247,7 @@ impl AFLRun {
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+            .env("INPUT_FILENAME", dev_null)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
@@ -256,7 +257,7 @@ impl AFLRun {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
-        mv(
+        copy(
             format!("./active-state/{}", self.state_path),
             String::from("./saved-states/"),
         );
@@ -530,14 +531,11 @@ pub fn run() {
         // kick off new run
         let afl_current = queue.pop_front().unwrap();
 
-        println!(
-            "==== [*] Starting the fuzz run of: {} ====",
-            afl_current.state_path
-        );
-
-        if afl_current.previous_state_path != "".to_string()
-            || afl_current.state_path != "fitm-c0s1".to_string()
-        {
+        if !afl_current.initial {
+            println!(
+                "==== [*] Starting the fuzz run of: {} ====",
+                afl_current.state_path
+            );
             let mut child_fuzz = afl_current
                 .fuzz_run()
                 .expect("[!] Failed to start fuzz run");
@@ -635,7 +633,6 @@ pub fn run() {
             } else {
                 rm(afl_current.state_path.clone());
             }
-
         }
         //.TODO: Change to a variable like `init-state`
         if !afl_current.initial {
