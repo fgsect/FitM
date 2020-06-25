@@ -629,10 +629,11 @@ pub fn run() {
                 rm(afl_current.state_path.clone());
             }
 
-            //.TODO: Change to a variable like `init-state`
-            if afl_current.state_path != "fitm-c0s1".to_string() {
-                queue.push_back(afl_current.clone());
-            }
+        }
+        //.TODO: Change to a variable like `init-state`
+        if afl_current.state_path != "fitm-c0s1".to_string() &&
+                afl_current.state_path != "fitm-c1s0".to_string() {
+            queue.push_back(afl_current.clone());
         }
     }
 
