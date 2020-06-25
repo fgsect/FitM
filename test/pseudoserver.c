@@ -57,27 +57,26 @@ int main() {
     printf("recv #1: %s\n", buf);
 
     if(buf[0] == 'R') {
-        buf[strlen(buf)] = '\n';
+        free(buf);
+        buf = (char *)calloc(100, 1);
+
         // send 1
-        send(new_socket , buf , strlen(buf) , 0 );
+        char *new_msg = "ACK! Got correct init signal\n";
+        printf("send #1: %s\n", buf);
+        send(new_socket , new_msg , strlen(new_msg) , 0 );
+
         free(buf);
         buf = (char *)calloc(100, 1);
         // recv 2
         recv(new_socket, buf, 100, 0);
         printf("recv #2: %s\n", buf);
-        if (buf[1] == 'I') {
-            if (buf[2] == 'P') {
-                // send 2
-                buf[strlen(buf)] = '\n';
-                // send 1
-                send(new_socket , buf , strlen(buf) , 0 );
-                free(buf);
-                char *foo = NULL;
-            } else {
-                printf("Got: RI\n");
-            }
-        } else {
-            printf("Got: R\n");
+        if (strcmp(buf, "Need more state!\n")) {
+
+            // send 2
+            new_msg = "make client go b00m.\n";
+            send(new_socket , new_msg , strlen(new_msg) , 0 );
+
+            free(buf);
         }
     }
     return 0;
