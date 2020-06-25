@@ -94,6 +94,8 @@ struct AFLRun {
     /// State folder name of the state from which this object's snapshot was created
     /// Empty if created from binary
     base_state: String,
+    /// Marks if this run is an initial state or not
+    initial: bool,
 }
 
 impl fmt::Debug for AFLRun {
@@ -104,6 +106,7 @@ impl fmt::Debug for AFLRun {
             .field("previous_state_path", &self.previous_state_path)
             .field("timeout", &self.timeout)
             .field("server", &self.server)
+            .field("initial", &self.initial)
             .finish()
     }
 }
@@ -182,6 +185,7 @@ impl AFLRun {
             previous_state_path,
             server,
             base_state,
+            initial: false,
         }
     }
 
@@ -486,7 +490,7 @@ pub fn run() {
     let mut cur_state: (u32, u32) = (1, 0);
     let mut client_maps: BTreeSet<String> = BTreeSet::new();
 
-    let afl_client: AFLRun = AFLRun::new(
+    let mut afl_client: AFLRun = AFLRun::new(
         (1, 0),
         "test/pseudoclient".to_string(),
         cur_timeout,
@@ -496,7 +500,7 @@ pub fn run() {
         false,
     );
 
-    let afl_server: AFLRun = AFLRun::new(
+    let mut afl_server: AFLRun = AFLRun::new(
         (0, 1),
         "test/pseudoserver".to_string(),
         cur_timeout,
@@ -511,6 +515,9 @@ pub fn run() {
         "init case.",
     )
     .expect("[-] Could not create initial test case!");
+
+    afl_client.initial = true;
+    afl_server.initial = true;
 
     afl_server.init_run();
     afl_client.init_run();
@@ -631,8 +638,7 @@ pub fn run() {
 
         }
         //.TODO: Change to a variable like `init-state`
-        if afl_current.state_path != "fitm-c0s1".to_string() &&
-                afl_current.state_path != "fitm-c1s0".to_string() {
+        if !afl_current.initial {
             queue.push_back(afl_current.clone());
         }
     }
