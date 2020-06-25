@@ -501,7 +501,7 @@ pub fn run() {
         false,
     );
 
-    let mut afl_server: AFLRun = AFLRun::new(
+    let afl_server: AFLRun = AFLRun::new(
         (0, 1),
         "test/pseudoserver".to_string(),
         cur_timeout,
@@ -518,7 +518,6 @@ pub fn run() {
     .expect("[-] Could not create initial test case!");
 
     afl_client.initial = true;
-    afl_server.initial = true;
 
     afl_server.init_run();
     afl_client.init_run();
