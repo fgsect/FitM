@@ -3,6 +3,7 @@ from sys import argv
 from os import getcwd
 from subprocess import call
 
+import re
 import json
 
 # execute from fitm/
@@ -32,8 +33,11 @@ def main():
             fd = list(filter(lambda x: x["id"] == f[0], fd_info["entries"]))[0]
             mapping.append((fd["fd"], f[1]))
 
+        open_fds += f"exec 1> /{cur_state}/stdout\n"
+        open_fds += f"exec 2> /{cur_state}/stderr\n"
+
         for m in mapping:
-            open_fds += f"exec {m[0]}< {m[1].replace(argv[1], argv[2])}\n"
+            open_fds += f"exec {m[0]}< {re.sub(r'fitm-c[0-9]+s[0-9]+', argv[2], m[1])}\n"
             lines.append(f"    --inherit-fd \"fd[{m[0]}]:{m[1][1:]}\" \\")
 
     lines.append("    && echo 'OK'")
