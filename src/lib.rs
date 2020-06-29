@@ -3,6 +3,7 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
@@ -102,11 +103,11 @@ impl fmt::Debug for AFLRun {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AFLRun")
             .field("state_path", &self.state_path)
-            // .field("target_bin", &self.target_bin)
-            // .field("previous_state_path", &self.previous_state_path)
-            // .field("timeout", &self.timeout)
-            // .field("server", &self.server)
-            // .field("initial", &self.initial)
+            .field("target_bin", &self.target_bin)
+            .field("previous_state_path", &self.previous_state_path)
+            .field("timeout", &self.timeout)
+            .field("server", &self.server)
+            .field("initial", &self.initial)
             .finish()
     }
 }
@@ -178,7 +179,7 @@ impl AFLRun {
             copy(from, to);
         }
 
-        AFLRun {
+        let new_run = AFLRun {
             state_path,
             target_bin,
             timeout,
@@ -186,7 +187,17 @@ impl AFLRun {
             server,
             base_state,
             initial: false,
-        }
+        };
+
+        // We can write a tool in the future to parse this info
+        // and print a visualization of the state order
+        let path = format!("./active-state/{}/run-info", new_run.state_path);
+        let mut file =
+            fs::File::create(path).expect("[!] Could not create aflrun file");
+        file.write(format!("{:?}", new_run).as_bytes())
+            .expect("[!] Could not write to aflrun file");
+
+        new_run
     }
 
     fn copy_base_state(&self) -> () {
