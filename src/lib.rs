@@ -246,6 +246,7 @@ impl AFLRun {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+            .env("FITM_CREATE_OUTPUTS", "1")
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
             .env("INPUT_FILENAME", dev_null)
             .env("AFL_NO_UI", "1")
@@ -384,20 +385,11 @@ impl AFLRun {
             .wait()
             .expect("[!] Error while waiting for fuzz run");
 
-        // After spawning the run we go back into the base directory
-        env::set_current_dir(&Path::new("../../")).unwrap();
-
         println!("==== [*] Generating outputs for: {} ====", self.state_path);
-
         self.create_outputs();
     }
 
     fn create_outputs(&self) -> () {
-        // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
-        let foo = env::current_dir().unwrap();
-        println!("cur dir: {:?}", foo);
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout-afl").unwrap();
         let stderr = fs::File::create("stderr-afl").unwrap();
