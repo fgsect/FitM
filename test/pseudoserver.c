@@ -54,7 +54,7 @@ int main() {
 
     // recv 1
     recv(new_socket, buf, 100, 0);
-    printf("recv #1: %s\n", buf);
+    printf("server recv #1: %s\n", buf);
 
     if(buf[0] == 'R') {
         free(buf);
@@ -62,19 +62,20 @@ int main() {
 
         // send 1
         char *new_msg = "ACK! Got correct init signal\n";
-        printf("send #1: %s\n", buf);
+        printf("server send #1: %s\n", buf);
         send(new_socket , new_msg , strlen(new_msg) , 0 );
 
         free(buf);
         buf = (char *)calloc(100, 1);
         // recv 2
         recv(new_socket, buf, 100, 0);
-        printf("recv #2: %s\n", buf);
-        if (strcmp(buf, "Need more state!\n")) {
+        printf("server recv #2: %s\n", buf);
+        if (!strcmp(buf, "Need more state!\n")) {
 
             // send 2
             new_msg = "make client go b00m.\n";
             send(new_socket , new_msg , strlen(new_msg) , 0 );
+            printf("server send #2: %s\n", buf);
 
             free(buf);
         }

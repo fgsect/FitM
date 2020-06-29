@@ -38,19 +38,20 @@ int main()
     // TODO: This is a quick fix for our init_run being developed only with server binaries in mind
     // I am not sure atm if `recv` is the right point to snapshot the client.
     send(sock , msg , strlen(msg) , 0 );
-    printf("Client sent: %s\n", msg);
+    printf("client sent: %s\n", msg);
     recv(sock, buffer, 100, 0);
-    if(strcmp(msg, "ACK! Got correct init signal\n")) {
-        printf("recv #1: %s\n", buffer);
+    printf("client recv #1: %s\n", buffer);
+    if(!strcmp(msg, "ACK! Got correct init signal\n")) {
         char *new_msg = "Need more state!\n";
         send(sock, new_msg, strlen(new_msg), 0);
-        printf("send #2: %s\n", new_msg);
+        printf("client send #2: %s\n", new_msg);
 
         free(buffer);
         buffer = (char *) calloc(100, 1);
 
         recv(sock, buffer, 100, 0);
-        if (strcmp(buffer, "make client go b00m.\n\n")) {
+        printf("client recv #2: %s\n", buffer);
+        if (!strcmp(buffer, "make client go b00m.\n\n")) {
             printf("dingdingding, client goes bum");
             char *foo = 0;
             printf("%s", foo);
