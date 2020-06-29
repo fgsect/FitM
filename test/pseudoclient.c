@@ -52,7 +52,8 @@ int main()
         recv(sock, buffer, 100, 0);
         if (strcmp(buffer, "make client go b00m.\n\n")) {
             printf("dingdingding, client goes bum");
-            buffer[9999];
+            char *foo = 0;
+            printf("%s", foo);
         }
     }
     return 0;
