@@ -35,14 +35,14 @@ fn copy(from: String, to: String) {
         );
 }
 
-fn rm(target: String) {
-    let _ = Command::new("rm")
-        .args(&[format!("-rf"), format!("./active-state/{}", target)])
-        .spawn()
-        .expect("[!] Could not start removing active-states folders")
-        .wait()
-        .expect("[!] Removing state folder from active-state failed");
-}
+// fn rm(target: String) {
+//     let _ = Command::new("rm")
+//         .args(&[format!("-rf"), format!("./active-state/{}", target)])
+//         .spawn()
+//         .expect("[!] Could not start removing active-states folders")
+//         .wait()
+//         .expect("[!] Removing state folder from active-state failed");
+// }
 
 fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
     // copy old snapshot folder for criu
@@ -529,8 +529,14 @@ pub fn run() {
     while !queue.is_empty() {
         // kick off new run
         let afl_current = queue.pop_front().unwrap();
-
+        
         if !afl_current.initial {
+            //clean active-state dir before doing anything
+            std::fs::remove_dir_all("./active-state")
+                .expect("[!] Can't delete ./active-state");
+            std::fs::create_dir("./active-state")
+                .expect("[!] Can't create ./active-state");
+
             println!(
                 "==== [*] Starting the fuzz run of: {} ====",
                 afl_current.state_path
@@ -626,11 +632,6 @@ pub fn run() {
                 if let Some(next_run) = next_run {
                     queue.push_back(next_run);
                 }
-
-                rm(afl_current.state_path.clone());
-                rm(afl_current.previous_state_path.clone());
-            } else {
-                rm(afl_current.state_path.clone());
             }
         }
         //.TODO: Change to a variable like `init-state`
