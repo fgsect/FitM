@@ -41,7 +41,7 @@ int main()
     printf("client sent: %s\n", msg);
     recv(sock, buffer, 100, 0);
     printf("client recv #1: %s\n", buffer);
-    if(!strcmp(msg, "ACK! Got correct init signal\n")) {
+    if(!strcmp(buffer, "ACK! Got correct init signal\n")) {
         char *new_msg = "Need more state!\n";
         send(sock, new_msg, strlen(new_msg), 0);
         printf("client send #2: %s\n", new_msg);
