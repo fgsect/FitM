@@ -270,8 +270,8 @@ impl AFLRun {
         // otherwise criu can't restore
         if self.base_state != "".to_string() {
             self.copy_base_state();
-            create_restore_sh(self);
         }
+        create_restore_sh(self);
 
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -331,6 +331,7 @@ impl AFLRun {
         if self.base_state != "".to_string() {
             self.copy_base_state();
         }
+        create_restore_sh(self);
 
         // Change into our state directory and create fuzz run from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -634,10 +635,7 @@ pub fn run() {
                 }
             }
         }
-        //.TODO: Change to a variable like `init-state`
-        if !afl_current.initial {
-            queue.push_back(afl_current.clone());
-        }
+        queue.push_back(afl_current.clone());
     }
 
     println!("[*] Reached end of programm. Quitting.");
