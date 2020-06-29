@@ -103,8 +103,9 @@ impl fmt::Debug for AFLRun {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AFLRun")
             .field("state_path", &self.state_path)
-            .field("target_bin", &self.target_bin)
             .field("previous_state_path", &self.previous_state_path)
+            .field("base_state", &self.base_state)
+            .field("target_bin", &self.target_bin)
             .field("timeout", &self.timeout)
             .field("server", &self.server)
             .field("initial", &self.initial)
