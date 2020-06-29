@@ -19,8 +19,8 @@ fn main() {
 
     let idc = "AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES";
     let cpu = "AFL_SKIP_CPUFREQ";
-    // let debug = "AFL_DEBUG_CHILD_OUTPUT";
-    let debug = "AFL_QUIET";
+    let debug = "AFL_DEBUG_CHILD_OUTPUT";
+    // let debug = "AFL_QUIET";
 
     env::set_var(idc, "1");
     env::set_var(cpu, "1");
