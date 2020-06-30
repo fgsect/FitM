@@ -420,6 +420,7 @@ impl AFLRun {
                 .args(&[
                     format!("stdbuf"),
                     format!("-oL"),
+                    format!("sh"),
                     format!("../../restore.sh"),
                     format!("{}", self.state_path),
                     String::from(entry_path.clone().to_str().unwrap()),
