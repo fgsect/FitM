@@ -258,7 +258,6 @@ impl AFLRun {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("FITM_CREATE_OUTPUTS", "1")
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
             .env("INPUT_FILENAME", dev_null)
             .env("AFL_NO_UI", "1")
@@ -270,6 +269,8 @@ impl AFLRun {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
+        // With snapshot_run we move the state folder, but in this initial case we need to use
+        // the state folder shortly after running this function
         copy(
             format!("./active-state/{}", self.state_path),
             String::from("./saved-states/"),
@@ -397,21 +398,35 @@ impl AFLRun {
             .wait()
             .expect("[!] Error while waiting for fuzz run");
 
+        // After finishing the run we go back into the base directory
+        env::set_current_dir(&Path::new("../../")).unwrap();
+
         println!("==== [*] Generating outputs for: {} ====", self.state_path);
         self.create_outputs();
     }
 
     fn create_outputs(&self) -> () {
-        // Open a file for stdout and stderr to log to
-        let stdout = fs::File::create("stdout-afl").unwrap();
-        let stderr = fs::File::create("stderr-afl").unwrap();
-        fs::File::create("stdout").unwrap();
-        fs::File::create("stderr").unwrap();
+        // For consistency, change into necessary dir inside the function
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
+            .unwrap();
 
-        for entry in fs::read_dir("./out/queue").expect(&format!(
+        // For the binary that creates the seed we need to take input from the in folder
+        let input_path = if self.previous_state_path == "".to_string() {
+            "./in"
+        } else {
+            "./out/queue"
+        };
+
+        for entry in fs::read_dir(input_path).expect(&format!(
             "[!] Could not read queue of state: {}",
             self.state_path
         )) {
+            // Open a file for stdout and stderr to log to
+            // We need to do this inside the loop as the process gets restored multiple times
+            let stdout = fs::File::create("stdout-afl").unwrap();
+            let stderr = fs::File::create("stderr-afl").unwrap();
+            // Don't truncate stdout/err here as this breaks criu
+
             let entry_path = entry.unwrap().path();
             let entry_file = fs::File::open(entry_path.clone())
                 .expect("[!] Could not open queue file");
@@ -437,7 +452,7 @@ impl AFLRun {
                 .expect("[!] Snapshot run failed");
         }
 
-        // After spawning the run we go back into the base directory
+        // After creating the outputs we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
     }
 
@@ -634,8 +649,10 @@ pub fn run() {
                 .expect("[!] Error while waiting for the showmap run");
         } else {
             // copy output of first run of binary 1 to in of first run of bin 2 as seed
-            // apparently fs_extra can not copy content of `from` into folder `[..]/in`
+            afl_current.create_outputs();
+
             let from = format!("active-state/{}/fd", afl_current.state_path);
+            // apparently fs_extra can not copy content of `from` into folder `[..]/in`
             for entry in fs::read_dir(from)
                 .expect("[!] Could not read output of initial run")
             {
