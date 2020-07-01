@@ -253,13 +253,14 @@ impl AFLRun {
                 format!("-oL"),
                 format!("../../AFLplusplus/afl-qemu-trace"),
                 format!("../../{}", self.target_bin),
+                format!("{}", dev_null),
             ])
             .stdin(Stdio::from(stdin))
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+            .env("FITM_CREATE_OUTPUTS", "1")
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
-            .env("INPUT_FILENAME", dev_null)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
