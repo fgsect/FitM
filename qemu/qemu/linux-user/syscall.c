@@ -1983,18 +1983,12 @@ static inline int target_to_host_sock_type(int *type)
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
-    int new_fd = -1;
-    if(getenv_from_file("FITM_CREATE_OUTPUTS")){
-        char *uuid = get_new_uuid();
-        char path[44] = "./fd/";
-        strncat(path, uuid, 37);
+    char *uuid = get_new_uuid();
+    char path[44] = "./fd/";
+    strncat(path, uuid, 37);
 
-        new_fd = open(path, O_RDWR | O_CREAT, 0644);
-        is_socket |= 1 << new_fd;
-    } else {
-        new_fd = open("/dev/null", O_RDWR | O_CREAT, 0644);
-        is_socket |= 1 << new_fd;
-    }
+    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    is_socket |= 1 << new_fd;
 
     return new_fd;
 }
@@ -2191,18 +2185,12 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    int new_fd = -1;
-    if(getenv_from_file("FITM_CREATE_OUTPUTS")){
-        char *uuid = get_new_uuid();
-        char path[44] = "./fd/";
-        strncat(path, uuid, 37);
+    char *uuid = get_new_uuid();
+    char path[44] = "./fd/";
+    strncat(path, uuid, 37);
 
-        new_fd = open(path, O_RDWR | O_CREAT, 0644);
-        is_socket |= 1 << new_fd;
-    } else {
-        new_fd = open("/dev/null", O_RDWR | O_CREAT, 0644);
-        is_socket |= 1 << new_fd;
-    }
+    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    is_socket |= 1 << new_fd;
 
     return new_fd;
 }
@@ -2288,7 +2276,12 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
     sent = true;
-    return write(fd, (char *)msg, len);
+    // Only write sth to the fd if we are in consolidation
+    if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+        return (ssize_t)len;
+    } else {
+        return write(fd, (char *) msg, len);
+    }
 }
 
 /* do_recvfrom() Must return target values and target errnos. */
@@ -2330,7 +2323,6 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         fclose(f);
 
         do_criu();
-        system("ls -la /proc/self/fd");
         // Weird bug making criu restore crash - this solves it
          sleep(0.2);
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
@@ -6384,6 +6376,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return ret;
     case TARGET_NR_write:
         if ((is_socket >> arg1) & 1){
+            // TODO: Julian, can you checkout how to patch this properly?
             sent = true;
         }
         if (arg2 == 0 && arg3 == 0) {
