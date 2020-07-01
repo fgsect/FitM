@@ -2280,6 +2280,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
     if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
         return (ssize_t)len;
     } else {
+        system("touch /tmp/fitm_createoutputs");
         return write(fd, (char *) msg, len);
     }
 }
@@ -6381,8 +6382,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         }
         if (arg2 == 0 && arg3 == 0) {
             if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                system("touch /tmp/fitm-0");
                 return 0;
             } else {
+                system("touch /tmp/fitm-safewrite0");
                 return get_errno(safe_write(arg1, 0, 0));
             }
         }
@@ -6394,14 +6397,19 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             ret = fd_trans_target_to_host_data(arg1)(copy, arg3);
             if (ret >= 0) {
                 if(getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                    system("touch /tmp/fitm-safewrite1");
                     ret = get_errno(safe_write(arg1, copy, ret));
+                } else {
+                    system("touch /tmp/fitm-ret");
                 }
             }
             g_free(copy);
         } else {
             if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                system("touch /tmp/fitm-arg3");
                 ret = arg3;
             } else {
+                system("touch /tmp/fitm-safewrite2");
                 ret = get_errno(safe_write(arg1, p, arg3));
             }
         }
