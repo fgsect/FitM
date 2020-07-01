@@ -6380,7 +6380,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             sent = true;
         }
         if (arg2 == 0 && arg3 == 0) {
-            return get_errno(safe_write(arg1, 0, 0));
+            if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                return 0;
+            } else {
+                return get_errno(safe_write(arg1, 0, 0));
+            }
         }
         if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
             return -TARGET_EFAULT;
@@ -6389,11 +6393,17 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             memcpy(copy, p, arg3);
             ret = fd_trans_target_to_host_data(arg1)(copy, arg3);
             if (ret >= 0) {
-                ret = get_errno(safe_write(arg1, copy, ret));
+                if(getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                    ret = get_errno(safe_write(arg1, copy, ret));
+                }
             }
             g_free(copy);
         } else {
-            ret = get_errno(safe_write(arg1, p, arg3));
+            if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                ret = arg3;
+            } else {
+                ret = get_errno(safe_write(arg1, p, arg3));
+            }
         }
         unlock_user(p, arg2, 0);
         return ret;
