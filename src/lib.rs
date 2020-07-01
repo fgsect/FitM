@@ -426,7 +426,8 @@ impl AFLRun {
             // We need to do this inside the loop as the process gets restored multiple times
             let stdout = fs::File::create("stdout-afl").unwrap();
             let stderr = fs::File::create("stderr-afl").unwrap();
-            // Don't truncate stdout/err here as this breaks criu
+            fs::File::create("stdout").unwrap();
+            fs::File::create("stderr").unwrap();
 
             let entry_path = entry.unwrap().path();
             let entry_file = fs::File::open(entry_path.clone())
@@ -445,7 +446,6 @@ impl AFLRun {
                 .stdout(Stdio::from(stdout.try_clone().unwrap()))
                 .stderr(Stdio::from(stderr.try_clone().unwrap()))
                 .env("FITM_CREATE_OUTPUTS", "1")
-                .env("CRIU_SNAPSHOT_DIR", "./snapshot")
                 .env("AFL_NO_UI", "1")
                 .spawn()
                 .expect("[!] Could not spawn snapshot run")
@@ -650,8 +650,6 @@ pub fn run() {
                 .expect("[!] Error while waiting for the showmap run");
         } else {
             // copy output of first run of binary 1 to in of first run of bin 2 as seed
-            afl_current.create_outputs();
-
             let from = format!("active-state/{}/fd", afl_current.state_path);
             // apparently fs_extra can not copy content of `from` into folder `[..]/in`
             for entry in fs::read_dir(from)
