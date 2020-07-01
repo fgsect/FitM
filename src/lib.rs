@@ -658,8 +658,11 @@ pub fn run() {
                 let entry_path = entry.unwrap().path();
                 let filename =
                     entry_path.file_name().unwrap().to_string_lossy();
-                let to =
-                    format!("saved-states/{}/in/{}", "fitm-c0s1", filename);
+                let upcoming_run = queue.front().unwrap();
+                let to = format!(
+                    "saved-states/{}/in/{}",
+                    upcoming_run.state_path, filename
+                );
 
                 std::fs::copy(entry_path, to).unwrap();
             }
