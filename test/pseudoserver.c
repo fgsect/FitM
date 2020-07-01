@@ -62,7 +62,7 @@ int main() {
 
         // send 1
         char *new_msg = "ACK! Got correct init signal\n";
-        printf("server send #1: %s\n", buf);
+        printf("server send #1: %s\n", new_msg);
         send(new_socket , new_msg , strlen(new_msg) , 0 );
 
         free(buf);
@@ -75,7 +75,7 @@ int main() {
             // send 2
             new_msg = "make client go b00m.\n";
             send(new_socket , new_msg , strlen(new_msg) , 0 );
-            printf("server send #2: %s\n", buf);
+            printf("server send #2: %s\n", new_msg);
 
             free(buf);
         }
