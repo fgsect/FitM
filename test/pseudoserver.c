@@ -62,8 +62,8 @@ int main() {
 
         // send 1
         char *new_msg = "ACK! Got correct init signal\n";
-        printf("server send #1: %s\n", new_msg);
         send(new_socket , new_msg , strlen(new_msg) , 0 );
+        printf("server send #1: %s\n", new_msg);
 
         free(buf);
         buf = (char *)calloc(100, 1);
@@ -78,7 +78,11 @@ int main() {
             printf("server send #2: %s\n", new_msg);
 
             free(buf);
+        } else {
+            printf("server didn't get more state\n");
         }
+    } else {
+        printf("server got incorrect init signal...aborting\n");
     }
     return 0;
 }

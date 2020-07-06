@@ -55,7 +55,11 @@ int main()
             printf("dingdingding, client goes bum");
             char *foo = 0;
             printf("%s", foo);
+        } else {
+            printf("client did not go bum\n");
         }
+    } else {
+        printf("client got incorrect init response\n");
     }
     return 0;
 }
