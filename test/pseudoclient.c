@@ -40,16 +40,20 @@ int main()
     send(sock , msg , strlen(msg) , 0 );
     printf("client sent: %s\n", msg);
     recv(sock, buffer, 100, 0);
+    system("touch /tmp/client1");
     printf("client recv #1: %s\n", buffer);
     if(!strcmp(buffer, "ACK! Got correct init signal\n")) {
         char *new_msg = "Need more state!\n";
         send(sock, new_msg, strlen(new_msg), 0);
         printf("client send #2: %s\n", new_msg);
+        system("touch /tmp/client2");
+        printf("client sock: %s\n", sock);
 
         free(buffer);
         buffer = (char *) calloc(100, 1);
 
         recv(sock, buffer, 100, 0);
+        system("touch /tmp/client3");
         printf("client recv #2: %s\n", buffer);
         if (!strcmp(buffer, "make client go b00m.\n\n")) {
             printf("dingdingding, client goes bum");

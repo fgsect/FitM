@@ -6406,10 +6406,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             g_free(copy);
         } else {
             if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
-                system("touch /tmp/fitm-arg3");
+                system("ls -la /proc/self/fd > /tmp/fitm-arg3");
                 ret = arg3;
             } else {
-                system("touch /tmp/fitm-safewrite2");
+                system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
                 ret = get_errno(safe_write(arg1, p, arg3));
             }
         }

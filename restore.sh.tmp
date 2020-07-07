@@ -15,6 +15,7 @@ PIPE2=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
 echo "======="
 ls -la /proc/self/fd
+echo $@
 echo "======="
 
 echo -n "" > ./out/.cur_input
