@@ -459,7 +459,7 @@ impl AFLRun {
                 .wait()
                 .expect("[!] Snapshot run failed");
 
-            // No new states are discovered on otto's machine if this sleep is not there
+            // No new states are discovered if this sleep is not there
             // Didn't investigate further.
             sleep(Duration::new(0, 10000000));
 
@@ -710,8 +710,6 @@ pub fn run() {
             let new_map = fs::read_to_string(entry_path.clone())
                 .expect("[!] Could not read map file while consolidating");
 
-            println!("== client maps: {:?}", client_maps);
-            println!("== new map: {:?}", new_map);
             if !client_maps.contains(new_map.as_str()) {
                 client_maps.insert(new_map);
 
