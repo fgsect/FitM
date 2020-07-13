@@ -142,6 +142,9 @@ impl AFLRun {
         fs::create_dir(format!("active-state/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
+        fs::create_dir(format!("active-state/{}/outputs", state_path))
+            .expect("[-] Could not create outputs dir!");
+
         fs::create_dir(format!("active-state/{}/out/maps", state_path))
             .expect("[-] Could not create out/maps dir!");
 
@@ -400,14 +403,23 @@ impl AFLRun {
             "./out/queue"
         };
 
-        for entry in fs::read_dir(input_path).expect(&format!(
-            "[!] Could not read queue of state: {}",
-            self.state_path
-        )) {
+        for (index, entry) in fs::read_dir(input_path)
+            .expect(&format!(
+                "[!] Could not read queue of state: {}",
+                self.state_path
+            ))
+            .enumerate()
+        {
             std::fs::remove_dir_all(String::from("./snapshot"))
                 .expect("[!] Error deleting old snapshot folder");
+            std::fs::remove_dir_all(String::from("./fd"))
+                .expect("[!] Error deleting old fd folder");
             copy(
                 format!("../../saved-states/{}/snapshot", self.state_path),
+                format!("."),
+            );
+            copy(
+                format!("../../saved-states/{}/fd", self.state_path),
                 format!("."),
             );
 
@@ -422,10 +434,10 @@ impl AFLRun {
             fs::File::create("stdout").unwrap();
             fs::File::create("stderr").unwrap();
 
-            let entry_path = entry.unwrap().path();
+            let entry_path = entry_unwrapped.path();
             let entry_file = fs::File::open(entry_path.clone())
                 .expect("[!] Could not open queue file");
-
+            println!("using output: {:?}", entry_path);
             let _ = Command::new("setsid")
                 .args(&[
                     format!("stdbuf"),
@@ -444,6 +456,20 @@ impl AFLRun {
                 .expect("[!] Could not spawn snapshot run")
                 .wait()
                 .expect("[!] Snapshot run failed");
+
+            for entry in fs::read_dir("./fd")
+                .expect("[!] Could not read populated fd folder")
+            {
+                let cur_file = entry.unwrap().file_name();
+                let from = format!("./fd/{}", &cur_file.to_str().unwrap());
+                let to = format!(
+                    "./outputs/{}_{}",
+                    index,
+                    &cur_file.to_str().unwrap()
+                );
+                fs::copy(from, to)
+                    .expect("[!] Could not copy output file to outputs folder");
+            }
         }
 
         // After creating the outputs we go back into the base directory
@@ -487,7 +513,7 @@ impl AFLRun {
         let ret = Command::new("../../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
-                format!("./fd"),
+                format!("./outputs"),
                 format!("-o"),
                 format!("./out/maps"),
                 format!("-m"),
@@ -521,7 +547,7 @@ impl AFLRun {
         from_snapshot: bool,
     ) -> AFLRun {
         let input_path: String =
-            format!("active-state/{}/fd/{}", self.state_path, input);
+            format!("active-state/{}/outputs/{}", self.state_path, input);
 
         let target_bin = if self.server {
             "test/pseudoclient".to_string()
@@ -575,7 +601,7 @@ fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32) {
 }
 
 pub fn run() {
-    let cur_timeout = 1;
+    let cur_timeout = 3;
     let mut cur_state: (u32, u32) = (1, 0);
     let mut client_maps: BTreeSet<String> = BTreeSet::new();
 
@@ -678,6 +704,8 @@ pub fn run() {
             let new_map = fs::read_to_string(entry_path.clone())
                 .expect("[!] Could not read map file while consolidating");
 
+            println!("== client maps: {:?}", client_maps);
+            println!("== new map: {:?}", new_map);
             if !client_maps.contains(new_map.as_str()) {
                 client_maps.insert(new_map);
 
