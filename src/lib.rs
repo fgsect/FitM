@@ -36,15 +36,6 @@ fn copy(from: String, to: String) {
         );
 }
 
-// fn rm(target: String) {
-//     let _ = Command::new("rm")
-//         .args(&[format!("-rf"), format!("./active-state/{}", target)])
-//         .spawn()
-//         .expect("[!] Could not start removing active-states folders")
-//         .wait()
-//         .expect("[!] Removing state folder from active-state failed");
-// }
-
 fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
@@ -121,6 +112,7 @@ impl AFLRun {
         target_bin: String,
         timeout: u32,
         previous_state_path: String,
+        base_state: String,
         server: bool,
         from_snapshot: bool,
     ) -> AFLRun {
@@ -156,24 +148,14 @@ impl AFLRun {
         let fd_path = format!("active-state/{}/fd", state_path);
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
-        let base_state = if from_snapshot {
-            // TODO: This is not correct.
-            // The base_state may be i, while this run is already i+10.
-            // Thus the logic "new_state - 1" is not sufficient
-            let base_state = if server {
-                format!("fitm-c{}s{}", new_state.0, (new_state.1) - 1)
-            } else {
-                format!("fitm-c{}s{}", (new_state.0) - 1, new_state.1)
-            };
+        if from_snapshot {
             copy_snapshot_base(&base_state, &state_path);
-            base_state
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
-            "".to_string()
         };
 
-        if base_state != "" {
+        if base_state != "".to_string() {
             // copy old fd folder for new state
             let from = format!("./saved-states/{}/fd", base_state);
             let to = format!("./active-state/{}/", state_path);
@@ -550,11 +532,16 @@ impl AFLRun {
         // Only mutate cur_state in this method. So next_state_path gets a
         // readable copy. We update cur_state here with a new tuple.
         // cur_state = next_state_path(cur_state, true);
+        // We create a new state for the other binary that is not fuzzed by "self".
+        // For this new state previous_state is "self". And base_state is self.previous
+        // as we generated the maps on self.previous
+        // and thus create the new state from that snapshot
         let afl = AFLRun::new(
             new_state,
             target_bin.to_string(),
             timeout,
             self.state_path.clone(),
+            self.previous_state_path.clone(),
             !self.server,
             from_snapshot,
         );
@@ -598,6 +585,7 @@ pub fn run() {
         cur_timeout,
         // TODO: Need some extra handling for this previous_path value
         "".to_string(),
+        "".to_string(),
         false,
         false,
     );
@@ -607,6 +595,7 @@ pub fn run() {
         "test/pseudoserver".to_string(),
         cur_timeout,
         "fitm-c1s0".to_string(),
+        "".to_string(),
         true,
         false,
     );
