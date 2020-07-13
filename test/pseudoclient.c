@@ -47,7 +47,7 @@ int main()
         send(sock, new_msg, strlen(new_msg), 0);
         printf("client send #2: %s\n", new_msg);
         system("touch /tmp/client2");
-        printf("client sock: %s\n", sock);
+        printf("client sock: %d\n", sock);
 
         free(buffer);
         buffer = (char *) calloc(100, 1);
@@ -64,6 +64,8 @@ int main()
         }
     } else {
         printf("client got incorrect init response\n");
+        recv(sock, buffer, 100, 0);
+        printf("this is the wrong recv\n");
     }
     return 0;
 }
