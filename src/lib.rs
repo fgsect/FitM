@@ -9,6 +9,8 @@ use std::process::{Child, Command, Stdio};
 
 extern crate fs_extra;
 use fs_extra::dir::*;
+use std::thread::sleep;
+use std::time::Duration;
 
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
@@ -456,6 +458,10 @@ impl AFLRun {
                 .expect("[!] Could not spawn snapshot run")
                 .wait()
                 .expect("[!] Snapshot run failed");
+
+            // No new states are discovered on otto's machine if this sleep is not there
+            // Didn't investigate further.
+            sleep(Duration::new(0, 10000000));
 
             for entry in fs::read_dir("./fd")
                 .expect("[!] Could not read populated fd folder")
