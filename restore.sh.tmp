@@ -9,7 +9,7 @@ export INPUT_FILENAME=$(realpath $2)
 STATE_DIR=../../active-state/$1
 
 ENVFILE=$STATE_DIR/../envfile
-env > $ENVFILE
+env | sort > $ENVFILE
 PIPE1=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
 PIPE2=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
