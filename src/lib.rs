@@ -404,6 +404,10 @@ impl AFLRun {
 
         sleep(Duration::new(0, 20000000));
 
+        if self.state_path == "fitm-c2s1" {
+            println!("pass");
+        }
+
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
