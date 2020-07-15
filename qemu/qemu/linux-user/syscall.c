@@ -2325,7 +2325,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 
         do_criu();
         // Weird bug making criu restore crash - this solves it
-         sleep(0.2);
+        sleep(0.2);
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
