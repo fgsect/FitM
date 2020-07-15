@@ -402,6 +402,8 @@ impl AFLRun {
             .wait()
             .expect("[!] Error while waiting for fuzz run");
 
+        sleep(Duration::new(0, 20000000));
+
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
@@ -477,7 +479,7 @@ impl AFLRun {
 
             // No new states are discovered if this sleep is not there
             // Didn't investigate further.
-            sleep(Duration::new(0, 10000000));
+            sleep(Duration::new(0, 20000000));
 
             for entry in fs::read_dir("./fd")
                 .expect("[!] Could not read populated fd folder")
