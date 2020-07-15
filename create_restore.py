@@ -33,8 +33,13 @@ def main():
             fd = list(filter(lambda x: x["id"] == f[0], fd_info["entries"]))[0]
             mapping.append((fd["fd"], f[1]))
 
-        open_fds += f"exec 1> /{cur_state}/stdout\n"
-        open_fds += f"exec 2> /{cur_state}/stderr\n"
+        open_fds += 'if [[ -z "${LETS_DO_THE_TIMEWARP_AGAIN}" ]]; then\n'
+        open_fds += f"  exec 1> /{cur_state}/stdout\n"
+        open_fds += f"  exec 2> /{cur_state}/stderr\n"
+        open_fds += "else\n"
+        open_fds += "  exec 1> /dev/null\n"
+        open_fds += "  exec 2> /dev/null\n"
+        open_fds += "fi\n\n"
 
         for m in mapping:
             open_fds += f"exec {m[0]}< {re.sub(r'fitm-c[0-9]+s[0-9]+', argv[2], m[1])}\n"
