@@ -321,6 +321,13 @@ impl AFLRun {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
+        rm(format!("./active-state/{}/snapshot", self.state_path));
+
+        mv(
+            format!("./active-state/{}/snapshot", self.base_state),
+            format!("./active-state/{}", self.state_path)
+        );
+
         mv(
             format!("./active-state/{}", self.state_path),
             String::from("./saved-states/"),
