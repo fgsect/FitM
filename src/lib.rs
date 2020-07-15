@@ -38,6 +38,15 @@ fn copy(from: String, to: String) {
         );
 }
 
+fn rm(dir: String) {
+    Command::new("rm")
+        .args(&["-rf", dir.clone().as_str()])
+        .spawn()
+        .expect("[!] Could not start removing dir/file")
+        .wait()
+        .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
+}
+
 fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
