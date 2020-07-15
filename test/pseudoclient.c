@@ -39,33 +39,17 @@ int main()
     // I am not sure atm if `recv` is the right point to snapshot the client.
     send(sock , msg , strlen(msg) , 0 );
     printf("client sent: %s\n", msg);
+
     recv(sock, buffer, 100, 0);
-    system("touch /tmp/client1");
     printf("client recv #1: %s\n", buffer);
-    if(!strcmp(buffer, "ACK! Got correct init signal\n")) {
-        char *new_msg = "Need more state!\n";
-        send(sock, new_msg, strlen(new_msg), 0);
-        printf("client send #2: %s\n", new_msg);
-        system("touch /tmp/client2");
-        printf("client sock: %d\n", sock);
 
-        free(buffer);
-        buffer = (char *) calloc(100, 1);
+    char *new_msg = "Need more state!\n";
+    send(sock, new_msg, strlen(new_msg), 0);
+    printf("client send #2: %s\n", new_msg);
 
-        recv(sock, buffer, 100, 0);
-        system("touch /tmp/client3");
-        printf("client recv #2: %s\n", buffer);
-        if (!strcmp(buffer, "make client go b00m.\n\n")) {
-            printf("dingdingding, client goes bum");
-            char *foo = 0;
-            printf("%s", foo);
-        } else {
-            printf("client did not go bum\n");
-        }
-    } else {
-        printf("client got incorrect init response\n");
-        recv(sock, buffer, 100, 0);
-        printf("this is the wrong recv\n");
-    }
+    free(buffer);
+    buffer = (char *) calloc(100, 1);
+    recv(sock, buffer, 100, 0);
+    printf("client recv #2: %s\n", buffer);
     return 0;
 }

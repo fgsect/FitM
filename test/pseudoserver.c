@@ -48,41 +48,29 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    char *buf = (char *)calloc(100, 1);
-    // client sends first...
-//    send(new_socket, "RI\0", 3, 0);
-
     // recv 1
+    char *buf = (char *)calloc(100, 1);
     recv(new_socket, buf, 100, 0);
     printf("server recv #1: %s\n", buf);
 
-    if(buf[0] == 'R') {
-        free(buf);
-        buf = (char *)calloc(100, 1);
+    // send 1
+    free(buf);
+    buf = (char *)calloc(100, 1);
+    char *new_msg = "ACK! Got correct init signal\n";
+    send(new_socket , new_msg , strlen(new_msg) , 0 );
+    printf("server send #1: %s\n", new_msg);
 
-        // send 1
-        char *new_msg = "ACK! Got correct init signal\n";
-        send(new_socket , new_msg , strlen(new_msg) , 0 );
-        printf("server send #1: %s\n", new_msg);
+    // recv 2
+    free(buf);
+    buf = (char *)calloc(100, 1);
+    recv(new_socket, buf, 100, 0);
+    printf("server recv #2: %s\n", buf);
 
-        free(buf);
-        buf = (char *)calloc(100, 1);
-        // recv 2
-        recv(new_socket, buf, 100, 0);
-        printf("server recv #2: %s\n", buf);
-        if (!strcmp(buf, "Need more state!\n")) {
+    // send 2
+    new_msg = "make client go b00m.\n";
+    send(new_socket , new_msg , strlen(new_msg) , 0 );
+    printf("server send #2: %s\n", new_msg);
 
-            // send 2
-            new_msg = "make client go b00m.\n";
-            send(new_socket , new_msg , strlen(new_msg) , 0 );
-            printf("server send #2: %s\n", new_msg);
-
-            free(buf);
-        } else {
-            printf("server didn't get more state\n");
-        }
-    } else {
-        printf("server got incorrect init signal...aborting\n");
-    }
+    free(buf);
     return 0;
 }
