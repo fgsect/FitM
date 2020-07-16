@@ -71,6 +71,11 @@ int do_criu(void){
     struct sockaddr_un addr;
     socklen_t addr_len;
 
+    char *uuid = get_new_uuid();
+    char path[44] = "/tmp/";
+    strncat(path, uuid, 37);
+    close(open(path, O_RDWR | O_CREAT, 0644));
+
     char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_DIR");
 
     dir_fd = open(snapshot_dir, O_DIRECTORY);
