@@ -20,13 +20,21 @@ test_pipe: clean
 	gcc -o pipe_test pipe_test.c
 	setsid stdbuf -oL ../AFLplusplus/afl-qemu-trace ./pipe_test < /dev/null &> pipe_test.out
 
-pseudotest: pseudoserver pseudoclient
+pseudotest_simple: pseudoserver_simple pseudoclient_simple
 
-pseudoserver: clean
-	gcc -o pseudoserver pseudoserver.c
+pseudoserver_simple: clean
+	gcc -o pseudoserver pseudoserver_simple.c
 
-pseudoclient: clean
-	gcc -o pseudoclient pseudoclient.c
+pseudoclient_simple: clean
+	gcc -o pseudoclient pseudoclient_simple.c
+
+pseudotest_complex: pseudoserver_complex pseudoclient_complex
+
+pseudoserver_complex: clean
+	gcc -o pseudoserver pseudoserver_complex.c
+
+pseudoclient_complex: clean
+	gcc -o pseudoclient pseudoclient_complex.c
 
 test_criupipe: clean
 	gcc -o pipe pipe.c
