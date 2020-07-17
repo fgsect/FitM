@@ -1983,12 +1983,14 @@ static inline int target_to_host_sock_type(int *type)
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
+    puts("do_socket: 00");
     char *uuid = get_new_uuid();
     char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
+    printf("is_socket: %lld\n", is_socket);
 
     return new_fd;
 }
@@ -2290,11 +2292,15 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
+    system("touch /tmp/qemu00");
+
     if(sent){
+        system("touch /tmp/qemu01");
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             exit(0);
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
+        system("touch /tmp/qemu02");
 
         if (fcntl(FRKSRV_READ_FD, F_GETFD) == -1) {
             int read_pipe[2];
@@ -2322,6 +2328,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         fprintf(f, "%s\n", buff);
         free(buff);
         fclose(f);
+
+        system("touch /tmp/qemu03");
 
         do_criu();
         // Weird bug making criu restore crash - this solves it
@@ -6296,13 +6304,27 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
-        if (arg3 == 0) {
-            return 0;
+        system("touch /tmp/qemu_read00");
+            if (arg3 == 0) {
+                system("touch /tmp/qemu_read01");
+                return 0;
         } else {
+                if(sent) {
+                    system("echo 'true' > /tmp/qemu_read042");
+                    puts("read is_socket:");
+                } else {
+                system("echo 'false' > /tmp/qemu_read042");
+            }
+//            if(sent && (is_socket >> arg1) & 1){
+            system("touch /tmp/qemu_read043");
+            puts("touched qemu043");
             if(sent && (is_socket >> arg1) & 1){
                 puts("should not be here");
-                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
+                system("touch /tmp/qemu_read03");
+                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+                    system("touch /tmp/qemu_read04");
                     exit(0);
+                }
                 sent = false; // After restore, we'll await the next sent before criuin' again
                 if (fcntl(FRKSRV_READ_FD, F_GETFD) == -1) {
                     int read_pipe[2];
@@ -6320,7 +6342,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     close(write_pipe[0]);
                     close(write_pipe[1]);
                 }
-
+                system("touch /tmp/qemu_read05");
                 FILE *f = fopen("./pipes", "w");
                 char *buff = calloc(200, 1);
                 readlink("/proc/self/fd/198", buff, 100);
@@ -6330,6 +6352,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 fprintf(f, "%s\n", buff);
                 free(buff);
                 fclose(f);
+                system("touch /tmp/qemu_read04");
 
                 do_criu();
                 // Weird bug making criu restore crash - this solves it
@@ -6365,6 +6388,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 dup2(input_fd, arg1);
                 close(input_fd);
             }
+            system("touch /tmp/qemu_read099");
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 return -TARGET_EFAULT;
             ret = get_errno(safe_read(arg1, p, arg3));
