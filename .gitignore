@@ -16,3 +16,4 @@ saved-states/
 pseudoclient
 pseudoserver
 venv
+restore.sh
