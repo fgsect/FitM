@@ -31,6 +31,7 @@ create_snap(){
   touch stdout
   touch input_file
   setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../snapshot_creation < /dev/null &> stdout
+  cd ..
 }
 
 
@@ -39,5 +40,10 @@ backup_snap(){
   sudo cp -r $state_dir /tmp/test
 }
 
+restore(){
+  sudo criu restore -d -vvv -o ./restore.log --images-dir ./test-state/snapshot && echo 'OK'
+}
+
 clean
 create_snap
+restore
