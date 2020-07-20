@@ -41,9 +41,18 @@ backup_snap(){
 }
 
 restore(){
+#  unset LETS_DO_THE_TIMEWARP_AGAIN
+  export CRIU_SNAPSHOT_DIR=$state_dir/snapshot2
+  mkdir -p $CRIU_SNAPSHOT_DIR
+  env > envfile
   sudo criu restore -d -vvv -o ./restore.log --images-dir ./test-state/snapshot && echo 'OK'
 }
 
 clean
 create_snap
 restore
+# This sleep is needed for criu as otherwise criu will try to reuse the PID that the previous process just used
+# but the PID is not freed up by the previous process yet.
+sleep 0.1
+#truncate --size=100 test-state/stdout
+sudo criu restore -d -vvv -o ./restore.log --images-dir ./test-state/snapshot2 && echo 'OK'
