@@ -6,29 +6,25 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
-#define PORT 8080
 
 int main()
 {
     // necessary preamble
     int sock = 0;
-    struct sockaddr_in serv_addr;
-    char *msg = "";
     char *buffer = (char *)calloc(1, 1);
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("\n Socket creation error \n");
+        system("echo 'Socket creation error'");
         return -1;
     }
 
 
 //    send(sock , msg, strlen(msg) , 0 );
 //    printf("client sent: %s\n", msg);
-
-    puts("00");
+    system("echo '00'");
     recv(sock, buffer, 1, 0);
-    puts("01");
-    printf("client recv #1: %s\n", buffer);
+    system("echo '01'");
+//    printf("client recv #1: %s\n", buffer);
 
 //    char *new_msg = "Need more state!\n";
 //    send(sock, new_msg, strlen(new_msg), 0);

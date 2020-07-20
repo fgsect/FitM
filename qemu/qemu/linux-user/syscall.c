@@ -6308,10 +6308,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             if (arg3 == 0) {
                 system("touch /tmp/qemu_read01");
                 return 0;
-        } else {
+            } else {
                 if(sent) {
                     system("echo 'true' > /tmp/qemu_read042");
-                    puts("read is_socket:");
+                    puts("read: sent is true");
                 } else {
                 system("echo 'false' > /tmp/qemu_read042");
             }
