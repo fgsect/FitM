@@ -1983,14 +1983,12 @@ static inline int target_to_host_sock_type(int *type)
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
 {
-    puts("do_socket: 00");
     char *uuid = get_new_uuid();
     char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0644);
     is_socket |= 1 << new_fd;
-    printf("is_socket: %lld\n", is_socket);
 
     return new_fd;
 }
@@ -6311,13 +6309,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             } else {
                 if(sent) {
                     system("echo 'true' > /tmp/qemu_read042");
-                    puts("read: sent is true");
                 } else {
                 system("echo 'false' > /tmp/qemu_read042");
             }
 //            if(sent && (is_socket >> arg1) & 1){
             system("touch /tmp/qemu_read043");
-            puts("touched qemu043");
             if(sent && (is_socket >> arg1) & 1){
                 puts("should not be here");
                 system("touch /tmp/qemu_read03");

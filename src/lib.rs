@@ -263,6 +263,7 @@ impl AFLRun {
             .wait()
             .expect("[!] Snapshot run failed");
 
+        sleep(Duration::new(0, 20000000));
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
@@ -317,6 +318,7 @@ impl AFLRun {
             .expect("[!] Could not spawn snapshot run")
             .wait()
             .expect("[!] Snapshot run failed");
+        sleep(Duration::new(0, 20000000));
 
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
@@ -325,7 +327,7 @@ impl AFLRun {
 
         mv(
             format!("./active-state/{}/snapshot", self.base_state),
-            format!("./active-state/{}", self.state_path)
+            format!("./active-state/{}", self.state_path),
         );
 
         mv(
@@ -369,8 +371,8 @@ impl AFLRun {
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout-afl").unwrap();
         let stderr = fs::File::create("stderr-afl").unwrap();
-        fs::File::create("stdout").unwrap();
-        fs::File::create("stderr").unwrap();
+        // fs::File::create("stdout").unwrap();
+        // fs::File::create("stderr").unwrap();
 
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -560,6 +562,7 @@ impl AFLRun {
             .env("AFL_NO_UI", "1")
             .env("AFL_DEBUG", "1")
             .spawn();
+        sleep(Duration::new(0, 20000000));
 
         // After spawning showmap command we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
