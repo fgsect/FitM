@@ -19,15 +19,18 @@ create_snap(){
   export AFL_SKIP_CPUFREQ=1
   export AFL_DEBUG_CHILD_OUTPUT=1
   export AFL_SKIP_BIN_CHECK=1
+  export INPUT_FILENAME="./input_file"
 
   old_pwd=$PWD
   state_dir=$(pwd)/test-state
   export CRIU_SNAPSHOT_DIR=$state_dir/snapshot
   mkdir -p $CRIU_SNAPSHOT_DIR
   cd $state_dir
+  mkdir fd
   touch stderr
   touch stdout
-  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../snapshot_creation < /dev/null
+  touch input_file
+  setsid stdbuf -oL ../../AFLplusplus/afl-qemu-trace ../snapshot_creation < /dev/null &> stdout
 }
 
 
