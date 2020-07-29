@@ -10,7 +10,7 @@ fn init_run_test() {
 
     let mut afl_client: AFLRun = AFLRun::new(
         (1, 0),
-        "test/pseudoclient".to_string(),
+        "tests/targets/pseudoclient".to_string(),
         1,
         "".to_string(),
         "".to_string(),

@@ -581,9 +581,9 @@ impl AFLRun {
             format!("active-state/{}/outputs/{}", self.state_path, input);
 
         let target_bin = if self.server {
-            "test/pseudoclient".to_string()
+            "tests/targets/pseudoclient".to_string()
         } else {
-            "test/pseudoserver".to_string()
+            "tests/targets/pseudoserver".to_string()
         };
 
         // Only mutate cur_state in this method. So next_state_path gets a
@@ -638,7 +638,7 @@ pub fn run() {
 
     let mut afl_client: AFLRun = AFLRun::new(
         (1, 0),
-        "test/pseudoclient".to_string(),
+        "tests/targets/pseudoclient".to_string(),
         cur_timeout,
         // TODO: Need some extra handling for this previous_path value
         "".to_string(),
@@ -649,7 +649,7 @@ pub fn run() {
 
     let afl_server: AFLRun = AFLRun::new(
         (0, 1),
-        "test/pseudoserver".to_string(),
+        "tests/targets/pseudoserver".to_string(),
         cur_timeout,
         "fitm-c1s0".to_string(),
         "".to_string(),
