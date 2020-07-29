@@ -79,7 +79,7 @@ fn create_restore_sh(afl: &AFLRun) {
 
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
-struct AFLRun {
+pub struct AFLRun {
     /// Path to the base directory of the state of the current fuzz run
     state_path: String,
     /// Binary that is being fuzzed
@@ -118,7 +118,7 @@ impl fmt::Debug for AFLRun {
 /// Implementation of functions for an afl run
 impl AFLRun {
     /// Create a new afl run instance
-    fn new(
+    pub fn new(
         new_state: (u32, u32),
         target_bin: String,
         timeout: u32,
@@ -224,7 +224,7 @@ impl AFLRun {
     }
 
     /// Needed for the two initial snapshots created based on the target binaries
-    fn init_run(&self) -> () {
+    pub fn init_run(&self) -> () {
         create_restore_sh(self);
         let dev_null = "/dev/null";
         // create the .cur_input so that criu snapshots a fd connected to
