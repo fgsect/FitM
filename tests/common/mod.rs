@@ -18,4 +18,13 @@ pub fn setup() {
     std::fs::create_dir(saved_states).expect("[!] Can't create ./saved-states");
 }
 
-pub fn teardown() {}
+pub fn teardown() {
+    let active_state = "./active-state";
+    let saved_states = "./saved-states";
+
+    std::fs::remove_dir_all(active_state)
+        .expect("[!] Can't delete ./active-state");
+
+    std::fs::remove_dir_all(saved_states)
+        .expect("[!] Can't delete ./saved-states");
+}
