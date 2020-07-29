@@ -12,70 +12,9 @@ use fs_extra::dir::*;
 use std::thread::sleep;
 use std::time::Duration;
 
+mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
-
-fn mv(from: String, to: String) {
-    Command::new("mv")
-        .args(&[from.clone(), to.clone()])
-        .spawn()
-        .expect("[!] Could not start moving dirs")
-        .wait()
-        .expect(
-            format!("[!] Moving dir failed To: {} From: {}", to, from).as_str(),
-        );
-}
-
-fn copy(from: String, to: String) {
-    Command::new("cp")
-        .args(&[String::from("-r"), from.clone(), to.clone()])
-        .spawn()
-        .expect("[!] Could not start copying dirs")
-        .wait()
-        .expect(
-            format!("[!] Copying dir failed To: {} From: {}", to, from)
-                .as_str(),
-        );
-}
-
-fn rm(dir: String) {
-    Command::new("rm")
-        .args(&["-rf", dir.clone().as_str()])
-        .spawn()
-        .expect("[!] Could not start removing dir/file")
-        .wait()
-        .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
-}
-
-fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
-    // copy old snapshot folder for criu
-    let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
-    let new_snapshot = format!("./active-state/{}/", state_path);
-
-    // Check fs_extra docs for different copy options
-    let options = CopyOptions::new();
-    fs_extra::dir::copy(old_snapshot, new_snapshot, &options)
-        .expect("[!] Could not copy snapshot dir from previous state");
-
-    // copy old pipes file so restore.sh knows which pipes are open
-    let old_pipes = format!("./saved-states/{}/pipes", base_state);
-    let new_pipes = format!("./active-state/{}/pipes", state_path);
-    fs::copy(old_pipes, new_pipes)
-        .expect("[!] Could not copy old pipes file to new state-dir");
-}
-
-fn create_restore_sh(afl: &AFLRun) {
-    let _ = Command::new("python3")
-        .args(&[
-            "create_restore.py".to_string(),
-            afl.base_state.to_string(),
-            afl.state_path.to_string(),
-        ])
-        .spawn()
-        .expect("[!] Could not spawn create_restore.py")
-        .wait()
-        .expect("[!] Could not create restore.sh with python");
-}
 
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
@@ -163,7 +102,7 @@ impl AFLRun {
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
-            copy_snapshot_base(&base_state, &state_path);
+            utils::copy_snapshot_base(&base_state, &state_path);
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
@@ -173,7 +112,7 @@ impl AFLRun {
             // copy old fd folder for new state
             let from = format!("./saved-states/{}/fd", base_state);
             let to = format!("./active-state/{}/", state_path);
-            copy(from, to);
+            utils::copy(from, to);
         }
 
         let new_run = AFLRun {
@@ -225,7 +164,7 @@ impl AFLRun {
 
     /// Needed for the two initial snapshots created based on the target binaries
     pub fn init_run(&self) -> () {
-        create_restore_sh(self);
+        utils::create_restore_sh(self);
         let dev_null = "/dev/null";
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -269,7 +208,7 @@ impl AFLRun {
 
         // With snapshot_run we move the state folder, but in this initial case we need to use
         // the state folder shortly after running this function
-        copy(
+        utils::copy(
             format!("./active-state/{}", self.state_path),
             String::from("./saved-states/"),
         );
@@ -283,7 +222,7 @@ impl AFLRun {
         if self.base_state != "".to_string() {
             self.copy_base_state();
         }
-        create_restore_sh(self);
+        utils::create_restore_sh(self);
 
         // Change into our state directory and create the snapshot from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -323,14 +262,14 @@ impl AFLRun {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
-        rm(format!("./active-state/{}/snapshot", self.state_path));
+        utils::rm(format!("./active-state/{}/snapshot", self.state_path));
 
-        mv(
+        utils::mv(
             format!("./active-state/{}/snapshot", self.base_state),
             format!("./active-state/{}", self.state_path),
         );
 
-        mv(
+        utils::mv(
             format!("./active-state/{}", self.state_path),
             String::from("./saved-states/"),
         );
@@ -342,16 +281,16 @@ impl AFLRun {
     fn fuzz_run(&self) -> () {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
-        copy(
+        utils::copy(
             format!("./saved-states/{}", self.state_path),
             String::from("./active-state/"),
         );
 
-        copy(
+        utils::copy(
             String::from("./saved-states/fitm-c1s0"),
             String::from("./active-state/"),
         );
-        copy(
+        utils::copy(
             String::from("./saved-states/fitm-c0s1"),
             String::from("./active-state/"),
         );
@@ -362,7 +301,7 @@ impl AFLRun {
         if self.base_state != "".to_string() {
             self.copy_base_state();
         }
-        create_restore_sh(self);
+        utils::create_restore_sh(self);
 
         // Change into our state directory and create fuzz run from there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
@@ -440,11 +379,11 @@ impl AFLRun {
                 .expect("[!] Error deleting old snapshot folder");
             std::fs::remove_dir_all(String::from("./fd"))
                 .expect("[!] Error deleting old fd folder");
-            copy(
+            utils::copy(
                 format!("../../saved-states/{}/snapshot", self.state_path),
                 format!("."),
             );
-            copy(
+            utils::copy(
                 format!("../../saved-states/{}/fd", self.state_path),
                 format!("."),
             );
@@ -512,7 +451,7 @@ impl AFLRun {
     fn gen_afl_maps(&self) -> io::Result<Child> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
-        copy(
+        utils::copy(
             format!("./saved-states/{}", self.previous_state_path),
             String::from("./active-state/"),
         );
@@ -615,19 +554,6 @@ impl AFLRun {
         afl.snapshot_run(format!("in/{}", input));
 
         afl
-    }
-}
-
-/// Create the next iteration from a given state directory. If inc_server is set
-/// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
-/// Otherwise we will increment the state for the client from fitm-cXsY to
-/// fitm-cX+1sY
-fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32) {
-    // If inc_server increment the server state else increment the client state
-    if cur_is_server {
-        ((state_path.0) + 1, state_path.1)
-    } else {
-        (state_path.0, (state_path.1) + 1)
     }
 }
 
@@ -739,7 +665,8 @@ pub fn run() {
                 client_maps.insert(new_map);
 
                 // Consolidating binary 1 will yield more runs on binary 2
-                cur_state = next_state_path(cur_state, afl_current.server);
+                cur_state =
+                    utils::next_state_path(cur_state, afl_current.server);
 
                 let in_file = entry_path.file_name().unwrap().to_str().unwrap();
 
