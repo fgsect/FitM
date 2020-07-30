@@ -22,7 +22,7 @@ jobs:
         token: ${{ secrets.ACCESS_TOKEN }}
 
     - name: Build AFL/QEMU
-      run: sudo apt-get install libprotobuf-dev libprotobuf-c0-dev protobuf-c-compiler protobuf-compiler python-protobuf && make
+      run: sudo apt-get install libprotobuf-dev libprotobuf-c0-dev protobuf-c-compiler protobuf-compiler python-protobuf libuuid1 uuid-dev && make
     - name: Build Rust
       run: cargo build --verbose
 
