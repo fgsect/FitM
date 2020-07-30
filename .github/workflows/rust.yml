@@ -19,7 +19,9 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: Build
+    - name: Build AFL/QEMU
+      run: make
+    - name: Build Rust
       run: cargo build --verbose
 
     - name: Install criu
