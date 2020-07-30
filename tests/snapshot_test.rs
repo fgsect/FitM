@@ -2,7 +2,8 @@ use fitm::AFLRun;
 mod common;
 
 use regex::Regex;
-use std::{env, fs};
+use std::fs::{remove_file, File};
+use std::io::Write;
 
 // This test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
@@ -13,6 +14,7 @@ fn init_run_test() {
     // pwd == root dir of repo
     common::setup();
 
+    // creating the afl_client object manually would make the test even more precise
     let afl_client: AFLRun = AFLRun::new(
         (1, 0),
         "tests/targets/pseudoclient".to_string(),
@@ -53,5 +55,36 @@ fn init_run_test() {
     assert_eq!(stdout, stdout_expected);
     assert_eq!(stderr, stderr_expected);
 
+    common::teardown();
+}
+
+#[test]
+fn snapshot_run_test() {
+    // pwd == root dir of repo
+    common::setup();
+
+    // creating the afl_client object manually would make the test even more precise
+    let afl_client: AFLRun = AFLRun::new(
+        (1, 0),
+        "tests/targets/pseudoclient".to_string(),
+        1,
+        "".to_string(),
+        "".to_string(),
+        false,
+        false,
+    );
+
+    let input_filepath = "input.txt";
+    let mut stdin = File::create(format!(
+        "./active-state/{}/in/{}",
+        afl_client.state_path, input_filepath
+    ))
+    .expect("Could not create input file");
+    stdin.write_all(b"a random teststring").unwrap();
+
+    afl_client.init_run();
+    afl_client.snapshot_run(format!("./in/{}", input_filepath));
+
+    remove_file(input_filepath).expect("Could not clean up input file");
     common::teardown();
 }

@@ -20,7 +20,7 @@ mod utils;
 #[derive(Clone)]
 pub struct AFLRun {
     /// Path to the base directory of the state of the current fuzz run
-    state_path: String,
+    pub state_path: String,
     /// Binary that is being fuzzed
     target_bin: String,
     /// Path to the state the current state receives input from
@@ -215,7 +215,7 @@ impl AFLRun {
     }
 
     /// Create a new snapshot based on a given snapshot
-    fn snapshot_run(&self, stdin: String) -> () {
+    pub fn snapshot_run(&self, stdin: String) -> () {
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
         // otherwise criu can't restore
