@@ -61,16 +61,20 @@ fn init_run_test() {
 // ignored for now as there is still some bug
 #[ignore]
 #[test]
-fn snapshot_run_test() {
+fn create_new_run_test() {
     // pwd == root dir of repo
     common::setup();
 
     // creating the afl_client object manually would make the test even more precise
+    // previous_state needs to be the same as base_state as create_new_run would normally generate
+    // new AFLRuns for the opposite binary for the one currently fuzzed.
+    // So if bin 1 was just fuzzed, consolidated and produced new outputs (and thus new paths in bin 2),
+    // then create_new_run would produce new AFLRuns based on binary 2.
     let afl_client: AFLRun = AFLRun::new(
         (1, 0),
         "tests/targets/pseudoclient".to_string(),
         1,
-        "".to_string(),
+        "fitm-c1s0".to_string(),
         "fitm-c1s0".to_string(),
         false,
         false,
@@ -87,8 +91,17 @@ fn snapshot_run_test() {
 
     afl_client.init_run();
 
+    let outputs_file = "foo.out";
+    let _ = File::create(format!(
+        "./active-state/{}/outputs/{}",
+        afl_client.state_path, outputs_file
+    ))
+    .expect("Could create dummy output file");
+
+    // let input = format!("./in/{}", input_filepath);
     // tested function
-    afl_client.snapshot_run(format!("./in/{}", input_filepath));
+    let _ =
+        afl_client.create_new_run((2, 0), outputs_file.to_string(), 1, true);
 
     // teardown
     remove_file(format!(

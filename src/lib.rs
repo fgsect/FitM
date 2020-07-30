@@ -35,7 +35,7 @@ pub struct AFLRun {
     server: bool,
     /// State folder name of the state from which this object's snapshot was created
     /// Empty if created from binary
-    base_state: String,
+    pub base_state: String,
     /// Marks if this run is an initial state or not
     initial: bool,
 }
@@ -239,19 +239,22 @@ impl AFLRun {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
+        let snapshot_dir =
+            format!("{}/snapshot", env::current_dir().unwrap().display());
+
         let _ = Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
                 format!("../../restore.sh"),
-                format!("{}", self.state_path),
+                format!("{}", self.base_state),
                 stdin,
             ])
             .stdin(Stdio::from(stdin_file))
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+            .env("CRIU_SNAPSHOT_DIR", snapshot_dir)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
@@ -261,13 +264,6 @@ impl AFLRun {
 
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
-
-        utils::rm(format!("./active-state/{}/snapshot", self.state_path));
-
-        utils::mv(
-            format!("./active-state/{}/snapshot", self.base_state),
-            format!("./active-state/{}", self.state_path),
-        );
 
         utils::mv(
             format!("./active-state/{}", self.state_path),
@@ -509,7 +505,7 @@ impl AFLRun {
         ret
     }
 
-    fn create_new_run(
+    pub fn create_new_run(
         &self,
         new_state: (u32, u32),
         input: String,
