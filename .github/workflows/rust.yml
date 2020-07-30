@@ -24,6 +24,6 @@ jobs:
     - name: Install criu
       run: sudo apt-get install --no-install-recommends criu
     - name: Run criu service
-      run: sudo criu service -v4 --address /tmp/criu_service.socket
+      run: sudo criu service -v4 --address /tmp/criu_service.socket &> /tmp/criu.out &
     - name: Run tests
       run: cargo test --verbose
