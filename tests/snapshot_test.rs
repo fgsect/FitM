@@ -2,7 +2,6 @@ use fitm::AFLRun;
 mod common;
 
 use regex::Regex;
-use std::env;
 
 // This test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
@@ -13,7 +12,7 @@ fn init_run_test() {
     // pwd == root dir of repo
     common::setup();
 
-    let mut afl_client: AFLRun = AFLRun::new(
+    let afl_client: AFLRun = AFLRun::new(
         (1, 0),
         "tests/targets/pseudoclient".to_string(),
         1,
