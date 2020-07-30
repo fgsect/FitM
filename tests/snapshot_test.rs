@@ -1,6 +1,7 @@
 use fitm::AFLRun;
 mod common;
 
+extern crate regex;
 use regex::Regex;
 
 // This test should check if a snapshot could be successfully be created.
