@@ -19,6 +19,7 @@ jobs:
       with:
         fetch-depth: 1
         submodules: 'true'
+        token: ${{ secrets.ACCESS_TOKEN }}
 
     - name: Build AFL/QEMU
       run: make
