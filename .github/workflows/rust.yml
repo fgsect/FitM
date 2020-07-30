@@ -19,11 +19,6 @@ jobs:
       with:
         fetch-depth: 1
 
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-
-
     - name: Build
       run: cargo build --verbose
 
