@@ -27,25 +27,6 @@ fn init_run_test() {
     afl_client.init_run();
 
     // relevant files
-    println!("pwd: {:?}", env::current_dir().unwrap());
-    let paths = fs::read_dir("./").unwrap();
-
-    for path in paths {
-        println!("Name: {}", path.unwrap().path().display())
-    }
-
-    let paths = fs::read_dir("./active-state").unwrap();
-
-    for path in paths {
-        println!("Name: {}", path.unwrap().path().display())
-    }
-
-    let paths = fs::read_dir("./active-state/fitm-c1s0/").unwrap();
-
-    for path in paths {
-        println!("Name: {}", path.unwrap().path().display())
-    }
-
     let pipes = std::fs::read_to_string("./active-state/fitm-c1s0/pipes")
         .expect("Pipes file missing");
     let run_info = std::fs::read_to_string("./active-state/fitm-c1s0/run-info")
