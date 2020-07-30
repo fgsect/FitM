@@ -2,6 +2,7 @@ use fitm::AFLRun;
 mod common;
 
 use regex::Regex;
+use std::{env, fs};
 
 // This test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
@@ -26,6 +27,13 @@ fn init_run_test() {
     afl_client.init_run();
 
     // relevant files
+    println!("pwd: {:?}", env::current_dir().unwrap());
+    let paths = fs::read_dir("./").unwrap();
+
+    for path in paths {
+        println!("Name: {}", path.unwrap().path().display())
+    }
+
     let pipes = std::fs::read_to_string("./active-state/fitm-c1s0/pipes")
         .expect("Pipes file missing");
     let run_info = std::fs::read_to_string("./active-state/fitm-c1s0/run-info")
