@@ -74,6 +74,7 @@ fn snapshot_run_test() {
         false,
     );
 
+    // required input for tested function
     let input_filepath = "input.txt";
     let mut stdin = File::create(format!(
         "./active-state/{}/in/{}",
@@ -83,8 +84,15 @@ fn snapshot_run_test() {
     stdin.write_all(b"a random teststring").unwrap();
 
     afl_client.init_run();
+
+    // tested function
     afl_client.snapshot_run(format!("./in/{}", input_filepath));
 
-    remove_file(input_filepath).expect("Could not clean up input file");
+    // teardown
+    remove_file(format!(
+        "./active-state/{}/in/{}",
+        afl_client.state_path, input_filepath
+    ))
+    .expect("Could not clean up input file");
     common::teardown();
 }
