@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 1
-        submodules: 'git@github.com:derpsteb/AFLplusplus.git'
+        submodules: 'true'
 
     - name: Build AFL/QEMU
       run: make
