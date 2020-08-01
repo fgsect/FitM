@@ -27,6 +27,7 @@ pub fn copy(from: String, to: String) {
         );
 }
 
+#[allow(dead_code)]
 pub fn rm(dir: String) {
     Command::new("rm")
         .args(&["-rf", dir.clone().as_str()])

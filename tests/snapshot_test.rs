@@ -1,9 +1,14 @@
 use fitm::AFLRun;
 mod common;
 
+use fs_extra::dir::CopyOptions;
 use regex::Regex;
+use std::env;
 use std::fs::{remove_file, File};
 use std::io::Write;
+use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
 
 // This test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
@@ -59,7 +64,6 @@ fn init_run_test() {
 }
 
 // ignored for now as there is still some bug
-#[ignore]
 #[test]
 fn create_new_run_test() {
     // pwd == root dir of repo
@@ -72,7 +76,7 @@ fn create_new_run_test() {
     // then create_new_run would produce new AFLRuns based on binary 2.
     let afl_client: AFLRun = AFLRun::new(
         (1, 0),
-        "tests/targets/pseudoclient".to_string(),
+        "tests/targets/snapshot_creation".to_string(),
         1,
         "fitm-c1s0".to_string(),
         "fitm-c1s0".to_string(),
@@ -91,17 +95,61 @@ fn create_new_run_test() {
 
     afl_client.init_run();
 
+    let stdout = std::fs::read_to_string("./active-state/fitm-c1s0/stdout")
+        .expect("stdout file missing");
+    let stderr = std::fs::read_to_string("./active-state/fitm-c1s0/stderr")
+        .expect("stderr file missing");
+    let stdout_expected = "00\n";
+    let stderr_expected = "";
+    assert_eq!(stdout, stdout_expected);
+    assert_eq!(stderr, stderr_expected);
+
     let outputs_file = "foo.out";
     let _ = File::create(format!(
         "./active-state/{}/outputs/{}",
         afl_client.state_path, outputs_file
     ))
-    .expect("Could create dummy output file");
+    .expect("Couldn't create dummy output file");
 
     // let input = format!("./in/{}", input_filepath);
     // tested function
-    let _ =
+    let new_run =
         afl_client.create_new_run((2, 0), outputs_file.to_string(), 1, true);
+
+    let options = CopyOptions::new();
+    fs_extra::dir::copy(
+        "./saved-states/fitm-c2s0",
+        "./active-state/",
+        &options,
+    )
+    .expect("[!] Could not copy snapshot dir from previous state");
+
+    // Restore the snapshotted process, because only by doing so can we be sure that the snapshot actually worked
+    env::set_current_dir(format!("./active-state/{}", new_run.state_path))
+        .unwrap();
+    let _ = Command::new("sh")
+        .args(&[
+            format!("../../restore.sh"),
+            format!("{}", new_run.state_path),
+            "in/foo.out".to_string(),
+        ])
+        .spawn()
+        .expect("[!] Could not spawn snapshot run")
+        .wait()
+        .expect("[!] Snapshot run failed");
+    // fokn sleep seems necessary everywhere - w/o the process is not done printing before the assert is done
+    sleep(Duration::new(0, 20000000));
+
+    env::set_current_dir("../../").unwrap();
+
+    let stdout = std::fs::read_to_string("./active-state/fitm-c2s0/stdout")
+        .expect("stdout file missing");
+    let stderr = std::fs::read_to_string("./active-state/fitm-c2s0/stderr")
+        .expect("stderr file missing");
+    let stdout_expected = "Success\nRestored\nOK\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\nOK\n03\n";
+    let stderr_expected = "";
+    assert_eq!(stdout, stdout_expected);
+    assert_eq!(stderr, stderr_expected);
 
     // teardown
     remove_file(format!(
