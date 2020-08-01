@@ -10,9 +10,8 @@ use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 
-// This test should check if a snapshot could be successfully be created.
+// init_run_test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
-// If snapshotting was successful can only be definitively tested by also restoring the process
 
 #[test]
 fn init_run_test() {
@@ -57,13 +56,19 @@ fn init_run_test() {
     // required assertions
     assert!(pipes_regex.is_match(&pipes));
     assert_eq!(run_info, run_info_expected);
-    assert_eq!(stdout, stdout_expected);
+    assert_eq!(
+        stdout, stdout_expected,
+        "Stdout expectation did not match. \
+        Check whether pseudoclient_simple.c test target is compiled."
+    );
     assert_eq!(stderr, stderr_expected);
 
     common::teardown();
 }
 
-// ignored for now as there is still some bug
+// create_new_run_test checks if the method with the same name works correctly and
+// the produced snapshot can be restored using restore.sh
+
 #[test]
 fn create_new_run_test() {
     // pwd == root dir of repo
@@ -116,6 +121,17 @@ fn create_new_run_test() {
     let new_run =
         afl_client.create_new_run((2, 0), outputs_file.to_string(), 1, true);
 
+    assert_eq!(new_run.state_path, "fitm-c2s0");
+    // As long as target_bin selection in create_new_run is hardcoded,
+    // this is what's expected at this point
+    assert_eq!(new_run.target_bin, "tests/targets/pseudoserver");
+    assert_eq!(new_run.previous_state_path, "fitm-c1s0");
+    assert_eq!(new_run.timeout, 1);
+    // afl_client was a client run, so the following run needs to be a server run
+    assert_eq!(new_run.server, true);
+    assert_eq!(new_run.base_state, "fitm-c1s0");
+    assert_eq!(new_run.initial, false);
+
     let options = CopyOptions::new();
     fs_extra::dir::copy(
         "./saved-states/fitm-c2s0",
@@ -148,7 +164,11 @@ fn create_new_run_test() {
         .expect("stderr file missing");
     let stdout_expected = "Success\nRestored\nOK\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\nOK\n03\n";
     let stderr_expected = "";
-    assert_eq!(stdout, stdout_expected);
+    assert_eq!(
+        stdout, stdout_expected,
+        "Stdout expectation did not match. \
+        Check whether snapshot_creation.c test target is compiled."
+    );
     assert_eq!(stderr, stderr_expected);
 
     // teardown

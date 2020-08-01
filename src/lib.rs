@@ -22,22 +22,22 @@ pub struct AFLRun {
     /// Path to the base directory of the state of the current fuzz run
     pub state_path: String,
     /// Binary that is being fuzzed
-    target_bin: String,
+    pub target_bin: String,
     /// Path to the state the current state receives input from
-    previous_state_path: String,
+    pub previous_state_path: String,
     /// Timeout for this run
     /// TODO: probably should be dynamic based on how interesting this state is.
-    timeout: u32,
+    pub timeout: u32,
     // All the states that came out of the current state
     // child_states: Vec<(u32, u32)>
     /// Used to determine whether to increase first or second value of state
     /// tuple. Hope this is not too broken
-    server: bool,
+    pub server: bool,
     /// State folder name of the state from which this object's snapshot was created
     /// Empty if created from binary
     pub base_state: String,
     /// Marks if this run is an initial state or not
-    initial: bool,
+    pub initial: bool,
 }
 
 impl fmt::Debug for AFLRun {
@@ -515,6 +515,7 @@ impl AFLRun {
         let input_path: String =
             format!("active-state/{}/outputs/{}", self.state_path, input);
 
+        // FIXME: This needs to be dependant on some input parameter
         let target_bin = if self.server {
             "tests/targets/pseudoclient".to_string()
         } else {
