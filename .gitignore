@@ -16,4 +16,5 @@ saved-states/
 pseudoclient
 pseudoserver
 venv
+config.mak
 restore.sh
