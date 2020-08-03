@@ -371,6 +371,11 @@ impl AFLRun {
             ))
             .enumerate()
         {
+            let entry_unwrapped = entry.unwrap();
+            if entry_unwrapped.file_type().unwrap().is_dir() {
+                continue;
+            }
+
             std::fs::remove_dir_all(String::from("./snapshot"))
                 .expect("[!] Error deleting old snapshot folder");
             std::fs::remove_dir_all(String::from("./fd"))
@@ -384,10 +389,6 @@ impl AFLRun {
                 format!("."),
             );
 
-            let entry_unwrapped = entry.unwrap();
-            if entry_unwrapped.file_type().unwrap().is_dir() {
-                continue;
-            }
             // Open a file for stdout and stderr to log to
             // We need to do this inside the loop as the process gets restored multiple times
             let stdout = fs::File::create("stdout-afl").unwrap();
