@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export LIBS='-lprotobuf-c -luuid'
+export LDFLAGS="$LIBS"
+export QEMU_LDFLAGS="$LIBS"
 ./configure --disable-system --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
             --enable-capstone=internal --target-list="x86_64-linux-user" --disable-bsd-user \
             --disable-guest-agent --disable-strip --disable-werror --disable-gcrypt \
@@ -12,7 +15,8 @@
             --disable-snappy --disable-spice --disable-libssh2 --disable-libusb --disable-usb-redir \
             --disable-vde --disable-vhost-net --disable-virglrenderer --disable-virtfs --disable-vnc \
             --disable-vte --disable-xen --disable-xen-pci-passthrough --disable-xfsctl \
-            --disable-system --disable-blobs --disable-tools --python=`which python3`
+            --disable-system --disable-blobs --disable-tools --python=`which python3` \
+	    --extra-ldflags="$LIBS"
 
-make -j$(nproc) CFLAGS="-lprotobuf-c -luuid"
+make -j$(nproc) CLFAGS="$LIBS"
 cp ./x86_64-linux-user/qemu-x86_64 ../../AFLplusplus/afl-qemu-trace
