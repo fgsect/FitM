@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from sys import argv
-from os import getcwd
+from os import getcwd, chmod
 from subprocess import call
 
 import re
@@ -43,6 +43,7 @@ def main():
     lines.append("    && echo 'OK'")
 
     open("./restore.sh", "w").write("\n".join(lines).replace("## TEMPLATE ##", open_fds))
-
+    # Make file world executable
+    chmod("./restore.sh", 0o661)
 if __name__ == "__main__":
     main()
