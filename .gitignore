@@ -18,3 +18,7 @@ pseudoserver
 venv
 config.mak
 restore.sh
+
+fdinfo
+file
+tests/targets/snapshot_creation
