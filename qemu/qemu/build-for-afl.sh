@@ -12,7 +12,7 @@
             --disable-snappy --disable-spice --disable-libssh2 --disable-libusb --disable-usb-redir \
             --disable-vde --disable-vhost-net --disable-virglrenderer --disable-virtfs --disable-vnc \
             --disable-vte --disable-xen --disable-xen-pci-passthrough --disable-xfsctl \
-            --disable-system --disable-blobs --disable-tools
+            --disable-system --disable-blobs --disable-tools --python=`which python3`
 
 make -j$(nproc) CFLAGS="-lprotobuf-c -luuid"
 cp ./x86_64-linux-user/qemu-x86_64 ../../AFLplusplus/afl-qemu-trace
