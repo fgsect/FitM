@@ -11,6 +11,9 @@ Replace L360 in `criu/lib/py/images/pb2dict.py` with the following code:
 
 `make build` can be used to run our build script to build our custom qemu patches
 
+On Ubuntu it was necessary to install the following package to execute criu's crit.
+`sudo apt install python-ipaddress`
+
 ## Testing
 
 `sh test.sh` can be used to correctly dump a qemu process outside of AFL and then try to restore it inside AFL.
