@@ -164,7 +164,6 @@ impl AFLRun {
 
     /// Needed for the two initial snapshots created based on the target binaries
     pub fn init_run(&self) -> () {
-        utils::create_restore_sh(self);
         let dev_null = "/dev/null";
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -352,7 +351,9 @@ impl AFLRun {
         self.create_outputs();
     }
 
-    fn create_outputs(&self) -> () {
+    pub fn create_outputs(&self) -> () {
+        utils::create_restore_sh(self);
+
         // For consistency, change into necessary dir inside the function
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
@@ -460,6 +461,7 @@ impl AFLRun {
             self.copy_base_state();
         }
 
+        utils::create_restore_sh(self);
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
