@@ -78,11 +78,50 @@ pub fn next_state_path(
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::copy;
+    use crate::utils;
     use std::fs;
+    use std::path::Path;
+
+    fn setup(
+        root_folder: &String,
+        from_path: &String,
+        from_content_path: &String,
+        content: &str,
+    ) {
+        // setup - require user interaction so we don't delete anything by default
+        // Creates necessary files/folders under /tmp
+        fs_extra::dir::create(root_folder, false).expect("rust_unittest folder already exists, please remove to make this test run");
+        fs_extra::dir::create_all(from_path, true)
+            .expect("Could not create test folder");
+        fs::write(from_content_path, content)
+            .expect("Could not write to 'from' content.txt");
+    }
+
+    fn teardown(root_folder: &String) {
+        // Remove all files created during the test
+        std::fs::remove_dir_all(root_folder)
+            .expect("Could not remove rust_unittest folder");
+    }
+
+    fn paths_exist(root_folder: &String, to_content_path: &String) -> bool {
+        // Returns true if all three of the given paths exists
+        let bool_1 = Path::new(&format!("{}/foo", root_folder)).exists();
+        let bool_2 = Path::new(&format!("{}/bar", root_folder)).exists();
+        let bool_3 = Path::new(to_content_path).exists();
+        bool_1 && bool_2 && bool_3
+    }
+
+    fn check_is_dir(to_path: &String) -> bool {
+        // Returns true if the given path points to a directory
+        let metadata =
+            fs::metadata(to_path).expect("Could not find copy 'to' folder");
+        metadata.file_type().is_dir()
+    }
 
     #[test]
-    fn test_copy_1() {
+    fn test_copy() {
+        // Test whether utils::copy() copies recursively to a given path,
+        // using the original folders name as target name
         let root_folder = String::from("/tmp/rust_unittest");
         let from_path = format!("{}/foo/bar", root_folder);
         let to_path = format!("{}", root_folder);
@@ -90,24 +129,17 @@ mod tests {
         let to_content_path = format!("{}/bar/content.txt", root_folder);
         let content = "A simple string.";
 
-        // setup - require user interaction so we don't delete anything by default
-        fs_extra::dir::create(&root_folder, false).expect("rust_unittest folder already exists, please remove to make this test run");
-        // Creates the full path
-        fs_extra::dir::create_all(&from_path, true)
-            .expect("Could not create test folder");
-        fs::write(from_content_path, content)
-            .expect("Could not write to 'from' content.txt");
+        setup(&root_folder, &from_path, &from_content_path, content);
 
         // tested function
-        copy(from_path.clone(), root_folder.clone());
+        utils::copy(from_path.clone(), root_folder.clone());
 
-        // Check if 'from' was copied to the expected location and
-        // the copied folder still has it's original name
-        let metadata =
-            fs::metadata(&to_path).expect("Could not find copy 'to' folder");
-        let file_type = metadata.file_type();
+        // Check that the 'from' path does not exist anymore, but the 'to' path does
+        assert_eq!(Path::new(&from_path).exists(), true);
+        assert!(paths_exist(&root_folder, &to_content_path));
 
-        assert_eq!(file_type.is_dir(), true);
+        // Check 'to' path is still a directory
+        assert!(check_is_dir(&to_path));
 
         // Check that the content of the copied folder still exists
         let result_content = std::fs::read_to_string(to_content_path)
@@ -116,7 +148,38 @@ mod tests {
         assert_eq!(result_content, "A simple string.");
 
         // teardown
-        std::fs::remove_dir_all(&root_folder)
-            .expect("Could not remove rust_unittest folder");
+        teardown(&root_folder);
+    }
+
+    #[test]
+    fn test_mv() {
+        // Check that utils::mv moves a folder to a new destination
+        let root_folder = String::from("/tmp/rust_unittest");
+        let from_path = format!("{}/foo/bar", root_folder);
+        let to_path = format!("{}", root_folder);
+        let from_content_path = format!("{}/foo/bar/content.txt", root_folder);
+        let to_content_path = format!("{}/bar/content.txt", root_folder);
+        let content = "A simple string.";
+
+        setup(&root_folder, &from_path, &from_content_path, content);
+
+        // tested function
+        utils::mv(from_path.clone(), to_path.clone());
+
+        // Check that the 'from' path does not exist anymore, but the 'to' path does
+        assert_eq!(Path::new(&from_path).exists(), false);
+        assert!(paths_exist(&root_folder, &to_content_path));
+
+        // Check 'to' path is still a directory
+        assert!(check_is_dir(&to_path));
+
+        // Check that the content of the copied folder still exists
+        let result_content = std::fs::read_to_string(to_content_path)
+            .expect("Could not read from expected content.txt");
+
+        assert_eq!(result_content, "A simple string.");
+
+        // teardown
+        teardown(&root_folder);
     }
 }
