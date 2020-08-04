@@ -6,12 +6,15 @@ use crate::AFLRun;
 
 pub fn mv(from: String, to: String) {
     copy(from.clone(), to.clone());
-    fs::remove_dir_all(from).expect("Could not remove 'from' in utils::mv");
+    fs::remove_dir_all(&from)
+        .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
 }
 
 pub fn copy(from: String, to: String) {
     let options = CopyOptions::new();
-    fs_extra::dir::copy(from, to, &options).expect("utils::copy failed");
+    fs_extra::dir::copy(&from, &to, &options).expect(
+        format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str(),
+    );
 }
 
 #[allow(dead_code)]
