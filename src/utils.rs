@@ -5,14 +5,8 @@ use std::process::Command;
 use crate::AFLRun;
 
 pub fn mv(from: String, to: String) {
-    Command::new("mv")
-        .args(&[from.clone(), to.clone()])
-        .spawn()
-        .expect("[!] Could not start moving dirs")
-        .wait()
-        .expect(
-            format!("[!] Moving dir failed To: {} From: {}", to, from).as_str(),
-        );
+    copy(from.clone(), to.clone());
+    fs::remove_dir_all(from).expect("Could not remove 'from' in utils::mv");
 }
 
 pub fn copy(from: String, to: String) {
