@@ -95,7 +95,8 @@ mod tests {
         // Creates the full path
         fs_extra::dir::create_all(&from_path, true)
             .expect("Could not create test folder");
-        fs::write(from_content_path, content);
+        fs::write(from_content_path, content)
+            .expect("Could not write to 'from' content.txt");
 
         // tested function
         copy(from_path.clone(), root_folder.clone());
@@ -115,6 +116,7 @@ mod tests {
         assert_eq!(result_content, "A simple string.");
 
         // teardown
-        std::fs::remove_dir_all(&root_folder);
+        std::fs::remove_dir_all(&root_folder)
+            .expect("Could not remove rust_unittest folder");
     }
 }
