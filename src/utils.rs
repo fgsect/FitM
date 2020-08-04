@@ -16,15 +16,8 @@ pub fn mv(from: String, to: String) {
 }
 
 pub fn copy(from: String, to: String) {
-    Command::new("cp")
-        .args(&[String::from("-r"), from.clone(), to.clone()])
-        .spawn()
-        .expect("[!] Could not start copying dirs")
-        .wait()
-        .expect(
-            format!("[!] Copying dir failed To: {} From: {}", to, from)
-                .as_str(),
-        );
+    let options = CopyOptions::new();
+    fs_extra::dir::copy(from, to, &options).expect("utils::copy failed");
 }
 
 #[allow(dead_code)]
