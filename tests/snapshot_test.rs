@@ -74,6 +74,14 @@ fn create_new_run_test() {
     // pwd == root dir of repo
     common::setup();
 
+    // We need this folder as AFLRun::new copies the fd folder from there
+    let base_state = "fitm-c1s0";
+    fs_extra::dir::create_all(
+        format!("./saved-states/{}/fd", base_state),
+        false,
+    )
+    .expect("Could not create dummy fd folder");
+
     // creating the afl_client object manually would make the test even more precise
     // previous_state needs to be the same as base_state as create_new_run would normally generate
     // new AFLRuns for the opposite binary for the one currently fuzzed.
@@ -84,7 +92,7 @@ fn create_new_run_test() {
         "tests/targets/snapshot_creation".to_string(),
         1,
         "fitm-c1s0".to_string(),
-        "fitm-c1s0".to_string(),
+        base_state.to_string(),
         false,
         false,
     );

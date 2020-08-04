@@ -82,7 +82,7 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn test_copy_1(){
+    fn test_copy_1() {
         let root_folder = String::from("/tmp/rust_unittest");
         let from_path = format!("{}/foo/bar", root_folder);
         let to_path = format!("{}", root_folder);
@@ -93,7 +93,8 @@ mod tests {
         // setup - require user interaction so we don't delete anything by default
         fs_extra::dir::create(&root_folder, false).expect("rust_unittest folder already exists, please remove to make this test run");
         // Creates the full path
-        fs_extra::dir::create_all(&from_path, true).expect("Could not create test folder");
+        fs_extra::dir::create_all(&from_path, true)
+            .expect("Could not create test folder");
         fs::write(from_content_path, content);
 
         // tested function
@@ -101,13 +102,15 @@ mod tests {
 
         // Check if 'from' was copied to the expected location and
         // the copied folder still has it's original name
-        let metadata = fs::metadata(&to_path).expect("Could not find copy 'to' folder");
+        let metadata =
+            fs::metadata(&to_path).expect("Could not find copy 'to' folder");
         let file_type = metadata.file_type();
 
         assert_eq!(file_type.is_dir(), true);
 
         // Check that the content of the copied folder still exists
-        let result_content = std::fs::read_to_string(to_content_path).expect("Could not read from expected content.txt");
+        let result_content = std::fs::read_to_string(to_content_path)
+            .expect("Could not read from expected content.txt");
 
         assert_eq!(result_content, "A simple string.");
 
