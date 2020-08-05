@@ -1,3 +1,4 @@
+use fs_extra;
 use fs_extra::dir::CopyOptions;
 use std::fs;
 use std::process::Command;
@@ -6,7 +7,7 @@ use crate::AFLRun;
 
 pub fn mv(from: String, to: String) {
     copy(from.clone(), to.clone());
-    fs::remove_dir_all(&from)
+    fs_extra::dir::remove(&from)
         .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
 }
 
@@ -177,6 +178,26 @@ mod tests {
         assert_eq!(result_content, "A simple string.");
 
         // teardown
+        teardown(&root_folder);
+    }
+
+    #[test]
+    fn test_remove_dir_all() {
+        let root_folder = String::from("/tmp/rust_unittest");
+        let path = format!("{}/foo/bar", root_folder);
+        let content_path = format!("{}/foo/bar/content.txt", root_folder);
+        let content = "A simple string.";
+
+        setup(&root_folder, &path, &content_path, content);
+
+        let foo_path = format!("{}/foo", root_folder);
+
+        // tested function
+        std::fs::remove_dir_all(&foo_path)
+            .expect("Tested remove_dir_all failed");
+
+        assert_eq!(Path::new(&foo_path).exists(), false);
+
         teardown(&root_folder);
     }
 }

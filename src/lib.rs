@@ -7,7 +7,6 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
-extern crate fs_extra;
 use fs_extra::dir::*;
 use std::thread::sleep;
 use std::time::Duration;
