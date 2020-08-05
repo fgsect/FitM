@@ -46,9 +46,11 @@ fn init_run_test() {
     let run_info_expected = "AFLRun { state_path: \"fitm-c1s0\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false }";
 
     // the regex matches e.g. "pipe:[123456]\npipe:[7890]\n"
-    // \d{3,6} - 3 to 6 decimal digits
+    // \d{3,7} - 3 to 7 decimal digits
+    // max PID should be 7 digits:
+    // https://stackoverflow.com/questions/6294133/maximum-pid-in-linux
     let pipes_regex: Regex =
-        Regex::new(r"^pipe:\[\d{3,6}]\npipe:\[\d{3,6}]\n$").unwrap();
+        Regex::new(r"^pipe:\[\d{3,7}]\npipe:\[\d{3,7}]\n$").unwrap();
 
     let stdout_expected = "client sent: R\n";
     let stderr_expected = "";
