@@ -7,7 +7,7 @@ use crate::AFLRun;
 
 pub fn mv(from: String, to: String) {
     copy(from.clone(), to.clone());
-    fs_extra::dir::remove(&from)
+    std::fs::remove_dir_all(&from)
         .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
 }
 

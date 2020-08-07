@@ -11,7 +11,7 @@ use fs_extra::dir::*;
 use std::thread::sleep;
 use std::time::Duration;
 
-mod utils;
+pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
