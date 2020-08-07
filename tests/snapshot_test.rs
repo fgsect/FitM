@@ -1,4 +1,4 @@
-use fitm::AFLRun;
+use fitm::{utils, AFLRun};
 mod common;
 
 use fs_extra::dir::CopyOptions;
@@ -9,6 +9,8 @@ use std::io::Write;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
+
+use rand::Rng;
 
 // init_run_test should check if a snapshot could be successfully be created.
 // As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
@@ -168,11 +170,20 @@ fn create_new_run_test() {
 
     env::set_current_dir("../../").unwrap();
 
+    // Remove this when debugging race condition is done
+    let num = rand::thread_rng().gen_range(0, 50000);
+
+    let dest = format!("/tmp/fitm-{}", num);
+    fs_extra::dir::create_all(&dest, true)
+        .expect("Could not create test folder");
+    utils::copy("./active-state/fitm-c2s0/".to_string(), dest.clone());
+
     let stdout = std::fs::read_to_string("./active-state/fitm-c2s0/stdout")
         .expect("stdout file missing");
     let stderr = std::fs::read_to_string("./active-state/fitm-c2s0/stderr")
         .expect("stderr file missing");
     let stdout_expected = "Success\nRestored\nOK\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\nOK\n03\n";
+    // let stdout_expected = "Success\nRestored\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\n03\n";
     let stderr_expected = "";
     assert_eq!(
         stdout, stdout_expected,
