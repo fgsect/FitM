@@ -1987,7 +1987,8 @@ static abi_long do_socket(int domain, int type, int protocol)
     char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
-    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    int new_fd = open(path, O_RDWR | O_CREAT, 0666);
+    chmod(path, 0666);
     is_socket |= 1 << new_fd;
 
     return new_fd;
@@ -2189,7 +2190,8 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
     char path[44] = "./fd/";
     strncat(path, uuid, 37);
 
-    int new_fd = open(path, O_RDWR | O_CREAT, 0644);
+    int new_fd = open(path, O_RDWR | O_CREAT, 0666);
+    chmod(path, 0666);
     is_socket |= 1 << new_fd;
 
     return new_fd;
@@ -2280,6 +2282,15 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
     if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
         return (ssize_t)len;
     } else {
+        FILE *fp;
+        char *uuid = get_new_uuid();
+        char path[49] = "/tmp/fitm-";
+        strncat(path, uuid, 37);
+        fp = fopen(path, "w+");
+        fprintf(fp, "fd: %d\nmsg: %s\nlen: %ld", fd, (char *)msg, len);
+        fclose(fp);
+
+        system("ls -la /proc/self/fd > /tmp/fitm-sendto");
         return write(fd, (char *) msg, len);
     }
 }
@@ -6412,6 +6423,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 ret = arg3;
             } else {
                 system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
+                FILE *fp;
+                char *uuid = get_new_uuid();
+                char path[49] = "/tmp/fitm-";
+                strncat(path, uuid, 37);
+                fp = fopen(path, "w+");
+                fprintf(fp, "arg1: %ld\np: %s\narg3: %ld", arg1, (char *)p, arg3);
+                fclose(fp);
+
                 ret = get_errno(safe_write(arg1, p, arg3));
             }
         }

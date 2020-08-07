@@ -24,6 +24,9 @@ test_pipe: clean
 snapshot_creation:
 	gcc -o targets/snapshot_creation targets/snapshot_creation.c
 
+echo_server:
+	gcc -o targets/echo_server targets/echo_server.c
+
 pseudotest_simple: pseudoserver_simple pseudoclient_simple
 
 pseudoserver_simple: clean
