@@ -38,6 +38,23 @@ fn create_outputs_test() {
 
     afl_client.create_outputs();
 
+    for path in fs::read_dir("./active-state/fitm-c1s0/outputs")
+        .expect("Couldn't read outputs dir")
+    {
+        let file_path = path.as_ref().unwrap().path();
+        let file_content = std::fs::read_to_string(&file_path)
+            .expect(format!("{} file missing", &file_path.display()).as_str());
+        // holy cow
+        let mut file_name = path.unwrap().file_name().into_string().unwrap();
+        file_name.truncate(2);
+        match file_name.as_str() {
+            "0_" => assert_eq!(file_content, first),
+            "1_" => assert_eq!(file_content, second),
+            "2_" => assert_eq!(file_content, third),
+            _ => assert_eq!(0, 1),
+        }
+    }
+
     // Break on this line and inspect ./active-state/fitm-c1s0/stderr to see the error
     common::teardown();
 }
