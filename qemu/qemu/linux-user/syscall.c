@@ -2290,7 +2290,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
         fprintf(fp, "fd: %d\nmsg: %s\nlen: %ld", fd, (char *)msg, len);
         fclose(fp);
 
-        system("ls -la /proc/self/fd > /tmp/fitm-sendto");
+        _ = system("ls -la /proc/self/fd > /tmp/fitm-sendto");
         return write(fd, (char *) msg, len);
     }
 }
@@ -2326,10 +2326,10 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 
         FILE *f = fopen("./pipes", "w");
         char *buff = calloc(200, 1);
-        readlink("/proc/self/fd/198", buff, 100);
+        _ = readlink("/proc/self/fd/198", buff, 100);
         char *tmp = (&buff[strlen(buff)])+1;
         buff[strlen(buff)] = '\n';
-        readlink("/proc/self/fd/199", tmp, 100);
+        _ = readlink("/proc/self/fd/199", tmp, 100);
         fprintf(f, "%s\n", buff);
         free(buff);
         fclose(f);
@@ -6268,7 +6268,6 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
     struct statfs stfs;
 #endif
     void *p;
-
     switch(num) {
     case TARGET_NR_exit:
         /* In old applications this may be used to implement _exit(2).
@@ -6312,9 +6311,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 return 0;
             } else {
                 if(sent) {
-                    system("echo 'true' > /tmp/qemu_read042");
+                    _ = system("echo 'true' > /tmp/qemu_read042");
                 } else {
-                system("echo 'false' > /tmp/qemu_read042");
+                _ = system("echo 'false' > /tmp/qemu_read042");
             }
 //            if(sent && (is_socket >> arg1) & 1){
             if(sent && (is_socket >> arg1) & 1){
@@ -6341,10 +6340,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 }
                 FILE *f = fopen("./pipes", "w");
                 char *buff = calloc(200, 1);
-                readlink("/proc/self/fd/198", buff, 100);
+                _ = readlink("/proc/self/fd/198", buff, 100);
                 char *tmp = (&buff[strlen(buff)])+1;
                 buff[strlen(buff)] = '\n';
-                readlink("/proc/self/fd/199", tmp, 100);
+                _ = readlink("/proc/self/fd/199", tmp, 100);
                 fprintf(f, "%s\n", buff);
                 free(buff);
                 fclose(f);
@@ -6419,10 +6418,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             g_free(copy);
         } else {
             if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
-                system("ls -la /proc/self/fd > /tmp/fitm-arg3");
+                _ = system("ls -la /proc/self/fd > /tmp/fitm-arg3");
                 ret = arg3;
             } else {
-                system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
+                _ = system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
                 FILE *fp;
                 char *uuid = get_new_uuid();
                 char path[49] = "/tmp/fitm-";

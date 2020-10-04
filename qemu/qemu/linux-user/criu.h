@@ -177,7 +177,7 @@ char* get_new_uuid(void){
 }
 
 char* concat3(char *first, char *second, char *third){
-    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+1, 1);
+    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+4, 1);
     strncpy(ret, first, strlen(first)+1);
     strncat(ret, second, strlen(second)+1);
     strncat(ret, third, strlen(third)+1);

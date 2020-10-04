@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// ignore return value
+int _ = 0;
+
 char *getenv_from_file(const char *var);
 
 /*
@@ -26,7 +29,7 @@ char *getenv_from_file(const char *var) {
     fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
 
     char *string = calloc(fsize + 1, 1);
-    fread(string, 1, fsize, f);
+    _ = fread(string, 1, fsize, f);
     fclose(f);
 
     char *tmp = string;

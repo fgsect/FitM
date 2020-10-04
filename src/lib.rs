@@ -102,17 +102,17 @@ impl AFLRun {
 
         if from_snapshot {
             utils::copy_snapshot_base(&base_state, &state_path);
+
+            if base_state != "".to_string() {
+                // copy old fd folder for new state
+                let from = format!("./saved-states/{}/fd", base_state);
+                let to = format!("./active-state/{}/", state_path);
+                utils::copy(from, to);
+            }
         } else {
             fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
         };
-
-        if base_state != "".to_string() {
-            // copy old fd folder for new state
-            let from = format!("./saved-states/{}/fd", base_state);
-            let to = format!("./active-state/{}/", state_path);
-            utils::copy(from, to);
-        }
 
         let new_run = AFLRun {
             state_path,
