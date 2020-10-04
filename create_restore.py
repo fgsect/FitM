@@ -37,7 +37,7 @@ def main():
         open_fds += f"exec 2>> /{cur_state}/stderr\n"
 
         for m in mapping:
-            open_fds += f"exec {m[0]}< {re.sub(r'fitm-c[0-9]+s[0-9]+', argv[2], m[1])}\n"
+            open_fds += f"exec {m[0]}<> {re.sub(r'fitm-c[0-9]+s[0-9]+', argv[2], m[1])}\n"
             lines.append(f"    --inherit-fd \"fd[{m[0]}]:{m[1][1:]}\" \\")
 
     lines.append("    && echo 'OK'")
