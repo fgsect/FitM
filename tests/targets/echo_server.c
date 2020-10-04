@@ -22,7 +22,7 @@ int main()
 //    printf("02: post recv/pre send\n");
 //    printf("%i\n", sock);
     system("whoami > /tmp/fitm-who");
-    int bytes = send(sock, buffer, 100, 0);
+    int bytes = send(sock, buffer, strlen(buffer), 0);
     printf("sent bytes: %d\n", bytes);
     perror("error: ");
 //    write(3, (char *) msg, len);

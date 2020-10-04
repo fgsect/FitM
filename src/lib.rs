@@ -200,7 +200,7 @@ impl AFLRun {
             .wait()
             .expect("[!] Snapshot run failed");
 
-        sleep(Duration::new(0, 20000000));
+        sleep(Duration::new(0, 50000000));
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
@@ -258,7 +258,7 @@ impl AFLRun {
             .expect("[!] Could not spawn snapshot run")
             .wait()
             .expect("[!] Snapshot run failed");
-        sleep(Duration::new(0, 20000000));
+        sleep(Duration::new(0, 50000000));
 
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
@@ -337,7 +337,7 @@ impl AFLRun {
             .wait()
             .expect("[!] Error while waiting for fuzz run");
 
-        sleep(Duration::new(0, 20000000));
+        sleep(Duration::new(0, 50000000));
 
         if self.state_path == "fitm-c2s1" {
             println!("pass");
@@ -421,7 +421,7 @@ impl AFLRun {
 
             // No new states are discovered if this sleep is not there
             // Didn't investigate further.
-            sleep(Duration::new(0, 20000000));
+            sleep(Duration::new(0, 50000000));
 
             for entry in fs::read_dir("./fd")
                 .expect("[!] Could not read populated fd folder")
@@ -499,7 +499,7 @@ impl AFLRun {
             .env("AFL_NO_UI", "1")
             .env("AFL_DEBUG", "1")
             .spawn();
-        sleep(Duration::new(0, 20000000));
+        sleep(Duration::new(0, 50000000));
 
         // After spawning showmap command we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
