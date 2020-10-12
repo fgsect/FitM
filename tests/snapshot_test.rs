@@ -88,7 +88,7 @@ fn create_new_run_test() {
 
     // creating the afl_client object manually would make the test even more precise
     // previous_state needs to be the same as base_state as create_new_run would normally generate
-    // new AFLRuns for the opposite binary for the one currently fuzzed.
+    // new AFLRuns for the opposite binary to the one currently fuzzed.
     // So if bin 1 was just fuzzed, consolidated and produced new outputs (and thus new paths in bin 2),
     // then create_new_run would produce new AFLRuns based on binary 2.
     let afl_client: AFLRun = AFLRun::new(

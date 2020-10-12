@@ -55,6 +55,5 @@ fn create_outputs_test() {
         }
     }
 
-    // Break on this line and inspect ./active-state/fitm-c1s0/stderr to see the error
     common::teardown();
 }

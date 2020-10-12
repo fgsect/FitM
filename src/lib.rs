@@ -204,7 +204,8 @@ impl AFLRun {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
-        // With snapshot_run we move the state folder, but in this initial case we need to use
+        // With snapshot_run we move the state folder instead of copying it,
+        // but in this initial case we need to use
         // the state folder shortly after running this function
         utils::copy(
             format!("./active-state/{}", self.state_path),
@@ -443,9 +444,9 @@ impl AFLRun {
     }
 
     /// Generate the maps provided by afl-showmap. This is used to filter out
-    /// for "interesting" new seeds meaning seeds, that will make the OTHER
+    /// "interesting" new seeds i.e. seeds that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
-    fn gen_afl_maps(&self) -> io::Result<Child> {
+    pub fn gen_afl_maps(&self) -> io::Result<Child> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         utils::copy(
