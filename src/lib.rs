@@ -454,7 +454,7 @@ impl AFLRun {
     pub fn gen_afl_maps(&self) -> io::Result<Child> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
-        utils::copy(
+        utils::copy_ignore(
             format!("./saved-states/{}", self.previous_state_path),
             String::from("./active-state/"),
         );

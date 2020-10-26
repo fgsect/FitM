@@ -18,6 +18,13 @@ pub fn copy(from: String, to: String) {
     );
 }
 
+pub fn copy_ignore(from: String, to: String) {
+    let options = CopyOptions::new();
+    match fs_extra::dir::copy(&from, &to, &options) {
+        _ => {},
+    }
+}
+
 #[allow(dead_code)]
 pub fn rm(dir: String) {
     Command::new("rm")
