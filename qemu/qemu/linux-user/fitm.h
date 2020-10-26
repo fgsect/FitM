@@ -19,7 +19,7 @@ char *getenv_from_file(const char *var) {
     // https://stackoverflow.com/questions/14002954/c-programming-how-to-read-the-whole-file-contents-into-a-buffer
     // Read the entire env file
     // pwd is set to the current state folder.
-    FILE *f = fopen("../envfile", "r");
+    FILE *f = fopen("./envfile", "r");
     if (!f) {
         return getenv(var);
     }

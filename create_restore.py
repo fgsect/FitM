@@ -9,11 +9,10 @@ import json
 # execute from fitm/
 def main():
     open_fds = ""
-
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
+    cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
     if argv[1]:
         base_state = f"{getcwd()}/active-state/{argv[1]}"[1:]
-        cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
 
         lines.append(f"    --inherit-fd \"fd[1]:{base_state}/stdout\" \\")
         lines.append(f"    --inherit-fd \"fd[2]:{base_state}/stderr\" \\")
@@ -42,8 +41,8 @@ def main():
 
     lines.append("    && echo 'OK'")
 
-    open("./restore.sh", "w").write("\n".join(lines).replace("## TEMPLATE ##", open_fds))
+    open(f"/{cur_state}/restore.sh", "w").write("\n".join(lines).replace("## TEMPLATE ##", open_fds))
     # Make file world executable
-    chmod("./restore.sh", 0o661)
+    chmod(f"/{cur_state}/restore.sh", 0o661)
 if __name__ == "__main__":
     main()

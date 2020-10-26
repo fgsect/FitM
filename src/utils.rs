@@ -57,7 +57,7 @@ pub fn create_restore_sh(afl: &AFLRun) {
         .args(&[
             "create_restore.py".to_string(),
             afl.base_state.to_string(),
-            afl.state_path.to_string(),
+            afl.active_dir.to_string(),
         ])
         .spawn()
         .expect("[!] Could not spawn create_restore.py")
