@@ -4,19 +4,18 @@
 # Expects relative path to state folder it's supposed to restore as arg
 # TODO: Clean this up, this looks/is ugly
 
-export INPUT_FILENAME=$(realpath $2)
+export INPUT_FILENAME=$(realpath $1)
 
-STATE_DIR=../../active-state/$1
-
-ENVFILE=$STATE_DIR/../envfile
+ENVFILE="./envfile"
 env | sort > $ENVFILE
-PIPE1=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
-PIPE2=$(cat $STATE_DIR/pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
+pwd
+PIPE1=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
+PIPE2=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
-echo "======="
-ls -la /proc/self/fd
-echo $@
-echo "======="
+# echo "======="
+# ls -la /proc/self/fd
+# echo $@
+# echo "======="
 
 echo -n "" > ./out/.cur_input
 
@@ -32,6 +31,6 @@ fi
 criu restore -d \
     -vvv \
     -o ./restore.log \
-    --images-dir $STATE_DIR/snapshot \
+    --images-dir ./snapshot \
     --inherit-fd "fd[198]:$PIPE1" \
     --inherit-fd "fd[199]:$PIPE2" \

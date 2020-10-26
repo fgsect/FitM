@@ -12,10 +12,15 @@ pub fn mv(from: String, to: String) {
 }
 
 pub fn copy(from: String, to: String) {
-    let options = CopyOptions::new();
-    fs_extra::dir::copy(&from, &to, &options).expect(
-        format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str(),
-    );
+    //let options = CopyOptions::new();
+    Command::new("cp").args(&[
+        String::from("-r"),
+        from.clone(),
+        to.clone()
+    ]).spawn()
+    .expect(format!("[!] Could not copy from {} to {}", from, to).as_str())
+    .wait()
+    .expect("[-] Failed waiting for copy.");
 }
 
 pub fn copy_ignore(from: String, to: String) {
