@@ -25,15 +25,16 @@ pub struct AFLRun {
     /// Path to the state the current state receives input from
     pub previous_state_path: String,
     /// Timeout for this run
-    /// TODO: probably should be dynamic based on how interesting this state is.
+    /// TODO: probably should be dynamic based on how interesting this state
+    /// is.
     pub timeout: u32,
     // All the states that came out of the current state
     // child_states: Vec<(u32, u32)>
     /// Used to determine whether to increase first or second value of state
     /// tuple. Hope this is not too broken
     pub server: bool,
-    /// State folder name of the state from which this object's snapshot was created
-    /// Empty if created from binary
+    /// State folder name of the state from which this object's snapshot was
+    /// created Empty if created from binary
     pub base_state: String,
     /// Marks if this run is an initial state or not
     pub initial: bool,
@@ -174,7 +175,8 @@ impl AFLRun {
         println!("TEST2");
     }
 
-    /// Needed for the two initial snapshots created based on the target binaries
+    /// Needed for the two initial snapshots created based on the target
+    /// binaries
     pub fn init_run(&self) -> () {
         let dev_null = "/dev/null";
         // create the .cur_input so that criu snapshots a fd connected to
@@ -372,7 +374,8 @@ impl AFLRun {
         env::set_current_dir(format!("./active-state/{}", self.active_dir))
             .unwrap();
 
-        // For the binary that creates the seed we need to take input from the in folder
+        // For the binary that creates the seed we need to take input from the
+        // in folder
         let input_path = if self.previous_state_path == "".to_string() {
             "./in"
         } else {
@@ -405,7 +408,8 @@ impl AFLRun {
             );
 
             // Open a file for stdout and stderr to log to
-            // We need to do this inside the loop as the process gets restored multiple times
+            // We need to do this inside the loop as the process gets restored
+            // multiple times
             let stdout = fs::File::create("stdout-afl").unwrap();
             let stderr = fs::File::create("stderr-afl").unwrap();
             fs::File::create("stdout").unwrap();
@@ -541,10 +545,11 @@ impl AFLRun {
         // Only mutate cur_state in this method. So next_state_path gets a
         // readable copy. We update cur_state here with a new tuple.
         // cur_state = next_state_path(cur_state, true);
-        // We create a new state for the other binary that is not fuzzed by "self".
-        // For this new state previous_state is "self". And base_state is self.previous
-        // as we generated the maps on self.previous
-        // and thus create the new state from that snapshot
+        // We create a new state for the other binary that is not fuzzed by
+        // "self". For this new state previous_state is "self". And
+        // base_state is self.previous as we generated the maps on
+        // self.previous and thus create the new state from that
+        // snapshot
         let afl = AFLRun::new(
             new_state,
             target_bin.to_string(),
@@ -643,9 +648,11 @@ pub fn run() {
                 .wait()
                 .expect("[!] Error while waiting for the showmap run");
         } else {
-            // copy output of first run of binary 1 to in of first run of bin 2 as seed
+            // copy output of first run of binary 1 to in of first run of bin 2
+            // as seed
             let from = format!("active-state/{}/fd", afl_current.active_dir);
-            // apparently fs_extra can not copy content of `from` into folder `[..]/in`
+            // apparently fs_extra can not copy content of `from` into folder
+            // `[..]/in`
             for entry in fs::read_dir(from)
                 .expect("[!] Could not read output of initial run")
             {

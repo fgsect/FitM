@@ -4,14 +4,16 @@ use std::fs;
 mod common;
 
 // init_run_test should check if a snapshot could be successfully be created.
-// As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
+// As the test does not have access to criu server responses or other logs it
+// relies on the correct creation of various files
 
 #[test]
 fn create_outputs_test() {
     // pwd == root dir of repo
     common::setup();
 
-    // creating the afl_client object manually would make the test even more precise
+    // creating the afl_client object manually would make the test even more
+    // precise
     let afl_client: AFLRun = AFLRun::new(
         (0, 1),
         "tests/targets/echo_server".to_string(),
@@ -47,6 +49,7 @@ fn create_outputs_test() {
     // tested function
     afl_client.gen_afl_maps();
 
-    // break here and inspect `active-state/stdout-afl` to see breaking forkserver
+    // break here and inspect `active-state/stdout-afl` to see breaking
+    // forkserver
     common::teardown();
 }

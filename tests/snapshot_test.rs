@@ -13,14 +13,16 @@ use std::time::Duration;
 use rand::Rng;
 
 // init_run_test should check if a snapshot could be successfully be created.
-// As the test does not have access to criu server responses or other logs it relies on the correct creation of various files
+// As the test does not have access to criu server responses or other logs it
+// relies on the correct creation of various files
 
 #[test]
 fn init_run_test() {
     // pwd == root dir of repo
     common::setup();
 
-    // creating the afl_client object manually would make the test even more precise
+    // creating the afl_client object manually would make the test even more
+    // precise
     let afl_client: AFLRun = AFLRun::new(
         (1, 0),
         "tests/targets/pseudoclient".to_string(),
@@ -70,8 +72,8 @@ fn init_run_test() {
     common::teardown();
 }
 
-// create_new_run_test checks if the method with the same name works correctly and
-// the produced snapshot can be restored using restore.sh
+// create_new_run_test checks if the method with the same name works correctly
+// and the produced snapshot can be restored using restore.sh
 
 #[test]
 fn create_new_run_test() {
@@ -86,10 +88,11 @@ fn create_new_run_test() {
     )
     .expect("Could not create dummy fd folder");
 
-    // creating the afl_client object manually would make the test even more precise
-    // previous_state needs to be the same as base_state as create_new_run would normally generate
-    // new AFLRuns for the opposite binary to the one currently fuzzed.
-    // So if bin 1 was just fuzzed, consolidated and produced new outputs (and thus new paths in bin 2),
+    // creating the afl_client object manually would make the test even more
+    // precise previous_state needs to be the same as base_state as
+    // create_new_run would normally generate new AFLRuns for the opposite
+    // binary to the one currently fuzzed. So if bin 1 was just fuzzed,
+    // consolidated and produced new outputs (and thus new paths in bin 2),
     // then create_new_run would produce new AFLRuns based on binary 2.
     let afl_client: AFLRun = AFLRun::new(
         (1, 0),
@@ -139,7 +142,8 @@ fn create_new_run_test() {
     assert_eq!(new_run.target_bin, "tests/targets/pseudoserver");
     assert_eq!(new_run.previous_state_path, "fitm-c1s0");
     assert_eq!(new_run.timeout, 1);
-    // afl_client was a client run, so the following run needs to be a server run
+    // afl_client was a client run, so the following run needs to be a server
+    // run
     assert_eq!(new_run.server, true);
     assert_eq!(new_run.base_state, "fitm-c1s0");
     assert_eq!(new_run.initial, false);
@@ -152,7 +156,8 @@ fn create_new_run_test() {
     )
     .expect("[!] Could not copy snapshot dir from previous state");
 
-    // Restore the snapshotted process, because only by doing so can we be sure that the snapshot actually worked
+    // Restore the snapshotted process, because only by doing so can we be sure
+    // that the snapshot actually worked
     env::set_current_dir(format!("./active-state/{}", new_run.state_path))
         .unwrap();
     let _ = Command::new("sh")
@@ -165,7 +170,8 @@ fn create_new_run_test() {
         .expect("[!] Could not spawn snapshot run")
         .wait()
         .expect("[!] Snapshot run failed");
-    // fokn sleep seems necessary everywhere - w/o the process is not done printing before the assert is done
+    // fokn sleep seems necessary everywhere - w/o the process is not done
+    // printing before the assert is done
     sleep(Duration::new(0, 20000000));
 
     env::set_current_dir("../../").unwrap();
@@ -183,7 +189,9 @@ fn create_new_run_test() {
     let stderr = std::fs::read_to_string("./active-state/fitm-c2s0/stderr")
         .expect("stderr file missing");
     let stdout_expected = "Success\nRestored\nOK\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\nOK\n03\n";
-    // let stdout_expected = "Success\nRestored\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\n03\n";
+    // let stdout_expected =
+    // "Success\nRestored\n01\n02\nSuccess\nRestored\nForkserver not started,
+    // since SHM_ENV_VAR env variable is missing\n03\n";
     let stderr_expected = "";
     assert_eq!(
         stdout, stdout_expected,

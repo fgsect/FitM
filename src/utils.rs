@@ -13,20 +13,18 @@ pub fn mv(from: String, to: String) {
 
 pub fn copy(from: String, to: String) {
     //let options = CopyOptions::new();
-    Command::new("cp").args(&[
-        String::from("-r"),
-        from.clone(),
-        to.clone()
-    ]).spawn()
-    .expect(format!("[!] Could not copy from {} to {}", from, to).as_str())
-    .wait()
-    .expect("[-] Failed waiting for copy.");
+    Command::new("cp")
+        .args(&[String::from("-r"), from.clone(), to.clone()])
+        .spawn()
+        .expect(format!("[!] Could not copy from {} to {}", from, to).as_str())
+        .wait()
+        .expect("[-] Failed waiting for copy.");
 }
 
 pub fn copy_ignore(from: String, to: String) {
     let options = CopyOptions::new();
     match fs_extra::dir::copy(&from, &to, &options) {
-        _ => {},
+        _ => {}
     }
 }
 
@@ -98,8 +96,8 @@ mod tests {
         from_content_path: &String,
         content: &str,
     ) {
-        // setup - require user interaction so we don't delete anything by default
-        // Creates necessary files/folders under /tmp
+        // setup - require user interaction so we don't delete anything by
+        // default Creates necessary files/folders under /tmp
         fs_extra::dir::create(root_folder, false).expect("rust_unittest folder already exists, please remove to make this test run");
         fs_extra::dir::create_all(from_path, true)
             .expect("Could not create test folder");
@@ -144,7 +142,8 @@ mod tests {
         // tested function
         utils::copy(from_path.clone(), root_folder.clone());
 
-        // Check that the 'from' path does not exist anymore, but the 'to' path does
+        // Check that the 'from' path does not exist anymore, but the 'to' path
+        // does
         assert_eq!(Path::new(&from_path).exists(), true);
         assert!(paths_exist(&root_folder, &to_content_path));
 
@@ -176,7 +175,8 @@ mod tests {
         // tested function
         utils::mv(from_path.clone(), to_path.clone());
 
-        // Check that the 'from' path does not exist anymore, but the 'to' path does
+        // Check that the 'from' path does not exist anymore, but the 'to' path
+        // does
         assert_eq!(Path::new(&from_path).exists(), false);
         assert!(paths_exist(&root_folder, &to_content_path));
 
