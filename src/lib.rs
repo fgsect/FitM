@@ -281,14 +281,19 @@ impl AFLRun {
             String::from("./active-state/"),
         );
 
-        utils::copy(
-            String::from("./saved-states/fitm-c1s0"),
-            String::from("./active-state/"),
-        );
-        utils::copy(
-            String::from("./saved-states/fitm-c0s1"),
-            String::from("./active-state/"),
-        );
+        if self.state_path != "fitm-c1s0" {
+            utils::copy(
+                String::from("./saved-states/fitm-c1s0"),
+                String::from("./active-state/"),
+            );
+        }
+
+        if self.state_path != "fitm-c0s1" {
+            utils::copy(
+                String::from("./saved-states/fitm-c0s1"),
+                String::from("./active-state/"),
+            );
+        }
 
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
