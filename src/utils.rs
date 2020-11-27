@@ -38,7 +38,7 @@ pub fn rm(dir: String) {
         .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
 }
 
-pub fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
+pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("./active-state/{}/", state_path);

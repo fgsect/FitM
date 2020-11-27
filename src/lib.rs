@@ -15,6 +15,10 @@ pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
+pub const ORIGIN_STATE_TUPLE: (u32, u32) = (0, 0);
+pub const ORIGIN_STATE_SERVER: &str = "fitm-server";
+pub const ORIGIN_STATE_CLIENT: &str = "fitm-client";
+
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
 pub struct AFLRun {
@@ -39,7 +43,7 @@ pub struct AFLRun {
     /// Marks if this run is an initial state or not
     pub initial: bool,
     /// Name of the corresponding acitve dir
-    pub active_dir: String,
+    pub active_dir: &'static str,
 }
 
 impl fmt::Debug for AFLRun {
@@ -57,6 +61,17 @@ impl fmt::Debug for AFLRun {
     }
 }
 
+/// Returns the origin state for client or server
+pub fn origin_state(is_server: bool) -> &'static str {
+
+    if is_server {
+        ORIGIN_STATE_SERVER
+    } else {
+        ORIGIN_STATE_CLIENT
+    }
+
+}
+
 /// Implementation of functions for an afl run
 impl AFLRun {
     /// Create a new afl run instance
@@ -69,12 +84,13 @@ impl AFLRun {
         server: bool,
         from_snapshot: bool,
     ) -> AFLRun {
-        let state_path = format!("fitm-c{}s{}", new_state.0, new_state.1);
 
-        let active_dir = if server {
-            String::from("fitm-server")
+        let active_dir = origin_state(server);
+
+        let state_path = if new_state == ORIGIN_STATE_TUPLE {
+            origin_state(server).to_string()
         } else {
-            String::from("fitm-client")
+            format!("fitm-c{}s{}", new_state.0, new_state.1)
         };
 
         // If the new state directory already exists we may have old data there

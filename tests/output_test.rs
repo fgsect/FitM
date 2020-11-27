@@ -19,7 +19,7 @@ fn create_outputs_test() {
         "tests/targets/echo_server".to_string(),
         1,
         "".to_string(),
-        "fitm-c1s0".to_string(),
+        "fitm-client".to_string(),
         false,
         false,
     );
@@ -31,16 +31,16 @@ fn create_outputs_test() {
     let first = "a simple string";
     let second = "message 1, upcoming linebreak now:\nmessage 2";
     let third = "foo\tbar";
-    fs::write("./active-state/fitm-c1s0/in/first_case.txt", first)
+    fs::write("./active-state/fitm-client/in/first_case.txt", first)
         .expect("Could not write first input file");
-    fs::write("./active-state/fitm-c1s0/in/second_case.txt", second)
+    fs::write("./active-state/fitm-client/in/second_case.txt", second)
         .expect("Could not write second input file");
-    fs::write("./active-state/fitm-c1s0/in/third_case.txt", third)
+    fs::write("./active-state/fitm-client/in/third_case.txt", third)
         .expect("Could not write third input file");
 
     afl_client.create_outputs();
 
-    for path in fs::read_dir("./active-state/fitm-c1s0/outputs")
+    for path in fs::read_dir("./active-state/fitm-client/outputs")
         .expect("Couldn't read outputs dir")
     {
         let file_path = path.as_ref().unwrap().path();
