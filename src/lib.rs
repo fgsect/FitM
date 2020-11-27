@@ -63,13 +63,11 @@ impl fmt::Debug for AFLRun {
 
 /// Returns the origin state for client or server
 pub fn origin_state(is_server: bool) -> &'static str {
-
     if is_server {
         ORIGIN_STATE_SERVER
     } else {
         ORIGIN_STATE_CLIENT
     }
-
 }
 
 /// Implementation of functions for an afl run
@@ -84,7 +82,6 @@ impl AFLRun {
         server: bool,
         from_snapshot: bool,
     ) -> AFLRun {
-
         let active_dir = origin_state(server);
 
         let state_path = if new_state == ORIGIN_STATE_TUPLE {
@@ -95,49 +92,49 @@ impl AFLRun {
 
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
-        if Path::new(&format!("active-state/{}", active_dir)).exists() {
+        if Path::new(&format!("active-state/{}", state_path)).exists() {
             println!(
                 "[!] active-state/{} already exists! Recreating..",
-                active_dir
+                state_path
             );
             let delete = true;
             if delete {
                 // expect already panics so we don't need to exit manually
-                fs::remove_dir(format!("active-state/{}", active_dir))
+                fs::remove_dir(format!("active-state/{}", state_path))
                     .expect("[-] Could not remove duplicate state dir!");
             }
         }
 
         // Create the new directories and files to make afl feel at home
-        fs::create_dir(format!("active-state/{}", active_dir))
+        fs::create_dir(format!("active-state/{}", state_path))
             .expect("[-] Could not create state dir!");
 
-        fs::create_dir(format!("active-state/{}/in", active_dir))
+        fs::create_dir(format!("active-state/{}/in", state_path))
             .expect("[-] Could not create in dir!");
 
-        fs::create_dir(format!("active-state/{}/out", active_dir))
+        fs::create_dir(format!("active-state/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
-        fs::create_dir(format!("active-state/{}/outputs", active_dir))
+        fs::create_dir(format!("active-state/{}/outputs", state_path))
             .expect("[-] Could not create outputs dir!");
 
-        fs::create_dir(format!("active-state/{}/out/maps", active_dir))
+        fs::create_dir(format!("active-state/{}/out/maps", state_path))
             .expect("[-] Could not create out/maps dir!");
 
-        let fd_path = format!("active-state/{}/fd", active_dir);
+        let fd_path = format!("active-state/{}/fd", state_path);
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
-            utils::copy_snapshot_base(&base_state, &active_dir);
+            utils::copy_snapshot_base(&base_state, &state_path);
 
             if base_state != "".to_string() {
                 // copy old fd folder for new state
                 let from = format!("./saved-states/{}/fd", base_state);
-                let to = format!("./active-state/{}/", active_dir);
+                let to = format!("./active-state/{}/", state_path);
                 utils::copy(from, to);
             }
         } else {
-            fs::create_dir(format!("active-state/{}/snapshot", active_dir))
+            fs::create_dir(format!("active-state/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
         };
 
@@ -154,7 +151,7 @@ impl AFLRun {
 
         // We can write a tool in the future to parse this info
         // and print a visualization of the state order
-        let path = format!("./active-state/{}/run-info", new_run.active_dir);
+        let path = format!("./active-state/{}/run-info", new_run.state_path);
         let mut file =
             fs::File::create(path).expect("[!] Could not create aflrun file");
         file.write(format!("{:?}", new_run).as_bytes())
@@ -180,15 +177,14 @@ impl AFLRun {
         }
 
         // copy old snapshot folder for criu
-        let from = format!("./saved-states/{}", self.base_state);
-        let to = format!("./active-state/");
+        let from = format!("./saved-states/{}", self.active_dir);
+        let to = format!("./active-state");
 
         // Check fs_extra docs for different copy options
-        println!("TEST");
-        let options = CopyOptions::new();
+        let mut options = CopyOptions::new();
+        options.overwrite = true;
         fs_extra::dir::copy(from, to, &options)
             .expect("[!] Could not copy base state dir from saved-states");
-        println!("TEST2");
     }
 
     /// Needed for the two initial snapshots created based on the target
@@ -200,7 +196,7 @@ impl AFLRun {
         let stdin = fs::File::open(dev_null).unwrap();
 
         // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.active_dir))
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
         // Open a file for stdout and stderr to log to
@@ -239,8 +235,8 @@ impl AFLRun {
         // but in this initial case we need to use
         // the state folder shortly after running this function
         utils::copy(
-            format!("./active-state/{}", self.active_dir),
-            format!("./saved-states/{}", self.state_path),
+            format!("./active-state/{}", self.state_path),
+            format!("./saved-states"),
         );
     }
 
@@ -255,7 +251,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.active_dir))
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
         let stdin_file = fs::File::open(stdin.clone()).unwrap();
@@ -295,8 +291,8 @@ impl AFLRun {
         env::set_current_dir(&Path::new("../../")).unwrap();
 
         utils::mv(
-            format!("./active-state/{}", self.active_dir),
-            format!("./saved-states/{}", self.state_path),
+            format!("./active-state/{}", self.state_path),
+            format!("./saved-states"),
         );
     }
 
@@ -308,7 +304,7 @@ impl AFLRun {
         // Thus they need to be copied to be fuzzed
         utils::copy(
             format!("./saved-states/{}", self.state_path),
-            format!("./active-state/{}", self.active_dir),
+            format!("./active-state/{}", self.state_path),
         );
 
         // if self.state_path != "fitm-c1s0" {
@@ -334,7 +330,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // Change into our state directory and create fuzz run from there
-        env::set_current_dir(format!("./active-state/{}", self.active_dir))
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
         // Open a file for stdout and stderr to log to
@@ -387,7 +383,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // For consistency, change into necessary dir inside the function
-        env::set_current_dir(format!("./active-state/{}", self.active_dir))
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
         // For the binary that creates the seed we need to take input from the
@@ -484,7 +480,7 @@ impl AFLRun {
         // Thus they need to be copied to be fuzzed
         utils::copy_ignore(
             format!("./saved-states/{}", self.previous_state_path),
-            format!("./active-state/{}", self.active_dir),
+            format!("./active-state/{}", self.state_path),
         );
 
         // Create a copy of the state folder in `active-state`
@@ -496,7 +492,7 @@ impl AFLRun {
 
         utils::create_restore_sh(self);
         // Change into our state directory and generate the afl maps there
-        env::set_current_dir(format!("./active-state/{}", self.active_dir))
+        env::set_current_dir(format!("./active-state/{}", self.state_path))
             .unwrap();
 
         // Open a file for stdout and stderr to log to
@@ -549,14 +545,7 @@ impl AFLRun {
         from_snapshot: bool,
     ) -> AFLRun {
         let input_path: String =
-            format!("active-state/{}/outputs/{}", self.active_dir, input);
-
-        // FIXME: This needs to be dependant on some input parameter
-        let target_bin = if self.server {
-            "tests/targets/pseudoclient".to_string()
-        } else {
-            "tests/targets/pseudoserver".to_string()
-        };
+            format!("active-state/{}/outputs/{}", self.state_path, input);
 
         // Only mutate cur_state in this method. So next_state_path gets a
         // readable copy. We update cur_state here with a new tuple.
@@ -568,16 +557,16 @@ impl AFLRun {
         // snapshot
         let afl = AFLRun::new(
             new_state,
-            target_bin.to_string(),
+            self.target_bin.to_string(),
             timeout,
             self.state_path.clone(),
             self.previous_state_path.clone(),
-            !self.server,
+            self.server,
             from_snapshot,
         );
 
         let seed_file_path =
-            format!("active-state/{}/in/{}", afl.active_dir, input);
+            format!("active-state/{}/in/{}", afl.state_path, input);
 
         fs::copy(input_path, &seed_file_path)
             .expect("[!] Could not copy to new afl.state_path");
@@ -619,7 +608,7 @@ pub fn run() {
     let mut queue: VecDeque<AFLRun> = VecDeque::new();
 
     fs::write(
-        format!("active-state/{}/in/1", afl_client.active_dir),
+        format!("active-state/{}/in/1", afl_client.state_path),
         "init case.",
     )
     .expect("[-] Could not create initial test case!");
@@ -666,7 +655,7 @@ pub fn run() {
         } else {
             // copy output of first run of binary 1 to in of first run of bin 2
             // as seed
-            let from = format!("active-state/{}/fd", afl_current.active_dir);
+            let from = format!("active-state/{}/fd", afl_current.state_path);
             // apparently fs_extra can not copy content of `from` into folder
             // `[..]/in`
             for entry in fs::read_dir(from)
@@ -686,7 +675,7 @@ pub fn run() {
         }
 
         // consolidate previous runs here
-        let path = format!("active-state/{}/out/maps", afl_current.active_dir);
+        let path = format!("active-state/{}/out/maps", afl_current.state_path);
 
         for entry in fs::read_dir(path)
             .expect("[!] Could not read maps dir while consolidating")
@@ -713,7 +702,7 @@ pub fn run() {
 
                         let from = format!(
                             "active-state/{}/fd/{}",
-                            afl_current.active_dir, in_file
+                            afl_current.state_path, in_file
                         );
                         let to = format!(
                             "saved-states/{}/in/{}",
