@@ -19,7 +19,7 @@ char *getenv_from_file(const char *var) {
     // https://stackoverflow.com/questions/14002954/c-programming-how-to-read-the-whole-file-contents-into-a-buffer
     // Read the entire env file
     // pwd is set to the current state folder.
-    FILE *f = fopen("./envfile", "r");
+    FILE *f = fopen("../envfile", "r");
     if (!f) {
         return getenv(var);
     }
@@ -29,14 +29,19 @@ char *getenv_from_file(const char *var) {
     fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
 
     char *string = calloc(fsize + 1, 1);
+    if (!string) {
+        perror("alloc");
+        exit(-2);
+    }
     _ = fread(string, 1, fsize, f);
     fclose(f);
 
     char *tmp = string;
 
     while (!found && tmp) {
-        if (!strncmp(var, tmp, strlen(var)))
+        if (!strncmp(var, tmp, strlen(var))) {
             found = tmp;
+        }
         tmp = strchr(tmp, '\n');
         if (tmp) {
             *tmp = '\0';
@@ -57,6 +62,10 @@ char *getenv_from_file(const char *var) {
 
     found++;
     char *ret = (char *)calloc(strlen(found), 1);
+    if (!ret) {
+        perror("alloc");
+        exit(-1);
+    }
     strncpy(ret, found, strlen(found));
     free(string);
     return ret;
