@@ -24,7 +24,7 @@ fn init_run_test() {
     // creating the afl_client object manually would make the test even more
     // precise
     let afl_client: AFLRun = AFLRun::new(
-        (1, 0),
+        (0, 0),
         "tests/targets/pseudoclient".to_string(),
         1,
         "".to_string(),
@@ -37,17 +37,17 @@ fn init_run_test() {
     afl_client.init_run();
 
     // relevant files
-    let pipes = std::fs::read_to_string("./active-state/fitm-c1s0/pipes")
+    let pipes = std::fs::read_to_string("./active-state/fitm-client/pipes")
         .expect("Pipes file missing");
-    let run_info = std::fs::read_to_string("./active-state/fitm-c1s0/run-info")
+    let run_info = std::fs::read_to_string("./active-state/fitm-client/run-info")
         .expect("run-info file missing");
-    let stdout = std::fs::read_to_string("./active-state/fitm-c1s0/stdout")
+    let stdout = std::fs::read_to_string("./active-state/fitm-client/stdout")
         .expect("stdout file missing");
-    let stderr = std::fs::read_to_string("./active-state/fitm-c1s0/stderr")
+    let stderr = std::fs::read_to_string("./active-state/fitm-client/stderr")
         .expect("stderr file missing");
 
     // expected outputs
-    let run_info_expected = "AFLRun { state_path: \"fitm-c1s0\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false }";
+    let run_info_expected = "AFLRun { state_path: \"fitm-client\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false, active_dir: \"fitm-client\" }";
 
     // the regex matches e.g. "pipe:[123456]\npipe:[7890]\n"
     // \d{3,7} - 3 to 7 decimal digits
@@ -81,7 +81,7 @@ fn create_new_run_test() {
     common::setup();
 
     // We need this folder as AFLRun::new copies the fd folder from there
-    let base_state = "fitm-c1s0";
+    let base_state = "fitm-client";
     fs_extra::dir::create_all(
         format!("./saved-states/{}/fd", base_state),
         false,
@@ -98,7 +98,7 @@ fn create_new_run_test() {
         (1, 0),
         "tests/targets/snapshot_creation".to_string(),
         1,
-        "fitm-c1s0".to_string(),
+        "fitm-client".to_string(),
         base_state.to_string(),
         false,
         false,
@@ -115,9 +115,9 @@ fn create_new_run_test() {
 
     afl_client.init_run();
 
-    let stdout = std::fs::read_to_string("./active-state/fitm-c1s0/stdout")
+    let stdout = std::fs::read_to_string("./active-state/fitm-client/stdout")
         .expect("stdout file missing");
-    let stderr = std::fs::read_to_string("./active-state/fitm-c1s0/stderr")
+    let stderr = std::fs::read_to_string("./active-state/fitm-client/stderr")
         .expect("stderr file missing");
     let stdout_expected = "00\n";
     let stderr_expected = "";
