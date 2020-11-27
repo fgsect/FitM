@@ -28,7 +28,7 @@ pub fn copy_ignore(from: String, to: String) {
     }
 }
 
-#[allow(dead_code)]
+//#[allow(dead_code)]
 pub fn rm(dir: String) {
     Command::new("rm")
         .args(&["-rf", dir.clone().as_str()])
@@ -91,9 +91,9 @@ mod tests {
     use std::path::Path;
 
     fn setup(
-        root_folder: &String,
-        from_path: &String,
-        from_content_path: &String,
+        root_folder: &str,
+        from_path: &str,
+        from_content_path: &str,
         content: &str,
     ) {
         // setup - require user interaction so we don't delete anything by

@@ -47,7 +47,7 @@ fn create_outputs_test() {
         .expect("Could not write third input file");
 
     // tested function
-    afl_client.gen_afl_maps();
+    afl_client.gen_afl_maps().unwrap();
 
     // break here and inspect `active-state/stdout-afl` to see breaking
     // forkserver
