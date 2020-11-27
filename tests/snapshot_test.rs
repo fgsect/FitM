@@ -1,4 +1,4 @@
-use fitm::{utils, AFLRun};
+use fitm::{utils, AFLRun, ORIGIN_STATE_TUPLE};
 mod common;
 
 use fs_extra::dir::CopyOptions;
@@ -24,7 +24,7 @@ fn init_run_test() {
     // creating the afl_client object manually would make the test even more
     // precise
     let afl_client: AFLRun = AFLRun::new(
-        (0, 0),
+        ORIGIN_STATE_TUPLE,
         "tests/targets/pseudoclient".to_string(),
         1,
         "".to_string(),
@@ -39,8 +39,9 @@ fn init_run_test() {
     // relevant files
     let pipes = std::fs::read_to_string("./active-state/fitm-client/pipes")
         .expect("Pipes file missing");
-    let run_info = std::fs::read_to_string("./active-state/fitm-client/run-info")
-        .expect("run-info file missing");
+    let run_info =
+        std::fs::read_to_string("./active-state/fitm-client/run-info")
+            .expect("run-info file missing");
     let stdout = std::fs::read_to_string("./active-state/fitm-client/stdout")
         .expect("stdout file missing");
     let stderr = std::fs::read_to_string("./active-state/fitm-client/stderr")
@@ -95,7 +96,7 @@ fn create_new_run_test() {
     // consolidated and produced new outputs (and thus new paths in bin 2),
     // then create_new_run would produce new AFLRuns based on binary 2.
     let afl_client: AFLRun = AFLRun::new(
-        (1, 0),
+        (0, 0),
         "tests/targets/snapshot_creation".to_string(),
         1,
         "fitm-client".to_string(),
@@ -134,23 +135,23 @@ fn create_new_run_test() {
     // let input = format!("./in/{}", input_filepath);
     // tested function
     let new_run =
-        afl_client.create_new_run((2, 0), outputs_file.to_string(), 1, true);
+        afl_client.create_new_run((1, 0), outputs_file.to_string(), 1, true);
 
-    assert_eq!(new_run.state_path, "fitm-c2s0");
+    assert_eq!(new_run.state_path, "fitm-c1s0");
     // As long as target_bin selection in create_new_run is hardcoded,
     // this is what's expected at this point
-    assert_eq!(new_run.target_bin, "tests/targets/pseudoserver");
-    assert_eq!(new_run.previous_state_path, "fitm-c1s0");
+    assert_eq!(new_run.target_bin, "tests/targets/snapshot_creation");
+    assert_eq!(new_run.previous_state_path, "fitm-client");
     assert_eq!(new_run.timeout, 1);
     // afl_client was a client run, so the following run needs to be a server
     // run
-    assert_eq!(new_run.server, true);
-    assert_eq!(new_run.base_state, "fitm-c1s0");
+    assert_eq!(new_run.server, false);
+    assert_eq!(new_run.base_state, "fitm-client");
     assert_eq!(new_run.initial, false);
 
     let options = CopyOptions::new();
     fs_extra::dir::copy(
-        "./saved-states/fitm-c2s0",
+        "./saved-states/fitm-c1s0",
         "./active-state/",
         &options,
     )
@@ -182,16 +183,14 @@ fn create_new_run_test() {
     let dest = format!("/tmp/fitm-{}", num);
     fs_extra::dir::create_all(&dest, true)
         .expect("Could not create test folder");
-    utils::copy("./active-state/fitm-c2s0/".to_string(), dest.clone());
+    utils::copy("./active-state/fitm-c1s0/".to_string(), dest.clone());
 
-    let stdout = std::fs::read_to_string("./active-state/fitm-c2s0/stdout")
+    let stdout = std::fs::read_to_string("./active-state/fitm-c1s0/stdout")
         .expect("stdout file missing");
-    let stderr = std::fs::read_to_string("./active-state/fitm-c2s0/stderr")
+    let stderr = std::fs::read_to_string("./active-state/fitm-c1s0/stderr")
         .expect("stderr file missing");
-    let stdout_expected = "Success\nRestored\nOK\n01\n02\nSuccess\nRestored\nForkserver not started, since SHM_ENV_VAR env variable is missing\nOK\n03\n";
-    // let stdout_expected =
-    // "Success\nRestored\n01\n02\nSuccess\nRestored\nForkserver not started,
-    // since SHM_ENV_VAR env variable is missing\n03\n";
+    let stdout_expected = "Success\nRestored\nOK\n01\n02\n";
+
     let stderr_expected = "";
     assert_eq!(
         stdout, stdout_expected,
