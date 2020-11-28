@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 
 use fs_extra::dir::*;
 use std::thread::sleep;
@@ -348,23 +348,34 @@ impl AFLRun {
                 format!("./in"),
                 format!("-o"),
                 format!("./out"),
+                // No mem limit
                 format!("-m"),
                 format!("none"),
+                // Fuzzing as main node
+                format!("-M"),
+                format!("main"),
                 format!("-d"),
+                // At what time to stop this afl run
                 format!("-V"),
                 format!("{}", self.timeout),
+                // Timeout per indiviudal execution
                 format!("-t"),
                 format!("1000"),
                 format!("--"),
                 format!("sh"),
+                // Our restore script
                 format!("./restore.sh"),
+                // The fuzzer input file
                 format!("@@"),
             ])
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+            // We launch sh first, which is (hopefully) not instrumented
             .env("AFL_SKIP_BIN_CHECK", "1")
             .env("AFL_NO_UI", "1")
+            // Give criu forkserver up to a minute to spawn
+            .env("AFL_FORKSRV_INIT_TMOUT", "60000")
             .spawn()
             .expect("[!] Error while spawning fuzz run")
             .wait()
@@ -391,7 +402,7 @@ impl AFLRun {
         let input_path = if self.previous_state_path == "".to_string() {
             "./in"
         } else {
-            "./out/queue"
+            "./out/main/queue"
         };
 
         for (index, entry) in fs::read_dir(input_path)
@@ -475,12 +486,12 @@ impl AFLRun {
     /// Generate the maps provided by afl-showmap. This is used to filter out
     /// "interesting" new seeds i.e. seeds that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
-    pub fn gen_afl_maps(&self) -> io::Result<Child> {
+    pub fn gen_afl_maps(&self) -> Result<(), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         utils::copy_ignore(
-            format!("./saved-states/{}", self.previous_state_path),
-            format!("./active-state/{}", self.state_path),
+            format!("./saved-states/{}", self.state_path),
+            format!("./active-state"),
         );
 
         // Create a copy of the state folder in `active-state`
@@ -507,34 +518,39 @@ impl AFLRun {
         // later.
         // For the first run fitm-c1s0 "previous_state_path" actually is the
         // upcoming state.
-        let ret = Command::new("../../AFLplusplus/afl-showmap")
+        Command::new("../../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
-                format!("./outputs"),
+                format!("./out/main/queue"),
                 format!("-o"),
                 format!("./out/maps"),
                 format!("-m"),
                 format!("none"),
-                format!("-Q"),
+                format!("-U"),
                 format!("--"),
                 format!("sh"),
                 format!("./restore.sh"),
-                format!("{}", self.previous_state_path),
                 format!("@@"),
             ])
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("CRIU_SNAPSHOT_DIR", "./snapshot") // which folder a snapshot will be saved to
+            // Ignore that sh is not instrumented
             .env("AFL_SKIP_BIN_CHECK", "1")
+            // We want commandline output
             .env("AFL_NO_UI", "1")
+            // Give criu forkserver up to a minute to spawn
+            .env("AFL_FORKSRV_INIT_TMOUT", "60000")
+            // Give me more output
             .env("AFL_DEBUG", "1")
-            .spawn();
+            .spawn()?
+            .wait()?;
+
         sleep(Duration::new(0, 50000000));
 
         // After spawning showmap command we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
-
-        ret
+        Ok(())
     }
 
     pub fn create_new_run(
@@ -645,13 +661,9 @@ pub fn run() {
                 "==== [*] Generating maps for: {} ====",
                 afl_current.state_path
             );
-            let mut child_map = afl_current
+            afl_current
                 .gen_afl_maps()
                 .expect("[!] Failed to start the showmap run");
-
-            child_map
-                .wait()
-                .expect("[!] Error while waiting for the showmap run");
         } else {
             // copy output of first run of binary 1 to in of first run of bin 2
             // as seed
