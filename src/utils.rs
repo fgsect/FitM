@@ -5,30 +5,31 @@ use std::process::Command;
 
 use crate::AFLRun;
 
-pub fn mv(from: String, to: String) {
-    copy(from.clone(), to.clone());
+pub fn mv(from: &str, to: &str) {
+    copy(from, to);
     std::fs::remove_dir_all(&from)
         .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
 }
 
-pub fn copy(from: String, to: String) {
+pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::copy(&from, &to, &options).expect(
         format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str(),
     );
 }
 
-pub fn copy_ignore(from: String, to: String) {
+pub fn copy_ignore(from: &str, to: &str) {
     let options = CopyOptions::new();
     match fs_extra::dir::copy(&from, &to, &options) {
-        _ => {}
+        Err(e) => println!("Ignored error in copy: {:?}", e),
+        _ => (),
     }
 }
 
 //#[allow(dead_code)]
-pub fn rm(dir: String) {
+pub fn rm(dir: &str) {
     Command::new("rm")
-        .args(&["-rf", dir.clone().as_str()])
+        .args(&["-rf", dir])
         .spawn()
         .expect("[!] Could not start removing dir/file")
         .wait()
@@ -137,7 +138,7 @@ mod tests {
         setup(&root_folder, &from_path, &from_content_path, content);
 
         // tested function
-        utils::copy(from_path.clone(), root_folder.clone());
+        utils::copy(&from_path, &root_folder);
 
         // Check that the 'from' path does not exist anymore, but the 'to' path
         // does
@@ -170,7 +171,7 @@ mod tests {
         setup(&root_folder, &from_path, &from_content_path, content);
 
         // tested function
-        utils::mv(from_path.clone(), to_path.clone());
+        utils::mv(&from_path, &to_path);
 
         // Check that the 'from' path does not exist anymore, but the 'to' path
         // does

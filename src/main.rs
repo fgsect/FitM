@@ -40,5 +40,10 @@ fn main() {
         process::exit(0);
     }
 
-    fitm::run();
+    // TODO: use argv to fill these
+    fitm::run(
+        ".",
+        "./tests/targets/pseudoclient_simple",
+        "./tests/targets/pseudoserver_simple",
+    );
 }
