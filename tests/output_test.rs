@@ -15,7 +15,7 @@ fn create_outputs_test() {
     // creating the afl_client object manually would make the test even more
     // precise
     let afl_client: AFLRun = AFLRun::new(
-        (1, 0),
+        (0, 0),
         "tests/targets/echo_server".to_string(),
         1,
         "".to_string(),
