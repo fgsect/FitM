@@ -1,4 +1,4 @@
-use fitm::AFLRun;
+use fitm::{AFLRun, origin_state, ORIGIN_STATE_TUPLE};
 use std::fs;
 
 mod common;
@@ -7,6 +7,52 @@ mod common;
 // As the test does not have access to criu server responses or other logs it
 // relies on the correct creation of various files
 
+/*
+
+    fitm-client -> snapshot() at initial recv
+        --> outputs send stuff
+    fitm-server -> snapshot() at initial recv (server should not send earlier (for now))
+
+    fuzz fitm-server -> c0s1(fitm-client[send stuff])
+        --> outputs c0s1stuff[testcase][u8]
+
+    for testcase in c0s1stuff
+        fuzz fitm-client -> c1s1(c0s1[testcase])
+    
+    fitm-client: origin_state(client)
+    fitm-server: origin_state(server), necessary for criu right now
+        - server_run0 (c0s1)
+            - client_run0 (c1s1)
+                - server_run0 (c1s2)
+                - server_run1 (c1s3) < base state here <<----.
+                    - client_run0 (c2s3)                     |
+                        - server_run0 (c2s5)  ---------------^ << counter for c, s are global
+                    - client_run1 (c3s3)
+                - server_run2 (c1s4)
+                    - client_run1 (c2s4)
+
+    numbers are continouus
+
+    Scripted client, wants to CWD, DELE, MODE
+
+    FTP Example
+    Base snapshot: 
+    fitm-client: sent CWD, rady to recv
+    fitm-server: ready to recv
+
+    step 1: fuzz the server (fitm-server).
+    Client => CWD
+    server: CWD, CWX, DWD, FXX, PORT, ...
+    if new testcase: snapshot(c0s1..c0sn)
+
+    step 2: fuzz the client (fitm-client).
+    Server => [CWD, PORT]
+    client: Unknown command: XOXO -> DELE, CWD with what it expected -> PLZ send file, PORT -> Exit
+
+    step 3: fuzz all servers (c0s1)
+
+
+    */
 #[test]
 fn create_outputs_test() {
     // pwd == root dir of repo
@@ -15,10 +61,10 @@ fn create_outputs_test() {
     // creating the afl_client object manually would make the test even more
     // precise
     let afl_client: AFLRun = AFLRun::new(
-        (0, 1),
+        ORIGIN_STATE_TUPLE,
         "tests/targets/echo_server".to_string(),
         1,
-        "fitm-c0s1".to_string(),
+        origin_state(true).to_string(),
         "".to_string(),
         false,
         false,
@@ -39,15 +85,15 @@ fn create_outputs_test() {
     let first = "a simple string";
     let second = "message 1, upcoming linebreak now:\nmessage 2";
     let third = "foo\tbar";
-    fs::write("./saved-states/fitm-c0s1/outputs/first_case.txt", first)
+    fs::write("./saved-states/fitm-server/outputs/first_case.txt", first)
         .expect("Could not write first input file");
-    fs::write("./saved-states/fitm-c0s1/outputs/second_case.txt", second)
+    fs::write("./saved-states/fitm-server/outputs/second_case.txt", second)
         .expect("Could not write second input file");
-    fs::write("./saved-states/fitm-c0s1/outputs/third_case.txt", third)
+    fs::write("./saved-states/fitm-server/outputs/third_case.txt", third)
         .expect("Could not write third input file");
 
     // tested function
-    afl_client.gen_afl_maps().unwrap();
+    afl_client.gen_afl_maps().expect("Couldn't generate afl maps");
 
     // break here and inspect `active-state/stdout-afl` to see breaking
     // forkserver

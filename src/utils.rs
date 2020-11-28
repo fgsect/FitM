@@ -12,13 +12,10 @@ pub fn mv(from: String, to: String) {
 }
 
 pub fn copy(from: String, to: String) {
-    //let options = CopyOptions::new();
-    Command::new("cp")
-        .args(&[String::from("-r"), from.clone(), to.clone()])
-        .spawn()
-        .expect(format!("[!] Could not copy from {} to {}", from, to).as_str())
-        .wait()
-        .expect("[-] Failed waiting for copy.");
+    let options = CopyOptions::new();
+    fs_extra::dir::copy(&from, &to, &options).expect(
+        format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str(),
+    );
 }
 
 pub fn copy_ignore(from: String, to: String) {
@@ -38,7 +35,7 @@ pub fn rm(dir: String) {
         .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
 }
 
-pub fn copy_snapshot_base(base_state: &String, state_path: &String) -> () {
+pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("./active-state/{}/", state_path);
@@ -60,7 +57,7 @@ pub fn create_restore_sh(afl: &AFLRun) {
         .args(&[
             "create_restore.py".to_string(),
             afl.base_state.to_string(),
-            afl.active_dir.to_string(),
+            afl.state_path.to_string(),
         ])
         .spawn()
         .expect("[!] Could not spawn create_restore.py")
