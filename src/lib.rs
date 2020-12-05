@@ -1,17 +1,17 @@
-use std::env;
 use std::fmt;
 use std::fs;
 use std::io;
+use std::io::Read;
 use std::io::Write;
+use std::iter::FromIterator;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::{env, fs::File};
 
 use fs_extra::dir::*;
 use regex::Regex;
-use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
-use regex::Regex;
 
 pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
@@ -714,18 +714,45 @@ const fn bin_for_gen<'a>(gen_id: u64, server_bin: &'a str, client_bin: &'a str) 
 /// the snapshots of this generation. Starts with 0 for each X
 /// @param gen_id: The generation for which to get all outputs
 /// @return: List of strings, one string per output per state
-fn all_outputs_for_gen(gen_id: u64) -> Vec<&'static str> {
-    let mut all_outputs: Vec<&str> = vec![];
+fn all_outputs_for_gen(gen_id: u64) -> Result<Vec<String>, io::Error> {
     // should match above naming scheme
-    let gen_path = Regex::new(r"gen\d+-state\d+").unwrap();
+    let gen_path = Regex::new(&format!("gen{}-state\\d+", gen_id)).unwrap();
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
-    // for entry in fs::read_dir("./saved-states/gen{gen_id}-state*/outputs")
-    //     .expect("[!] Could not read outputs dir") {
-    //     let entry_path = entry.unwrap().path();
-    //     all_outputs.append(fs::read_to_string(entry_path).to_str());
-    // }
+    Ok(Vec::from_iter(
+        fs::read_dir("./saved-states/")?
+            .into_iter()
+            .filter_map(|result| {
+                if result.is_err() {
+                    return None;
+                }
+                let entry = result.unwrap();
 
-    all_outputs
+                // First, find all legit gen{gen_id}-state dirs
+                if entry.path().is_dir() && gen_path.find(entry.path().to_str()?).is_some() {
+                    // return all files in outpus
+                    Some(entry.path().join("outputs").read_dir().unwrap())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .filter_map(|x| match x {
+                Ok(entry) => {
+                    if !entry.path().is_file() {
+                        None
+                    } else {
+                        let mut buf = String::new();
+                        File::open(entry.path())
+                            .unwrap()
+                            .read_to_string(&mut buf)
+                            .unwrap();
+                        Some(buf)
+                    }
+                }
+                Err(_) => None,
+            })
+            .filter_map(|x| if x.len() > 0 { Some(x) } else { None }),
+    ))
 }
 
 pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io::Error> {
