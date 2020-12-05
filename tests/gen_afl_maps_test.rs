@@ -9,18 +9,18 @@ mod common;
 
 /*
 
-fitm-client -> snapshot() at initial recv
+fitm-gen0-state0 -> snapshot() at initial recv
     --> outputs send stuff
-fitm-server -> snapshot() at initial recv (server should not send earlier (for now))
+fitm-gen1-state0 -> snapshot() at initial recv (server should not send earlier (for now))
 
-fuzz fitm-server -> c0s1(fitm-client[send stuff])
+fuzz fitm-gen1-state0 -> c0s1(fitm-gen0-state0[send stuff])
     --> outputs c0s1stuff[testcase][u8]
 
 for testcase in c0s1stuff
-    fuzz fitm-client -> c1s1(c0s1[testcase])
+    fuzz fitm-gen0-state0 -> c1s1(c0s1[testcase])
 
-fitm-client: origin_state(client)
-fitm-server: origin_state(server), necessary for criu right now
+fitm-gen0-state0: origin_state(client)
+fitm-gen1-state0: origin_state(server), necessary for criu right now
     - server_run0 (c0s1)
         - client_run0 (c1s1)
             - server_run0 (c1s2)
@@ -37,15 +37,15 @@ fitm-server: origin_state(server), necessary for criu right now
 
     FTP Example
     Base snapshot:
-    fitm-client: sent CWD, rady to recv
-    fitm-server: ready to recv
+    fitm-gen0-state0: sent CWD, rady to recv
+    fitm-gen1-state0: ready to recv
 
-    step 1: fuzz the server (fitm-server).
+    step 1: fuzz the server (fitm-gen1-state0).
     Client => CWD
     server: CWD, CWX, DWD, FXX, PORT, ...
     if new testcase: snapshot(c0s1..c0sn)
 
-    step 2: fuzz the client (fitm-client).
+    step 2: fuzz the client (fitm-gen0-state0).
     Server => [CWD, PORT]
     client: Unknown command: XOXO -> DELE, CWD with what it expected -> PLZ send file, PORT -> Exit
 
@@ -61,7 +61,8 @@ fn gen_afl_maps_test() {
     // creating the afl_client object manually would make the test even more
     // precise
     let afl_server: AFLRun = AFLRun::new(
-        ORIGIN_STATE_TUPLE,
+        1,
+        0,
         "tests/targets/echo_server".to_string(),
         1,
         origin_state(true).to_string(),
@@ -84,20 +85,20 @@ fn gen_afl_maps_test() {
     let first = "a simple string";
     let second = "message 1, upcoming linebreak now:\nmessage 2";
     let third = "foo\tbar";
-    fs::create_dir_all("./saved-states/fitm-server/out/main/queue/")
+    fs::create_dir_all("./saved-states/fitm-gen1-state0/out/main/queue/")
         .expect("Could not create queue folder");
     fs::write(
-        "./saved-states/fitm-server/out/main/queue/first_case.txt",
+        "./saved-states/fitm-gen1-state0/out/main/queue/first_case.txt",
         first,
     )
     .expect("Could not write first input file");
     fs::write(
-        "./saved-states/fitm-server/out/main/queue/second_case.txt",
+        "./saved-states/fitm-gen1-state0/out/main/queue/second_case.txt",
         second,
     )
     .expect("Could not write second input file");
     fs::write(
-        "./saved-states/fitm-server/out/main/queue/third_case.txt",
+        "./saved-states/fitm-gen1-state0/out/main/queue/third_case.txt",
         third,
     )
     .expect("Could not write third input file");
@@ -107,9 +108,9 @@ fn gen_afl_maps_test() {
         .gen_afl_maps()
         .expect("Couldn't generate afl maps");
 
-    let map1 = fs::read_to_string("./active-state/fitm-server/out/maps/first_case.txt");
-    let map2 = fs::read_to_string("./active-state/fitm-server/out/maps/second_case.txt");
-    let map3 = fs::read_to_string("./active-state/fitm-server/out/maps/third_case.txt");
+    let map1 = fs::read_to_string("./active-state/fitm-gen1-state0/out/maps/first_case.txt");
+    let map2 = fs::read_to_string("./active-state/fitm-gen1-state0/out/maps/second_case.txt");
+    let map3 = fs::read_to_string("./active-state/fitm-gen1-state0/out/maps/third_case.txt");
 
     // Can't check for exact content since the addresses change depending on the compiler/architecture used for building the tested binary
     assert!(map1.unwrap().contains(":"));

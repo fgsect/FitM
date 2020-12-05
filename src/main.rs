@@ -1,7 +1,7 @@
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::process;
+use std::{env, time::Duration};
 
 fn main() {
     match env::var("USER") {
@@ -41,5 +41,7 @@ fn main() {
         ".",
         "./tests/targets/pseudoclient_simple",
         "./tests/targets/pseudoserver_simple",
-    );
+        Duration::from_secs(10),
+    )
+    .unwrap();
 }

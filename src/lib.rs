@@ -1,4 +1,3 @@
-use std::fmt;
 use std::fs;
 use std::io;
 use std::io::Read;
@@ -7,6 +6,7 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::{env, fs::File};
+use std::{fmt, path::PathBuf};
 
 use fs_extra::dir::*;
 use regex::Regex;
@@ -18,12 +18,16 @@ pub mod utils;
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
 pub const ORIGIN_STATE_TUPLE: (u32, u32) = (0, 0);
-pub const ORIGIN_STATE_SERVER: &str = "fitm-server";
-pub const ORIGIN_STATE_CLIENT: &str = "fitm-client";
+pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen0-state0";
+pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 
 /// AFLRun contains all the information for one specific fuzz run.
 #[derive(Clone)]
 pub struct AFLRun {
+    /// The fitm generation (starting with 0 for the initial client)
+    pub generation: u32,
+    /// The state id, unique in one generation
+    pub state_id: u32,
     /// Path to the base directory of the state of the current fuzz run
     pub state_path: String,
     /// Binary that is being fuzzed
@@ -73,10 +77,12 @@ pub fn origin_state(is_server: bool) -> &'static str {
 }
 
 /// Implementation of functions for an afl run
+/// Createing a new AFLRun will create the necessary directory in active-state
 impl AFLRun {
     /// Create a new afl run instance
     pub fn new(
-        new_state: (u32, u32),
+        generation: u32,
+        state_id: u32,
         target_bin: String,
         timeout: u32,
         previous_state_path: String,
@@ -86,11 +92,7 @@ impl AFLRun {
     ) -> AFLRun {
         let active_dir = origin_state(server);
 
-        let state_path = if new_state == ORIGIN_STATE_TUPLE {
-            origin_state(server).to_string()
-        } else {
-            format!("fitm-c{}s{}", new_state.0, new_state.1)
-        };
+        let state_path = format!("fitm-gen{}-state{}", generation, state_id);
 
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
@@ -141,6 +143,8 @@ impl AFLRun {
         };
 
         let new_run = AFLRun {
+            generation,
+            state_id,
             state_path,
             target_bin,
             timeout,
@@ -299,20 +303,6 @@ impl AFLRun {
             &format!("./saved-states/{}", self.state_path),
             &format!("./active-state/{}", self.state_path),
         );
-
-        // if self.state_path != "fitm-c1s0" {
-        //     utils::copy(
-        //         String::from("./saved-states/fitm-c1s0"),
-        //         String::from("./active-state/"),
-        //     );
-        // }
-
-        // if self.state_path != "fitm-c0s1" {
-        //     utils::copy(
-        //         String::from("./saved-states/fitm-c0s1"),
-        //         String::from("./active-state/"),
-        //     );
-        // }
 
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
@@ -541,7 +531,8 @@ impl AFLRun {
 
     pub fn create_new_run(
         &self,
-        new_state: (u32, u32),
+        generation: u32,
+        state_id: u32,
         input: String,
         timeout: u32,
         from_snapshot: bool,
@@ -557,7 +548,8 @@ impl AFLRun {
         // self.previous and thus create the new state from that
         // snapshot
         let afl = AFLRun::new(
-            new_state,
+            generation,
+            state_id,
             self.target_bin.to_string(),
             timeout,
             self.state_path.clone(),
@@ -655,25 +647,42 @@ impl AFLRun {
 /// Run afl_fuzz for each snapshot with all inputs for the current gen
 /// @param current_snaps: list of snapshots for this stage
 /// @param current_inputs: path to inputs for this stage
-/// @return: Tuple of upcoming inputs + upcoming snaps based on current base snap (client->client, server->server)
+/// @return: upcoming snaps for the next generation based on current snaps (client->client, server->server)
 pub fn process_stage(
     current_snaps: &Vec<AFLRun>,
-    current_inputs: &Vec<u8>,
+    current_inputs: &Vec<PathBuf>,
     run_time: Duration,
-) -> (Vec<String>, Vec<AFLRun>) {
-    let next_inputs: Vec<String> = vec![];
-    let nextnext_snaps: Vec<AFLRun> = vec![];
+) -> Vec<AFLRun> {
+    let next_own_snaps: Vec<AFLRun> = vec![];
 
     for snap in current_snaps {
+
         /*
-                snap.afl_cmin(current_inputs, snap.input_dir())?;
-                ///
-                snap.fuzz_run(inputs)?;
+        snap.afl_cmin(current_inputs + snap.queue, snap.input_dir())?;
+        ///
+        snap.fuzz_run(inputs)?;
+
+        snap.afl_cmin(snap.queue, snap.input_dir())?
+
+        // Python pseudocode for the next steps:
+        for queue_entry in minimized_queue:
+            output = snap.restore().input(queue_entry).run_to_recv().output()
+            if output:
+                next_gen_valid = True
+                next_inputs.append(output)
+
+        # Get all snapshots for the n+1 server run (later)
+        # This could also be done at a later time.
+        for queue_entry in minimized_queue:
+            next_own_snaps.append(
+                snap.restore().input(queue_entry).run_to_recv().snapshot()
+            )
+
 
         */
     }
 
-    (next_inputs, nextnext_snaps)
+    next_own_snaps
 }
 
 /// Originally proposed return value of process_stage()
@@ -682,14 +691,14 @@ pub fn check_stage_advanced(next_inputs: &mut Vec<String>) -> bool {
     !next_inputs.is_empty()
 }
 
-// We begin fuzzing with the server (gen == 0), then client (gen == 1), etc
-// So every odd numbered is a client
-const fn is_client(gen_id: u64) -> bool {
-    gen_id % 2 == 1
+// We begin running the client to the first send (gen == 0), then we fuzz the server (gen == 1), the fuzz the client (gen == 2), etc.
+// So every odd numbered is a server
+const fn is_client(gen_id: usize) -> bool {
+    gen_id % 2 == 0
 }
 
 // Get the (non-minimized) input dir to the generation with id gen_id
-fn generation_input_dir(gen_id: u64) -> String {
+fn generation_input_dir(gen_id: usize) -> String {
     format!("./generation_inputs/{}", gen_id)
 }
 
@@ -699,7 +708,7 @@ fn ensure_dir_exists(dir: &str) {
 }
 
 /// Gets the correct binary for the passed gen_id (server or client bin)
-const fn bin_for_gen<'a>(gen_id: u64, server_bin: &'a str, client_bin: &'a str) -> &'a str {
+const fn bin_for_gen<'a>(gen_id: usize, server_bin: &'a str, client_bin: &'a str) -> &'a str {
     if is_client(gen_id) {
         client_bin
     } else {
@@ -712,11 +721,12 @@ const fn bin_for_gen<'a>(gen_id: u64, server_bin: &'a str, client_bin: &'a str) 
 /// X: identifies the generation, gen_id here
 /// Y: as the generation already identifies which binary is currently fuzzed Y just iterates
 /// the snapshots of this generation. Starts with 0 for each X
-/// @param gen_id: The generation for which to get all outputs
-/// @return: List of strings, one string per output per state
-fn all_outputs_for_gen(gen_id: u64) -> Result<Vec<String>, io::Error> {
+/// @param gen_id: The generation for which to get all inputs
+/// @return: List of paths, one path per output per state
+fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     // should match above naming scheme
-    let gen_path = Regex::new(&format!("gen{}-state\\d+", gen_id)).unwrap();
+    // Look for the last state's output to get the input.
+    let gen_path = Regex::new(&format!("fitm-gen{}-state\\d+", gen_id - 1)).unwrap();
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
     Ok(fs::read_dir("./saved-states/")?
         .into_iter()
@@ -734,32 +744,31 @@ fn all_outputs_for_gen(gen_id: u64) -> Result<Vec<String>, io::Error> {
         .filter_map(|x| x.ok())
         // read all files, return the strings
         .filter(|x| x.path().is_file())
-        .map(|entry| {
-            let mut buf = String::new();
-            File::open(entry.path())
-                .unwrap()
-                .read_to_string(&mut buf)
-                .unwrap();
-            buf
-        })
-        // Ignore empty files
-        .filter(|x| x.len() > 0)
+        .map(|x| x.path())
         .collect())
 }
 
-pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io::Error> {
+/// Run fitm
+/// runtime indicates the time, after which the fuzzer switches to the next entry
+pub fn run(
+    base_path: &str,
+    client_bin: &str,
+    server_bin: &str,
+    run_time: Duration,
+) -> Result<(), io::Error> {
     let cur_timeout = 10;
 
     // set the directory to base_path for all of this criu madness to work.
-    let dir_prev = env::current_dir();
-    env::set_current_dir(base_path);
+    let dir_prev = env::current_dir()?;
+    env::set_current_dir(base_path)?;
 
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
 
     let mut afl_client: AFLRun = AFLRun::new(
-        (1, 0),
+        0,
+        0,
         client_bin.to_string(),
         cur_timeout,
         // TODO: Need some extra handling for this previous_path value
@@ -771,7 +780,8 @@ pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io
     afl_client.init_run();
 
     let afl_server: AFLRun = AFLRun::new(
-        (0, 1),
+        1,
+        0,
         server_bin.to_string(),
         cur_timeout,
         "".to_string(),
@@ -781,12 +791,54 @@ pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io
     );
     afl_server.init_run();
 
-    // TODO: copy input from client to bin_for_gen(0)
+    // TODO: How do we get get the initial client run's output to the right dir?
 
-    let generation_snaps: Vec<Vec<AFLRun>> = vec![];
-    let generation_snaps: Vec<Vec<AFLRun>> = vec![];
+    // We want exactly one output from the client, else something went wrong
+    assert_eq!(input_file_list_for_gen(1)?.len(), 1);
 
-    // TODO: ...
+    let mut generation_snaps: Vec<Vec<AFLRun>> = vec![];
+    generation_snaps.push(vec![afl_client]);
+    generation_snaps.push(vec![afl_server]);
 
-    Ok(())
+    let mut current_gen = 1;
+
+    loop {
+        current_gen = current_gen + 1;
+        if generation_snaps[current_gen].len() == 0 {
+            println!(
+                "No for snapshots (yet) for gen {}, restarting with initial server",
+                current_gen
+            );
+            // Restart with gen 1 -> the client at gen 0 doesn not accept input.
+            current_gen = 1;
+        }
+
+        println!(
+            "Fuzzing {} (gen {})",
+            if is_client(current_gen) {
+                "client"
+            } else {
+                "server"
+            },
+            current_gen
+        );
+
+        let next_other_gen = current_gen + 1;
+        let next_own_gen = current_gen + 2;
+        // Make sure we have vecs for the next client and server generations
+        if next_other_gen == generation_snaps.len() {
+            generation_snaps.push(vec![])
+        }
+        if next_own_gen == generation_snaps.len() {
+            generation_snaps.push(vec![])
+        }
+
+        let mut next_snaps = process_stage(
+            &generation_snaps[current_gen],
+            &input_file_list_for_gen(current_gen)?,
+            run_time,
+        );
+
+        generation_snaps[next_own_gen].append(&mut next_snaps);
+    }
 }
