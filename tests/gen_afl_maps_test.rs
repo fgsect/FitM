@@ -1,4 +1,4 @@
-use fitm::{origin_state, AFLRun, ORIGIN_STATE_TUPLE};
+use fitm::{origin_state, AFLRun};
 use std::fs;
 
 mod common;

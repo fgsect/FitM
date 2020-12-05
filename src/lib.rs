@@ -1,11 +1,9 @@
+use std::env;
 use std::fs;
 use std::io;
-use std::io::Read;
 use std::io::Write;
-use std::iter::FromIterator;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
 
 use fs_extra::dir::*;
@@ -17,7 +15,6 @@ pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
-pub const ORIGIN_STATE_TUPLE: (u32, u32) = (0, 0);
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen0-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 
@@ -766,7 +763,7 @@ pub fn run(
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
 
-    let mut afl_client: AFLRun = AFLRun::new(
+    let afl_client: AFLRun = AFLRun::new(
         0,
         0,
         client_bin.to_string(),

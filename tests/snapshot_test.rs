@@ -1,4 +1,4 @@
-use fitm::{utils, AFLRun, ORIGIN_STATE_TUPLE};
+use fitm::{utils, AFLRun};
 mod common;
 
 use fs_extra::dir::CopyOptions;
