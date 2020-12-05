@@ -8,6 +8,7 @@ use std::process::{Command, Stdio};
 
 use fs_extra::dir::*;
 use regex::Regex;
+use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
 
