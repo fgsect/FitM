@@ -718,40 +718,33 @@ fn all_outputs_for_gen(gen_id: u64) -> Result<Vec<String>, io::Error> {
     // should match above naming scheme
     let gen_path = Regex::new(&format!("gen{}-state\\d+", gen_id)).unwrap();
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
-    Ok(Vec::from_iter(
-        fs::read_dir("./saved-states/")?
-            .into_iter()
-            .filter_map(|x| match x {
-                Ok(entry) => {
-                    // First, find all legit gen{gen_id}-state dirs
-                    if entry.path().is_dir() && gen_path.find(entry.path().to_str()?).is_some() {
-                        // return all files in outpus
-                        Some(entry.path().join("outputs").read_dir().unwrap())
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => None,
-            })
-            // We now have an iterator of directories of files, flatten to iterator of files
-            .flatten()
-            .filter_map(|x| match x {
-                Ok(entry) => {
-                    if !entry.path().is_file() {
-                        None
-                    } else {
-                        let mut buf = String::new();
-                        File::open(entry.path())
-                            .unwrap()
-                            .read_to_string(&mut buf)
-                            .unwrap();
-                        Some(buf)
-                    }
-                }
-                Err(_) => None,
-            })
-            .filter_map(|x| if x.len() > 0 { Some(x) } else { None }),
-    ))
+    Ok(fs::read_dir("./saved-states/")?
+        .into_iter()
+        // Ignore errors
+        .filter_map(|x| x.ok())
+        // First, find all legit gen{gen_id}-state dirs
+        .filter(|entry| {
+            entry.path().is_dir() && gen_path.find(entry.path().to_str().unwrap()).is_some()
+        })
+        // return all files in outpus
+        .map(|entry| entry.path().join("outputs").read_dir().unwrap())
+        // We now have an iterator of directories of files, flatten to iterator of files
+        .flatten()
+        // Ignore more errors
+        .filter_map(|x| x.ok())
+        // read all files, return the strings
+        .filter(|x| x.path().is_file())
+        .map(|entry| {
+            let mut buf = String::new();
+            File::open(entry.path())
+                .unwrap()
+                .read_to_string(&mut buf)
+                .unwrap();
+            buf
+        })
+        // Ignore empty files
+        .filter(|x| x.len() > 0)
+        .collect())
 }
 
 pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io::Error> {
