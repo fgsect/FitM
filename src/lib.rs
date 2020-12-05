@@ -721,20 +721,19 @@ fn all_outputs_for_gen(gen_id: u64) -> Result<Vec<String>, io::Error> {
     Ok(Vec::from_iter(
         fs::read_dir("./saved-states/")?
             .into_iter()
-            .filter_map(|result| {
-                if result.is_err() {
-                    return None;
+            .filter_map(|x| match x {
+                Ok(entry) => {
+                    // First, find all legit gen{gen_id}-state dirs
+                    if entry.path().is_dir() && gen_path.find(entry.path().to_str()?).is_some() {
+                        // return all files in outpus
+                        Some(entry.path().join("outputs").read_dir().unwrap())
+                    } else {
+                        None
+                    }
                 }
-                let entry = result.unwrap();
-
-                // First, find all legit gen{gen_id}-state dirs
-                if entry.path().is_dir() && gen_path.find(entry.path().to_str()?).is_some() {
-                    // return all files in outpus
-                    Some(entry.path().join("outputs").read_dir().unwrap())
-                } else {
-                    None
-                }
+                Err(_) => None,
             })
+            // We now have an iterator of directories of files, flatten to iterator of files
             .flatten()
             .filter_map(|x| match x {
                 Ok(entry) => {
