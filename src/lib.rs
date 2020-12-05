@@ -11,6 +11,7 @@ use regex::Regex;
 use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
+use regex::Regex;
 
 pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
