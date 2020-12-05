@@ -1,4 +1,3 @@
-use std::collections::{BTreeSet, VecDeque};
 use std::env;
 use std::fmt;
 use std::fs;
@@ -8,6 +7,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use fs_extra::dir::*;
+use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -653,16 +653,15 @@ impl AFLRun {
 /// Run afl_fuzz for each snapshot with all inputs for the current gen
 /// @param current_snaps: list of snapshots for this stage
 /// @param current_inputs: path to inputs for this stage
-/// @param next_inputs: (out) list of inputs for the next stage (client->server//server->client)
-/// @param nextnext_snaps: (out) list of snapshots based off of this base snap (client->client, server->server)
-/// @return: False, if we didn't advance to the next generation (no more output)
+/// @return: Tuple of upcoming inputs + upcoming snaps based on current base snap (client->client, server->server)
 pub fn process_stage(
     current_snaps: &Vec<AFLRun>,
     current_inputs: &Vec<u8>,
-    next_inputs: &mut Vec<String>,
-    nextnext_snaps: &mut Vec<AFLRun>,
     run_time: Duration,
-) -> Result<(), io::Error> {
+) -> (Vec<String>, Vec<AFLRun>) {
+    let next_inputs: Vec<String> = vec![];
+    let nextnext_snaps: Vec<AFLRun> = vec![];
+
     for snap in current_snaps {
         /*
                 snap.afl_cmin(current_inputs, snap.input_dir())?;
@@ -672,7 +671,13 @@ pub fn process_stage(
         */
     }
 
-    Ok(())
+    (next_inputs, nextnext_snaps)
+}
+
+/// Originally proposed return value of process_stage()
+/// @return: False, if we didn't advance to the next generation (no more output)
+pub fn check_stage_advanced(next_inputs: &mut Vec<String>) -> bool {
+    !next_inputs.is_empty()
 }
 
 // We begin fuzzing with the server (gen == 0), then client (gen == 1), etc
@@ -688,15 +693,37 @@ fn generation_input_dir(gen_id: u64) -> String {
 
 // Make sure the given folder exists
 fn ensure_dir_exists(dir: &str) {
-    fs_extra::dir::create_all(dir, false);
+    fs_extra::dir::create_all(dir, false).expect("Could not create dir");
 }
 
+/// Gets the correct binary for the passed gen_id (server or client bin)
 const fn bin_for_gen<'a>(gen_id: u64, server_bin: &'a str, client_bin: &'a str) -> &'a str {
     if is_client(gen_id) {
         client_bin
     } else {
         server_bin
     }
+}
+
+/// Naming scheme:
+/// genX-stateY
+/// X: identifies the generation, gen_id here
+/// Y: as the generation already identifies which binary is currently fuzzed Y just iterates
+/// the snapshots of this generation. Starts with 0 for each X
+/// @param gen_id: The generation for which to get all outputs
+/// @return: List of strings, one string per output per state
+fn all_outputs_for_gen(gen_id: u64) -> Vec<&'static str> {
+    let mut all_outputs: Vec<&str> = vec![];
+    // should match above naming scheme
+    let gen_path = Regex::new(r"gen\d+-state\d+").unwrap();
+    // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
+    // for entry in fs::read_dir("./saved-states/gen{gen_id}-state*/outputs")
+    //     .expect("[!] Could not read outputs dir") {
+    //     let entry_path = entry.unwrap().path();
+    //     all_outputs.append(fs::read_to_string(entry_path).to_str());
+    // }
+
+    all_outputs
 }
 
 pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io::Error> {
