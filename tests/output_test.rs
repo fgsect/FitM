@@ -40,8 +40,8 @@ fn create_outputs_test() {
 
     afl_client.create_outputs();
 
-    for path in fs::read_dir("./active-state/fitm-client/outputs")
-        .expect("Couldn't read outputs dir")
+    for path in
+        fs::read_dir("./active-state/fitm-client/outputs").expect("Couldn't read outputs dir")
     {
         let file_path = path.as_ref().unwrap().path();
         let file_content = std::fs::read_to_string(&file_path)

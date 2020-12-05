@@ -13,9 +13,8 @@ pub fn mv(from: &str, to: &str) {
 
 pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
-    fs_extra::dir::copy(&from, &to, &options).expect(
-        format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str(),
-    );
+    fs_extra::dir::copy(&from, &to, &options)
+        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
 }
 
 pub fn copy_ignore(from: &str, to: &str) {
@@ -49,8 +48,7 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old pipes file so restore.sh knows which pipes are open
     let old_pipes = format!("./saved-states/{}/pipes", base_state);
     let new_pipes = format!("./active-state/{}/pipes", state_path);
-    fs::copy(old_pipes, new_pipes)
-        .expect("[!] Could not copy old pipes file to new state-dir");
+    fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
 }
 
 pub fn create_restore_sh(afl: &AFLRun) {
@@ -70,10 +68,7 @@ pub fn create_restore_sh(afl: &AFLRun) {
 /// we will increment the state for the server from fitm-cXsY to fitm-cXsY+1.
 /// Otherwise we will increment the state for the client from fitm-cXsY to
 /// fitm-cX+1sY
-pub fn next_state_path(
-    state_path: (u32, u32),
-    cur_is_server: bool,
-) -> (u32, u32) {
+pub fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32) {
     // If inc_server increment the server state else increment the client state
     if cur_is_server {
         ((state_path.0) + 1, state_path.1)
@@ -88,25 +83,18 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    fn setup(
-        root_folder: &str,
-        from_path: &str,
-        from_content_path: &str,
-        content: &str,
-    ) {
+    fn setup(root_folder: &str, from_path: &str, from_content_path: &str, content: &str) {
         // setup - require user interaction so we don't delete anything by
         // default Creates necessary files/folders under /tmp
-        fs_extra::dir::create(root_folder, false).expect("rust_unittest folder already exists, please remove to make this test run");
-        fs_extra::dir::create_all(from_path, true)
-            .expect("Could not create test folder");
-        fs::write(from_content_path, content)
-            .expect("Could not write to 'from' content.txt");
+        fs_extra::dir::create(root_folder, false)
+            .expect("rust_unittest folder already exists, please remove to make this test run");
+        fs_extra::dir::create_all(from_path, true).expect("Could not create test folder");
+        fs::write(from_content_path, content).expect("Could not write to 'from' content.txt");
     }
 
     fn teardown(root_folder: &String) {
         // Remove all files created during the test
-        std::fs::remove_dir_all(root_folder)
-            .expect("Could not remove rust_unittest folder");
+        std::fs::remove_dir_all(root_folder).expect("Could not remove rust_unittest folder");
     }
 
     fn paths_exist(root_folder: &String, to_content_path: &String) -> bool {
@@ -119,8 +107,7 @@ mod tests {
 
     fn check_is_dir(to_path: &String) -> bool {
         // Returns true if the given path points to a directory
-        let metadata =
-            fs::metadata(to_path).expect("Could not find copy 'to' folder");
+        let metadata = fs::metadata(to_path).expect("Could not find copy 'to' folder");
         metadata.file_type().is_dir()
     }
 
@@ -203,8 +190,7 @@ mod tests {
         let foo_path = format!("{}/foo", root_folder);
 
         // tested function
-        std::fs::remove_dir_all(&foo_path)
-            .expect("Tested remove_dir_all failed");
+        std::fs::remove_dir_all(&foo_path).expect("Tested remove_dir_all failed");
 
         assert_eq!(Path::new(&foo_path).exists(), false);
 

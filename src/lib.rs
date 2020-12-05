@@ -152,8 +152,7 @@ impl AFLRun {
         // We can write a tool in the future to parse this info
         // and print a visualization of the state order
         let path = format!("./active-state/{}/run-info", new_run.state_path);
-        let mut file =
-            fs::File::create(path).expect("[!] Could not create aflrun file");
+        let mut file = fs::File::create(path).expect("[!] Could not create aflrun file");
         file.write(format!("{:?}", new_run).as_bytes())
             .expect("[!] Could not write to aflrun file");
 
@@ -167,13 +166,8 @@ impl AFLRun {
         // remove_dir_all panics if the target does not exist.
         // To still catch errors if sth goes wrong a match is used here.
         match std::fs::remove_dir_all(existing_path.clone()) {
-            Result::Ok(_) => {
-                println!("[!] Successfully deleted path: {}", existing_path)
-            }
-            Result::Err(err) => println!(
-                "[!] Error while deleting old base state folder: {}",
-                err
-            ),
+            Result::Ok(_) => println!("[!] Successfully deleted path: {}", existing_path),
+            Result::Err(err) => println!("[!] Error while deleting old base state folder: {}", err),
         }
 
         // copy old snapshot folder for criu
@@ -196,8 +190,7 @@ impl AFLRun {
         let stdin = fs::File::open(dev_null).unwrap();
 
         // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
+        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
 
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout").unwrap();
@@ -251,8 +244,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
+        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
 
         let stdin_file = fs::File::open(stdin.clone()).unwrap();
         // Open a file for stdout and stderr to log to
@@ -265,8 +257,7 @@ impl AFLRun {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
-        let snapshot_dir =
-            format!("{}/snapshot", env::current_dir().unwrap().display());
+        let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
 
         let _ = Command::new("setsid")
             .args(&[
@@ -396,8 +387,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // For consistency, change into necessary dir inside the function
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
+        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
 
         // For the binary that creates the seed we need to take input from the
         // in folder
@@ -441,8 +431,8 @@ impl AFLRun {
             fs::File::create("stderr").unwrap();
 
             let entry_path = entry_unwrapped.path();
-            let entry_file = fs::File::open(entry_path.clone())
-                .expect("[!] Could not open queue file");
+            let entry_file =
+                fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
             println!("using output: {:?}", entry_path);
             let _ = Command::new("setsid")
                 .args(&[
@@ -466,18 +456,11 @@ impl AFLRun {
             // Didn't investigate further.
             sleep(Duration::new(0, 50000000));
 
-            for entry in fs::read_dir("./fd")
-                .expect("[!] Could not read populated fd folder")
-            {
+            for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
                 let cur_file = entry.unwrap().file_name();
                 let from = format!("./fd/{}", &cur_file.to_str().unwrap());
-                let to = format!(
-                    "./outputs/{}_{}",
-                    index,
-                    &cur_file.to_str().unwrap()
-                );
-                fs::copy(from, to)
-                    .expect("[!] Could not copy output file to outputs folder");
+                let to = format!("./outputs/{}_{}", index, &cur_file.to_str().unwrap());
+                fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
             }
         }
 
@@ -505,8 +488,7 @@ impl AFLRun {
 
         utils::create_restore_sh(self);
         // Change into our state directory and generate the afl maps there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
+        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
 
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout-afl").unwrap();
@@ -562,8 +544,7 @@ impl AFLRun {
         timeout: u32,
         from_snapshot: bool,
     ) -> AFLRun {
-        let input_path: String =
-            format!("active-state/{}/outputs/{}", self.state_path, input);
+        let input_path: String = format!("active-state/{}/outputs/{}", self.state_path, input);
 
         // Only mutate cur_state in this method. So next_state_path gets a
         // readable copy. We update cur_state here with a new tuple.
@@ -583,11 +564,9 @@ impl AFLRun {
             from_snapshot,
         );
 
-        let seed_file_path =
-            format!("active-state/{}/in/{}", afl.state_path, input);
+        let seed_file_path = format!("active-state/{}/in/{}", afl.state_path, input);
 
-        fs::copy(input_path, &seed_file_path)
-            .expect("[!] Could not copy to new afl.state_path");
+        fs::copy(input_path, &seed_file_path).expect("[!] Could not copy to new afl.state_path");
 
         // let seed_file = fs::File::open(seed_file_path)
         //     .expect("[!] Could not create input file");
@@ -600,11 +579,7 @@ impl AFLRun {
     /// Start a single fuzz run in afl which gets restored from an earlier
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
-    fn afl_cmin(
-        &self,
-        input_dir: &str,
-        output_dir: &str,
-    ) -> Result<(), io::Error> {
+    fn afl_cmin(&self, input_dir: &str, output_dir: &str) -> Result<(), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         utils::copy(
@@ -621,8 +596,7 @@ impl AFLRun {
         utils::create_restore_sh(self);
 
         // Change into our state directory and create fuzz run from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))
-            .unwrap();
+        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
 
         // Open a file for stdout and stderr to log to
         let stdout = fs::File::create("stdout-afl").unwrap();
@@ -717,11 +691,7 @@ fn ensure_dir_exists(dir: &str) {
     fs_extra::dir::create_all(dir, false);
 }
 
-const fn bin_for_gen<'a>(
-    gen_id: u64,
-    server_bin: &'a str,
-    client_bin: &'a str,
-) -> &'a str {
+const fn bin_for_gen<'a>(gen_id: u64, server_bin: &'a str, client_bin: &'a str) -> &'a str {
     if is_client(gen_id) {
         client_bin
     } else {
@@ -729,11 +699,7 @@ const fn bin_for_gen<'a>(
     }
 }
 
-pub fn run(
-    base_path: &str,
-    client_bin: &str,
-    server_bin: &str,
-) -> Result<(), io::Error> {
+pub fn run(base_path: &str, client_bin: &str, server_bin: &str) -> Result<(), io::Error> {
     let cur_timeout = 10;
 
     // set the directory to base_path for all of this criu madness to work.

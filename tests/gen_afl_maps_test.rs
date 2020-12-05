@@ -72,14 +72,13 @@ fn gen_afl_maps_test() {
 
     afl_server.init_run();
 
-    std::fs::remove_dir_all(format!("active-state/{}", &afl_server.state_path))
-        .expect(
-            format!(
-                "Could not remove '{}' in gen_afl_maps_test",
-                &afl_server.state_path
-            )
-            .as_str(),
-        );
+    std::fs::remove_dir_all(format!("active-state/{}", &afl_server.state_path)).expect(
+        format!(
+            "Could not remove '{}' in gen_afl_maps_test",
+            &afl_server.state_path
+        )
+        .as_str(),
+    );
 
     // populate in folder here
     let first = "a simple string";
@@ -108,15 +107,9 @@ fn gen_afl_maps_test() {
         .gen_afl_maps()
         .expect("Couldn't generate afl maps");
 
-    let map1 = fs::read_to_string(
-        "./active-state/fitm-server/out/maps/first_case.txt",
-    );
-    let map2 = fs::read_to_string(
-        "./active-state/fitm-server/out/maps/second_case.txt",
-    );
-    let map3 = fs::read_to_string(
-        "./active-state/fitm-server/out/maps/third_case.txt",
-    );
+    let map1 = fs::read_to_string("./active-state/fitm-server/out/maps/first_case.txt");
+    let map2 = fs::read_to_string("./active-state/fitm-server/out/maps/second_case.txt");
+    let map3 = fs::read_to_string("./active-state/fitm-server/out/maps/third_case.txt");
 
     // Can't check for exact content since the addresses change depending on the compiler/architecture used for building the tested binary
     assert!(map1.unwrap().contains(":"));
