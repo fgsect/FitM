@@ -2334,7 +2334,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         free(buff);
         fclose(f);
 
-
+        // untested, may need debugging
+        close(0);
         do_criu();
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
@@ -6348,6 +6349,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 free(buff);
                 fclose(f);
 
+                // untested, may need debugging
+                close(0);
                 do_criu();
                 // Weird bug making criu restore crash - this solves it
                 sleep(0.2);
