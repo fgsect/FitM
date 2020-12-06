@@ -37,11 +37,13 @@ fn main() {
     }
 
     // TODO: use argv to fill these
-    fitm::run(
+    match fitm::run(
         ".",
         "./tests/targets/pseudoclient_simple",
         "./tests/targets/pseudoserver_simple",
         Duration::from_secs(10),
-    )
-    .unwrap();
+    ) {
+        Err(e) => println!("Error {:?}", e),
+        _ => {},
+    }
 }
