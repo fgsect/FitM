@@ -162,6 +162,18 @@ impl AFLRun {
         new_run
     }
 
+    /// Copies everything in ./fd to ./outputs/
+    /// this is used on the initial client state to generate intitial inputs for the first server run
+    fn copy_fds_to_output(&self) -> Result<(), io::Error> {
+        for (i, entry) in fs::read_dir(&format!("./saved-states/{}/fd", self.state_path))?.enumerate() {
+            let path = entry?.path();
+            if path.is_file() {
+                std::fs::copy(path, &format!("./saved-states/{}/outputs/initial{}", self.state_path, i))?;
+            }
+        }
+        Ok(())
+    }
+
     fn copy_base_state(&self) -> () {
         // Cleanstill existing base state folders in active-state
         let existing_path = format!("./active-state/{}", self.active_dir);
@@ -775,6 +787,8 @@ pub fn run(
         false,
     );
     afl_client.init_run();
+    // Probably: Move ./fd files (hopefully just one) to ./outputs folder
+    afl_client.copy_fds_to_output()?;
 
     let afl_server: AFLRun = AFLRun::new(
         1,
@@ -788,10 +802,8 @@ pub fn run(
     );
     afl_server.init_run();
 
-    // TODO: How do we get get the initial client run's output to the right dir?
-
-    // We want exactly one output from the client, else something went wrong
-    assert_eq!(input_file_list_for_gen(1)?.len(), 1);
+    // We need initial outputs from the client, else something went wrong
+    assert_ne!(input_file_list_for_gen(1)?.len(), 0);
 
     let mut generation_snaps: Vec<Vec<AFLRun>> = vec![];
     generation_snaps.push(vec![afl_client]);
@@ -820,7 +832,9 @@ pub fn run(
             current_gen
         );
 
+        // outputs of current gen (i.e. client) --> inputs[current_gen+1] (i.e. server)
         let next_other_gen = current_gen + 1;
+        // snapshots based on current_gen (i.e. client) --> snaps[current_gen+2] (client)
         let next_own_gen = current_gen + 2;
         // Make sure we have vecs for the next client and server generations
         if next_other_gen == generation_snaps.len() {

@@ -30,18 +30,18 @@ echo_server:
 pseudotest_simple: pseudoserver_simple pseudoclient_simple
 
 pseudoserver_simple: clean
-	gcc -o targets/pseudoserver targets/pseudoserver_simple.c
+	gcc -o targets/pseudoserver_simple targets/pseudoserver_simple.c
 
 pseudoclient_simple: clean
-	gcc -o targets/pseudoclient targets/pseudoclient_simple.c
+	gcc -o targets/pseudoclient_simple targets/pseudoclient_simple.c
 
 pseudotest_complex: pseudoserver_complex pseudoclient_complex
 
 pseudoserver_complex: clean
-	gcc -o targets/pseudoserver targets/pseudoserver_complex.c
+	gcc -o targets/pseudoserver_complex targets/pseudoserver_complex.c
 
 pseudoclient_complex: clean
-	gcc -o targets/pseudoclient targets/pseudoclient_complex.c
+	gcc -o targets/pseudoclient_complex targets/pseudoclient_complex.c
 
 test_criupipe: clean
 	gcc -o pipe pipe.c
