@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -x
+set -x
 # This file has to write the entire env into the envfile
 # Expects relative path to state folder it's supposed to restore as arg
 # TODO: Clean this up, this looks/is ugly
@@ -12,10 +12,14 @@ pwd
 PIPE1=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
 PIPE2=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
-# echo "======="
-# ls -la /proc/self/fd
-# echo $@
-# echo "======="
+#echo "======="
+#cp $INPUT_FILENAME /tmp
+#ls -la
+#echo $INPUT_FILENAME
+#ls -la /proc/self/fd
+#pwd
+#echo $@
+#echo "======="
 
 echo -n "" > ./out/.cur_input
 

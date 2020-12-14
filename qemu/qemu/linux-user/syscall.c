@@ -2339,6 +2339,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         do_criu();
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
+
         if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
@@ -2359,14 +2360,18 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
             printf("fatal: could not fopen INPUT_FILENAME: %s\n", input);
             exit(1);
         }
+
         int input_fd = fileno(input_file);
-        if(!input_fd){
+        if(input_fd == -1){
             printf("fatal: could not: %s\n", input);
             perror("fatal: could not fileno INPUT_FILENAME");
             exit(1);
         }
-        dup2(input_fd, 0);
-        close(input_fd);
+        // An open may result in INPUT_FILENAME at fd 0 if 0 is not used before calling fopen
+        if(input_fd){
+            dup2(input_fd, 0);
+            close(input_fd);
+        }
     }
     // read did not read anything without setting FD to the beginning of the file.
 //    lseek(0, 0, SEEK_SET);
@@ -6354,6 +6359,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 do_criu();
                 // Weird bug making criu restore crash - this solves it
                 sleep(0.2);
+                system("touch /tmp/after_docriu");
 
                 if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
                     exit(0);

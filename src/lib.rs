@@ -640,6 +640,8 @@ impl AFLRun {
             .env("AFL_NO_UI", "1")
             // Give criu forkserver up to a minute to spawn
             .env("AFL_FORKSRV_INIT_TMOUT", "60000")
+            .env("AFL_DEBUG_CHILD_OUTPUT", "1")
+            .env("AFL_DEBUG", "1")
             .spawn()?
             .wait()?;
 
@@ -690,7 +692,7 @@ pub fn process_stage(
 
         */
 
-        let cmin_tmp_dir = format!("./cmin-tmp");
+        let cmin_tmp_dir = format!("cmin-tmp");
 
         // remove old tmp if it exists, then recreate
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
