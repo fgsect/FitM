@@ -708,10 +708,11 @@ pub fn process_stage(
 
         // cmin all files to the in dir
         let _ = std::fs::remove_dir_all(&format!("./saved-states/{}/in", snap.state_path));
-        snap.afl_cmin(
-            &cmin_tmp_dir,
-            &format!("./saved-states/{}/in", snap.state_path),
-        )?;
+
+        let saved_state_dir = &format!("saved-states/{}/in", snap.state_path);
+        let output_dir = Path::new(&saved_state_dir).as_os_str().to_str().unwrap();
+
+        snap.afl_cmin(&cmin_tmp_dir, &output_dir)?;
 
         snap.fuzz_run()?; //TODO: inputs)?;
 
