@@ -357,7 +357,7 @@ impl AFLRun {
                 // At what time to stop this afl run
                 format!("-V"),
                 format!("{}", self.timeout),
-                // Timeout per indiviudal execution
+                // Timeout per individual execution
                 format!("-t"),
                 format!("1000"),
                 format!("--"),
@@ -386,7 +386,7 @@ impl AFLRun {
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../"))?;
 
-        println!("==== [*] Generating outputs for: {} ====", self.state_path);
+        // println!("==== [*] Generating outputs for: {} ====", self.state_path);
         //self.create_outputs();
 
         Ok(())
