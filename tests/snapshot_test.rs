@@ -1,4 +1,4 @@
-use fitm::{utils, AFLRun};
+use fitm::{utils, FITMSnapshot};
 mod common;
 
 use fs_extra::dir::CopyOptions;
@@ -23,7 +23,7 @@ fn init_run_test() {
 
     // creating the afl_client object manually would make the test even more
     // precise
-    let afl_client: AFLRun = AFLRun::new(
+    let afl_client: FITMSnapshot = FITMSnapshot::new(
         0,
         0,
         "tests/targets/pseudoclient".to_string(),
@@ -48,7 +48,7 @@ fn init_run_test() {
         .expect("stderr file missing");
 
     // expected outputs
-    let run_info_expected = "AFLRun { state_path: \"fitm-gen0-state0\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false, active_dir: \"fitm-gen0-state0\" }";
+    let run_info_expected = "FITMSnapshot { state_path: \"fitm-gen0-state0\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false, active_dir: \"fitm-gen0-state0\" }";
 
     // the regex matches e.g. "pipe:[123456]\npipe:[7890]\n"
     // \d{3,7} - 3 to 7 decimal digits
@@ -72,26 +72,26 @@ fn init_run_test() {
     common::teardown();
 }
 
-// create_new_run_test checks if the method with the same name works correctly
+// create_next_snapshot_test checks if the method with the same name works correctly
 // and the produced snapshot can be restored using restore.sh
 
 #[test]
-fn create_new_run_test() {
+fn create_next_snapshot_test() {
     // pwd == root dir of repo
     common::setup();
 
-    // We need this folder as AFLRun::new copies the fd folder from there
+    // We need this folder as FITMSnapshot::new copies the fd folder from there
     let base_state = "fitm-gen0-state0";
     fs_extra::dir::create_all(format!("./saved-states/{}/fd", base_state), false)
         .expect("Could not create dummy fd folder");
 
     // creating the afl_client object manually would make the test even more
     // precise previous_state needs to be the same as base_state as
-    // create_new_run would normally generate new AFLRuns for the opposite
+    // create_next_snapshot would normally generate new FITMSnapshots for the opposite
     // binary to the one currently fuzzed. So if bin 1 was just fuzzed,
     // consolidated and produced new outputs (and thus new paths in bin 2),
-    // then create_new_run would produce new AFLRuns based on binary 2.
-    let afl_client: AFLRun = AFLRun::new(
+    // then create_next_snapshot would produce new FITMSnapshots based on binary 2.
+    let afl_client: FITMSnapshot = FITMSnapshot::new(
         0,
         0,
         "tests/targets/snapshot_creation".to_string(),
@@ -123,7 +123,7 @@ fn create_new_run_test() {
     assert_eq!(stderr, stderr_expected);
 
     let outputs_file = "foo.out";
-    let _ = File::create(format!(
+    File::create(format!(
         "./active-state/{}/outputs/{}",
         afl_client.state_path, outputs_file
     ))
@@ -131,7 +131,7 @@ fn create_new_run_test() {
 
     // let input = format!("./in/{}", input_filepath);
     // tested function
-    let new_run = afl_client.create_new_run(
+    let new_run = afl_client.create_next_snapshot(
         afl_client.generation + 2,
         1,
         outputs_file.to_string(),
@@ -140,7 +140,7 @@ fn create_new_run_test() {
     );
 
     assert_eq!(new_run.state_path, "fitm-c1s0");
-    // As long as target_bin selection in create_new_run is hardcoded,
+    // As long as target_bin selection in create_next_snapshot is hardcoded,
     // this is what's expected at this point
     assert_eq!(new_run.target_bin, "tests/targets/snapshot_creation");
     assert_eq!(new_run.previous_state_path, "fitm-gen0-state0");
@@ -158,7 +158,7 @@ fn create_new_run_test() {
     // Restore the snapshotted process, because only by doing so can we be sure
     // that the snapshot actually worked
     env::set_current_dir(format!("./active-state/{}", new_run.state_path)).unwrap();
-    let _ = Command::new("sh")
+    Command::new("sh")
         .args(&[
             format!("../../restore.sh"),
             format!("{}", new_run.state_path),

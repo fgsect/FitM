@@ -18,13 +18,13 @@ pub mod utils;
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen0-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 
-/// AFLRun contains all the information for one specific fuzz run.
+/// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
-pub struct AFLRun {
+pub struct FITMSnapshot {
     /// The fitm generation (starting with 0 for the initial client)
     pub generation: u32,
     /// The state id, unique in one generation
-    pub state_id: u32,
+    pub state_id: usize,
     /// Path to the base directory of the state of the current fuzz run
     pub state_path: String,
     /// Binary that is being fuzzed
@@ -34,7 +34,7 @@ pub struct AFLRun {
     /// Timeout for this run
     /// TODO: probably should be dynamic based on how interesting this state
     /// is.
-    pub timeout: u32,
+    pub timeout: Duration,
     // All the states that came out of the current state
     // child_states: Vec<(u32, u32)>
     /// Used to determine whether to increase first or second value of state
@@ -49,9 +49,9 @@ pub struct AFLRun {
     pub active_dir: &'static str,
 }
 
-impl fmt::Debug for AFLRun {
+impl fmt::Debug for FITMSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AFLRun")
+        f.debug_struct("FITMSnapshot")
             .field("state_path", &self.state_path)
             .field("previous_state_path", &self.previous_state_path)
             .field("base_state", &self.base_state)
@@ -74,19 +74,19 @@ pub fn origin_state(is_server: bool) -> &'static str {
 }
 
 /// Implementation of functions for an afl run
-/// Createing a new AFLRun will create the necessary directory in active-state
-impl AFLRun {
+/// Createing a new FITMSnapshot will create the necessary directory in active-state
+impl FITMSnapshot {
     /// Create a new afl run instance
     pub fn new(
         generation: u32,
-        state_id: u32,
+        state_id: usize,
         target_bin: String,
-        timeout: u32,
+        timeout: Duration,
         previous_state_path: String,
         base_state: String,
         server: bool,
         from_snapshot: bool,
-    ) -> AFLRun {
+    ) -> FITMSnapshot {
         let active_dir = origin_state(server);
 
         let state_path = format!("fitm-gen{}-state{}", generation, state_id);
@@ -139,7 +139,7 @@ impl AFLRun {
                 .expect("[-] Could not create snapshot dir!");
         };
 
-        let new_run = AFLRun {
+        let new_run = FITMSnapshot {
             generation,
             state_id,
             state_path,
@@ -155,9 +155,9 @@ impl AFLRun {
         // We can write a tool in the future to parse this info
         // and print a visualization of the state order
         let path = format!("./active-state/{}/run-info", new_run.state_path);
-        let mut file = fs::File::create(path).expect("[!] Could not create aflrun file");
+        let mut file = fs::File::create(path).expect("[!] Could not create FITMSnapshot file");
         file.write(format!("{:?}", new_run).as_bytes())
-            .expect("[!] Could not write to aflrun file");
+            .expect("[!] Could not write to FITMSnapshot file");
 
         new_run
     }
@@ -182,7 +182,8 @@ impl AFLRun {
     /// Copies everything in ./fd to ./outputs/
     /// this is used on the initial client state to generate intitial inputs for the first server run
     fn copy_queue_to(&self, dst: &Path, active: bool) -> Result<(), io::Error> {
-        for (i, entry) in fs::read_dir(&format!(
+        fs::create_dir_all(dst)?;
+        for (_, entry) in fs::read_dir(&format!(
             "./{}/{}/out/main/queue",
             if active {
                 "active-state"
@@ -195,6 +196,7 @@ impl AFLRun {
         {
             let path = entry?.path();
             let name = path.file_name().unwrap();
+            println!("copying entry: {:?}", path);
             if path.is_file() {
                 std::fs::copy(&path, dst.join(&name))?;
             }
@@ -243,7 +245,7 @@ impl AFLRun {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
-        let _ = Command::new("setsid")
+        Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
@@ -277,24 +279,16 @@ impl AFLRun {
     }
 
     /// Create a new snapshot based on a given snapshot
-    pub fn snapshot_run(&self, stdin: String) -> () {
+    pub fn snapshot_run(&self, stdin: String) -> Result<(), io::Error> {
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
         // otherwise criu can't restore
         if self.base_state != "".to_string() {
             self.copy_base_state();
         }
-        utils::create_restore_sh(self);
-
-        // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
+        let (stdout, stderr) = self.to_active()?;
 
         let stdin_file = fs::File::open(stdin.clone()).unwrap();
-        // Open a file for stdout and stderr to log to
-        let stdout = fs::File::create("stdout-afl").unwrap();
-        let stderr = fs::File::create("stderr-afl").unwrap();
-        fs::File::create("stdout").unwrap();
-        fs::File::create("stderr").unwrap();
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -302,7 +296,7 @@ impl AFLRun {
         // correct stdin, stdout and stderr file descriptors.
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
 
-        let _ = Command::new("setsid")
+        Command::new("setsid")
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
@@ -328,12 +322,14 @@ impl AFLRun {
             &format!("./active-state/{}", self.state_path),
             &format!("./saved-states"),
         );
+
+        Ok(())
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
-    fn fuzz_run(&self) -> Result<(), io::Error> {
+    fn fuzz_run(&self, run_duration: &Duration) -> Result<(), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         let (stdout, stderr) = self.to_active()?;
@@ -356,10 +352,10 @@ impl AFLRun {
                 format!("-d"),
                 // At what time to stop this afl run
                 format!("-V"),
-                format!("{}", self.timeout),
+                format!("{}", run_duration.as_secs()),
                 // Timeout per individual execution
                 format!("-t"),
-                format!("1000"),
+                format!("{}", self.timeout.as_millis()),
                 format!("--"),
                 format!("sh"),
                 // Our restore script
@@ -392,21 +388,8 @@ impl AFLRun {
         Ok(())
     }
 
-    pub fn create_outputs(&self) -> () {
-        utils::create_restore_sh(self);
-
-        // For consistency, change into necessary dir inside the function
-        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
-
-        // For the binary that creates the seed we need to take input from the
-        // in folder
-        let input_path = if self.previous_state_path == "".to_string() {
-            "./in"
-        } else {
-            "./out/main/queue"
-        };
-
-        for (index, entry) in fs::read_dir(input_path)
+    pub fn create_outputs(&self, input_path: &str, output_path: &str) -> Result<(), io::Error> {
+        for (_, entry) in fs::read_dir(input_path)
             .expect(&format!(
                 "[!] Could not read queue of state: {}",
                 self.state_path
@@ -418,32 +401,13 @@ impl AFLRun {
                 continue;
             }
 
-            std::fs::remove_dir_all(String::from("./snapshot"))
-                .expect("[!] Error deleting old snapshot folder");
-            std::fs::remove_dir_all(String::from("./fd"))
-                .expect("[!] Error deleting old fd folder");
-            utils::copy(
-                &format!("../../saved-states/{}/snapshot", self.state_path),
-                &format!("."),
-            );
-            utils::copy(
-                &format!("../../saved-states/{}/fd", self.state_path),
-                &format!("."),
-            );
-
-            // Open a file for stdout and stderr to log to
-            // We need to do this inside the loop as the process gets restored
-            // multiple times
-            let stdout = fs::File::create("stdout-afl").unwrap();
-            let stderr = fs::File::create("stderr-afl").unwrap();
-            fs::File::create("stdout").unwrap();
-            fs::File::create("stderr").unwrap();
+            let (stdout, stderr) = self.to_active()?;
 
             let entry_path = entry_unwrapped.path();
             let entry_file =
                 fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
             println!("using output: {:?}", entry_path);
-            let _ = Command::new("setsid")
+            Command::new("setsid")
                 .args(&[
                     format!("stdbuf"),
                     format!("-oL"),
@@ -468,13 +432,14 @@ impl AFLRun {
             for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
                 let cur_file = entry.unwrap().file_name();
                 let from = format!("./fd/{}", &cur_file.to_str().unwrap());
-                let to = format!("./outputs/{}_{}", index, &cur_file.to_str().unwrap());
+                let to = output_path.to_string();
                 fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
             }
         }
 
         // After creating the outputs we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
+        Ok(())
     }
 
     /// Copies the state from saved-states to active-state
@@ -554,14 +519,11 @@ impl AFLRun {
         Ok(())
     }
 
-    pub fn create_new_run(
+    pub fn create_next_snapshot(
         &self,
-        generation: u32,
-        state_id: u32,
-        input: String,
-        timeout: u32,
-        from_snapshot: bool,
-    ) -> AFLRun {
+        state_id: usize,
+        input: &str,
+    ) -> Result<FITMSnapshot, io::Error> {
         let input_path: String = format!("active-state/{}/outputs/{}", self.state_path, input);
 
         // Only mutate cur_state in this method. So next_state_path gets a
@@ -571,16 +533,16 @@ impl AFLRun {
         // "self". For this new state previous_state is "self". And
         // base_state is self.previous as we generated the maps on
         // self.previous and thus create the new state from that
-        // snapshot
-        let afl = AFLRun::new(
-            generation,
+        // snapsho
+        let afl = FITMSnapshot::new(
+            self.generation + 2,
             state_id,
             self.target_bin.to_string(),
-            timeout,
+            self.timeout,
             self.state_path.clone(),
             self.previous_state_path.clone(),
             self.server,
-            from_snapshot,
+            true,
         );
 
         let seed_file_path = format!("active-state/{}/in/{}", afl.state_path, input);
@@ -590,9 +552,9 @@ impl AFLRun {
         // let seed_file = fs::File::open(seed_file_path)
         //     .expect("[!] Could not create input file");
 
-        afl.snapshot_run(format!("in/{}", input));
+        afl.snapshot_run(format!("in/{}", input))?;
 
-        afl
+        Ok(afl)
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
@@ -615,13 +577,15 @@ impl AFLRun {
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
-        Command::new("../../AFLplusplus/afl-cmin")
+        let exit_status = Command::new("../../AFLplusplus/afl-cmin")
             .args(&[
                 format!("-i"),
                 format!("{}", input_dir),
                 format!("-o"),
                 format!("{}", output_dir),
                 // No mem limit
+                format!("-t"),
+                format!("{}", self.timeout.as_millis()),
                 format!("-m"),
                 format!("none"),
                 format!("-U"),
@@ -647,6 +611,12 @@ impl AFLRun {
 
         sleep(Duration::new(0, 50000000));
 
+        if !exit_status.success() {
+            let info =
+                "[!] Error during afl-cmin execution. Please check latest statefolder for output";
+            println!("{}", info);
+            std::process::exit(1);
+        }
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
@@ -668,11 +638,12 @@ impl AFLRun {
 /// @param current_inputs: path to inputs for this stage
 /// @return: upcoming snaps for the next generation based on current snaps (client->client, server->server)
 pub fn process_stage(
-    current_snaps: &Vec<AFLRun>,
+    current_snaps: &Vec<FITMSnapshot>,
     current_inputs: &Vec<PathBuf>,
-    run_time: Duration,
-) -> Result<Vec<AFLRun>, io::Error> {
-    let next_own_snaps: Vec<AFLRun> = vec![];
+    next_gen_id_start: usize,
+    run_time: &Duration,
+) -> Result<Vec<FITMSnapshot>, io::Error> {
+    let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
     for snap in current_snaps {
         /*
@@ -714,38 +685,35 @@ pub fn process_stage(
 
         snap.afl_cmin(&cmin_tmp_dir, &output_dir)?;
 
-        snap.fuzz_run()?; //TODO: inputs)?;
+        // afl_cmin exports minimized input to saved-states/$state/in
+        // fuzz_run activates saved-states/$state and uses ./in as input
+        snap.fuzz_run(&run_time)?;
 
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
         snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)?;
 
-        /// Replace the old stored queue with the new cminned queue
+        // Replace the old stored queue with the new cminned queue
         let _ = std::fs::remove_dir_all(&format!(
             "./saved-states/{}/out/main/queue",
             snap.state_path
         ));
-        snap.afl_cmin(
-            &cmin_tmp_dir,
-            &format!("./saved-states/{}/out/main/queue", snap.state_path),
-        )?;
 
-        /*
-        // Python pseudocode for the next steps:
-        for queue_entry in minimized_queue:
-            output = snap.restore().input(queue_entry).run_to_recv().output()
-            if output:
-                next_gen_valid = True
-                next_inputs.append(output)
+        let cmin_post_exec = format!("./saved-states/{}/out/main/queue", snap.state_path);
+        snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec)?;
 
-        # Get all snapshots for the n+1 server run (later)
-        # This could also be done at a later time.
-        for queue_entry in minimized_queue:
-            next_own_snaps.append(
-                snap.restore().input(queue_entry).run_to_recv().snapshot()
-            )
+        let outputs = format!("./saved-states/{}/outputs", snap.state_path);
+        snap.create_outputs(&cmin_post_exec, &outputs)?;
 
-
-        */
+        for entry in fs::read_dir(&cmin_post_exec)? {
+            let entry = entry?;
+            if entry.path().is_file() {
+                // get the next id: current start + amount of snapshots we created in the meantime
+                next_own_snaps.push(snap.create_next_snapshot(
+                    next_gen_id_start + next_own_snaps.len(),
+                    entry.path().as_os_str().to_str().unwrap(),
+                )?)
+            }
+        }
     }
 
     Ok(next_own_snaps)
@@ -771,15 +739,6 @@ fn generation_input_dir(gen_id: usize) -> String {
 // Make sure the given folder exists
 fn ensure_dir_exists(dir: &str) {
     fs_extra::dir::create_all(dir, false).expect("Could not create dir");
-}
-
-/// Gets the correct binary for the passed gen_id (server or client bin)
-const fn bin_for_gen<'a>(gen_id: usize, server_bin: &'a str, client_bin: &'a str) -> &'a str {
-    if is_client(gen_id) {
-        client_bin
-    } else {
-        server_bin
-    }
 }
 
 /// Naming scheme:
@@ -820,23 +779,23 @@ pub fn run(
     base_path: &str,
     client_bin: &str,
     server_bin: &str,
-    run_time: Duration,
+    run_time: &Duration,
 ) -> Result<(), io::Error> {
-    let cur_timeout = 10;
+    // A lot of timeout for now
+    let run_timeout = Duration::from_secs(10);
 
     // set the directory to base_path for all of this criu madness to work.
-    let dir_prev = env::current_dir()?;
     env::set_current_dir(base_path)?;
 
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
 
-    let afl_client: AFLRun = AFLRun::new(
+    let afl_client: FITMSnapshot = FITMSnapshot::new(
         0,
         0,
         client_bin.to_string(),
-        cur_timeout,
+        run_timeout,
         // TODO: Need some extra handling for this previous_path value
         "".to_string(),
         "".to_string(),
@@ -847,11 +806,11 @@ pub fn run(
     // Probably: Move ./fd files (hopefully just one) to ./outputs folder
     afl_client.copy_fds_to_output()?;
 
-    let afl_server: AFLRun = AFLRun::new(
+    let afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
         0,
         server_bin.to_string(),
-        cur_timeout,
+        run_timeout,
         "".to_string(),
         "".to_string(),
         true,
@@ -862,7 +821,7 @@ pub fn run(
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
 
-    let mut generation_snaps: Vec<Vec<AFLRun>> = vec![];
+    let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
     generation_snaps.push(vec![afl_client]);
     generation_snaps.push(vec![afl_server]);
 
@@ -901,10 +860,13 @@ pub fn run(
             generation_snaps.push(vec![])
         }
 
+        // In each generation, IDs are simply numbered
+        let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
             &generation_snaps[current_gen],
             &input_file_list_for_gen(current_gen)?,
-            run_time,
+            next_gen_id_start,
+            &run_time,
         )?;
 
         generation_snaps[next_own_gen].append(&mut next_snaps);

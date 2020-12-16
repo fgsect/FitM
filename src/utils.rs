@@ -3,7 +3,7 @@ use fs_extra::dir::CopyOptions;
 use std::fs;
 use std::process::Command;
 
-use crate::AFLRun;
+use crate::FITMSnapshot;
 
 pub fn mv(from: &str, to: &str) {
     copy(from, to);
@@ -51,8 +51,8 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
 }
 
-pub fn create_restore_sh(afl: &AFLRun) {
-    let _ = Command::new("python3")
+pub fn create_restore_sh(afl: &FITMSnapshot) {
+    Command::new("python3")
         .args(&[
             "create_restore.py".to_string(),
             afl.base_state.to_string(),

@@ -41,9 +41,9 @@ fn main() {
         ".",
         "./tests/targets/pseudoclient_simple",
         "./tests/targets/pseudoserver_simple",
-        Duration::from_secs(10),
+        &Duration::from_secs(2),
     ) {
         Err(e) => println!("Error {:?}", e),
-        _ => {},
+        _ => {}
     }
 }
