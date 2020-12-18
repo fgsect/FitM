@@ -29,8 +29,6 @@ pub struct FITMSnapshot {
     pub state_path: String,
     /// Binary that is being fuzzed
     pub target_bin: String,
-    /// Path to the state the current state receives input from
-    pub previous_state_path: String,
     /// Timeout for this run
     /// TODO: probably should be dynamic based on how interesting this state
     /// is.
@@ -53,7 +51,6 @@ impl fmt::Debug for FITMSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FITMSnapshot")
             .field("state_path", &self.state_path)
-            .field("previous_state_path", &self.previous_state_path)
             .field("base_state", &self.base_state)
             .field("target_bin", &self.target_bin)
             .field("timeout", &self.timeout)
@@ -82,7 +79,6 @@ impl FITMSnapshot {
         state_id: usize,
         target_bin: String,
         timeout: Duration,
-        previous_state_path: String,
         base_state: String,
         server: bool,
         from_snapshot: bool,
@@ -126,6 +122,7 @@ impl FITMSnapshot {
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
+            // Grab old snapshot from which we want to create a new one here
             utils::copy_snapshot_base(&base_state, &state_path);
 
             if base_state != "".to_string() {
@@ -145,7 +142,6 @@ impl FITMSnapshot {
             state_path,
             target_bin,
             timeout,
-            previous_state_path,
             server,
             base_state,
             initial: false,
@@ -210,7 +206,7 @@ impl FITMSnapshot {
         // remove_dir_all panics if the target does not exist.
         // To still catch errors if sth goes wrong a match is used here.
         match std::fs::remove_dir_all(existing_path.clone()) {
-            Result::Ok(_) => println!("[!] Successfully deleted path: {}", existing_path),
+            Result::Ok(_) => (),
             Result::Err(err) => println!("[!] Error while deleting old base state folder: {}", err),
         }
 
@@ -308,7 +304,7 @@ impl FITMSnapshot {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
 
-        utils::mv(
+        utils::mv_overwrite(
             &format!("./active-state/{}", self.state_path),
             &format!("./saved-states"),
         );
@@ -507,8 +503,6 @@ impl FITMSnapshot {
         // inputs for the OTHER binary that we created with a call to `send`.
         // We then save the generated maps inside `out/maps` where they are used
         // later.
-        // For the first run fitm-c1s0 "previous_state_path" actually is the
-        // upcoming state.
         Command::new("../../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
@@ -555,7 +549,6 @@ impl FITMSnapshot {
             self.target_bin.to_string(),
             self.timeout,
             self.state_path.clone(),
-            self.previous_state_path.clone(),
             self.server,
             true,
         );
@@ -809,7 +802,6 @@ pub fn run(
         run_timeout,
         // TODO: Need some extra handling for this previous_path value
         "".to_string(),
-        "".to_string(),
         false,
         false,
     );
@@ -822,7 +814,6 @@ pub fn run(
         0,
         server_bin.to_string(),
         run_timeout,
-        "".to_string(),
         "".to_string(),
         true,
         false,
@@ -845,7 +836,7 @@ pub fn run(
                 "No for snapshots (yet) for gen {}, restarting with initial server",
                 current_gen
             );
-            // Restart with gen 1 -> the client at gen 0 doesn not accept input.
+            // Restart with gen 1 -> the client at gen 0 does not accept input.
             current_gen = 1;
         }
 
