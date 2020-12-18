@@ -400,6 +400,12 @@ impl FITMSnapshot {
     }
 
     pub fn create_outputs(&self, input_path: &str, output_path: &str) -> Result<(), io::Error> {
+        // Work with absolute paths
+        let input_path = build_create_absolute_path(input_path)
+            .expect("[!] Error while constructing absolute input_dir path");
+        let output_path = build_create_absolute_path(output_path)
+            .expect("[!] Error while constructing absolute output_dir path");
+
         println!(
             "==== [*] Creating outputs for state: {} ====",
             self.state_path
@@ -451,7 +457,10 @@ impl FITMSnapshot {
             for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
                 let cur_file = entry.unwrap().file_name();
                 let from = format!("./fd/{}", &cur_file.to_str().unwrap());
-                let to = output_path.to_string();
+                let destination_path = Path::new(&output_path).join(cur_file);
+                let to = destination_path
+                    .to_str()
+                    .expect("[!] Couldn't convert destination_path to str");
                 fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
             }
         }
