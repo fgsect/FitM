@@ -15,7 +15,7 @@ pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
 
-pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen0-state0";
+pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
@@ -70,6 +70,10 @@ pub fn origin_state(is_server: bool) -> &'static str {
     }
 }
 
+fn state_path_for(gen: u32, state_id: usize) -> String {
+    format!("fitm-gen{}-state{}", gen, state_id)
+}
+
 /// Implementation of functions for an afl run
 /// Createing a new FITMSnapshot will create the necessary directory in active-state
 impl FITMSnapshot {
@@ -85,7 +89,7 @@ impl FITMSnapshot {
     ) -> FITMSnapshot {
         let origin_state = origin_state(server);
 
-        let state_path = format!("fitm-gen{}-state{}", generation, state_id);
+        let state_path = state_path_for(generation, state_id);
 
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
@@ -158,9 +162,12 @@ impl FITMSnapshot {
         new_run
     }
 
-    /// Copies everything in ./fd to ./outputs/
+    /// Copies everything in ./fd to ./outputs/ of a specified state path.
     /// this is used on the initial client state to generate intitial inputs for the first server run
-    fn copy_fds_to_output(&self) -> Result<(), io::Error> {
+    fn copy_fds_to_output_for(&self, gen: u32, state: usize) -> Result<(), io::Error> {
+        let state_path = state_path_for(gen, state);
+        // Make sure state dir outputs exists
+        let _ = fs::create_dir_all(&format!("./saved-states/{}/outputs", state_path));
         for (i, entry) in
             fs::read_dir(&format!("./saved-states/{}/fd", self.state_path))?.enumerate()
         {
@@ -168,7 +175,7 @@ impl FITMSnapshot {
             if path.is_file() {
                 std::fs::copy(
                     path,
-                    &format!("./saved-states/{}/outputs/initial{}", self.state_path, i),
+                    &format!("./saved-states/{}/outputs/initial{}", &state_path, i),
                 )?;
             }
         }
@@ -207,7 +214,7 @@ impl FITMSnapshot {
         // To still catch errors if sth goes wrong a match is used here.
         match std::fs::remove_dir_all(existing_path.clone()) {
             Result::Ok(_) => (),
-            Result::Err(err) => println!("[!] Error while deleting old base state folder: {}", err),
+            Result::Err(err) => println!("[!] Error while deleting old active origin state folder ({}): {}", &existing_path, err),
         }
 
         // copy old snapshot folder for criu
@@ -794,20 +801,23 @@ pub fn run(
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
-
-    let afl_client: FITMSnapshot = FITMSnapshot::new(
-        0,
+    
+    // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
+    let afl_client_snap: FITMSnapshot = FITMSnapshot::new(
+        2,
         0,
         client_bin.to_string(),
         run_timeout,
-        // TODO: Need some extra handling for this previous_path value
         "".to_string(),
         false,
         false,
     );
-    afl_client.init_run()?;
-    // Probably: Move ./fd files (hopefully just one) to ./outputs folder
-    afl_client.copy_fds_to_output()?;
+    
+    afl_client_snap.init_run()?;
+    // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
+    // (to gen0-state0/outputs)
+    // This is the (theoretical) state before the initial server run.
+    afl_client_snap.copy_fds_to_output_for(0, 0)?;
 
     let afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -824,8 +834,12 @@ pub fn run(
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
 
     let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
-    generation_snaps.push(vec![afl_client]);
+    // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
+    generation_snaps.push(vec![]);
+    // Gen 1 server is the initial server snapshot at recv, awaiting gen 0's output as input
     generation_snaps.push(vec![afl_server]);
+    // Gen 2 client is the initial client snapshot, awaiting gen 1's output (server response) as input
+    generation_snaps.push(vec![afl_client_snap]);
 
     let mut current_gen = 0;
 
@@ -833,7 +847,7 @@ pub fn run(
         current_gen = current_gen + 1;
         if generation_snaps[current_gen].len() == 0 {
             println!(
-                "No for snapshots (yet) for gen {}, restarting with initial server",
+                "No snapshots (yet) for gen {}, restarting with gen 1 (initial server)",
                 current_gen
             );
             // Restart with gen 1 -> the client at gen 0 does not accept input.
