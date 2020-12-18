@@ -11,8 +11,21 @@ pub fn mv(from: &str, to: &str) {
         .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
 }
 
+pub fn mv_overwrite(from: &str, to: &str) {
+    copy_overwrite(from, to);
+    std::fs::remove_dir_all(&from)
+        .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
+}
+
 pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
+    fs_extra::dir::copy(&from, &to, &options)
+        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+}
+
+pub fn copy_overwrite(from: &str, to: &str) {
+    let mut options = CopyOptions::new();
+    options.overwrite = true;
     fs_extra::dir::copy(&from, &to, &options)
         .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
 }
@@ -38,7 +51,7 @@ pub fn rm(dir: &str) {
 pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
-    let new_snapshot = format!("./active-state/{}/", state_path);
+    let new_snapshot = format!("./saved-states/{}/", state_path);
 
     // Check fs_extra docs for different copy options
     let options = CopyOptions::new();
@@ -47,7 +60,7 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
 
     // copy old pipes file so restore.sh knows which pipes are open
     let old_pipes = format!("./saved-states/{}/pipes", base_state);
-    let new_pipes = format!("./active-state/{}/pipes", state_path);
+    let new_pipes = format!("./saved-states/{}/pipes", state_path);
     fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
 }
 

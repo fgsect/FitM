@@ -93,36 +93,36 @@ impl FITMSnapshot {
 
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
-        if Path::new(&format!("active-state/{}", state_path)).exists() {
+        if Path::new(&format!("saved-states/{}", state_path)).exists() {
             println!(
-                "[!] active-state/{} already exists! Recreating..",
+                "[!] saved-states/{} already exists! Recreating..",
                 state_path
             );
             let delete = true;
             if delete {
                 // expect already panics so we don't need to exit manually
-                fs::remove_dir(format!("active-state/{}", state_path))
+                fs::remove_dir(format!("saved-states/{}", state_path))
                     .expect("[-] Could not remove duplicate state dir!");
             }
         }
 
         // Create the new directories and files to make afl feel at home
-        fs::create_dir(format!("active-state/{}", state_path))
+        fs::create_dir(format!("saved-states/{}", state_path))
             .expect("[-] Could not create state dir!");
 
-        fs::create_dir(format!("active-state/{}/in", state_path))
+        fs::create_dir(format!("saved-states/{}/in", state_path))
             .expect("[-] Could not create in dir!");
 
-        fs::create_dir(format!("active-state/{}/out", state_path))
+        fs::create_dir(format!("saved-states/{}/out", state_path))
             .expect("[-] Could not create out dir!");
 
-        fs::create_dir(format!("active-state/{}/outputs", state_path))
+        fs::create_dir(format!("saved-states/{}/outputs", state_path))
             .expect("[-] Could not create outputs dir!");
 
-        fs::create_dir(format!("active-state/{}/out/maps", state_path))
+        fs::create_dir(format!("saved-states/{}/out/maps", state_path))
             .expect("[-] Could not create out/maps dir!");
 
-        let fd_path = format!("active-state/{}/fd", state_path);
+        let fd_path = format!("saved-states/{}/fd", state_path);
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
@@ -131,11 +131,11 @@ impl FITMSnapshot {
             if base_state != "".to_string() {
                 // copy old fd folder for new state
                 let from = format!("./saved-states/{}/fd", base_state);
-                let to = format!("./active-state/{}/", state_path);
+                let to = format!("./saved-states/{}/", state_path);
                 utils::copy(&from, &to);
             }
         } else {
-            fs::create_dir(format!("active-state/{}/snapshot", state_path))
+            fs::create_dir(format!("saved-states/{}/snapshot", state_path))
                 .expect("[-] Could not create snapshot dir!");
         };
 
@@ -154,7 +154,7 @@ impl FITMSnapshot {
 
         // We can write a tool in the future to parse this info
         // and print a visualization of the state order
-        let path = format!("./active-state/{}/run-info", new_run.state_path);
+        let path = format!("./saved-states/{}/run-info", new_run.state_path);
         let mut file = fs::File::create(path).expect("[!] Could not create FITMSnapshot file");
         file.write(format!("{:?}", new_run).as_bytes())
             .expect("[!] Could not write to FITMSnapshot file");
@@ -227,18 +227,13 @@ impl FITMSnapshot {
 
     /// Needed for the two initial snapshots created based on the target
     /// binaries
-    pub fn init_run(&self) -> () {
-        let dev_null = "/dev/null";
+    pub fn init_run(&self) -> Result<(), io::Error> {
+        let (stdout, stderr) = self.to_active(true)?;
+
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
+        let dev_null = "/dev/null";
         let stdin = fs::File::open(dev_null).unwrap();
-
-        // Change into our state directory and create the snapshot from there
-        env::set_current_dir(format!("./active-state/{}", self.state_path)).unwrap();
-
-        // Open a file for stdout and stderr to log to
-        let stdout = fs::File::create("stdout").unwrap();
-        let stderr = fs::File::create("stderr").unwrap();
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -271,15 +266,17 @@ impl FITMSnapshot {
         // With snapshot_run we move the state folder instead of copying it,
         // but in this initial case we need to use
         // the state folder shortly after running this function
-        utils::copy(
+        utils::mv_overwrite(
             &format!("./active-state/{}", self.state_path),
             &format!("./saved-states"),
         );
+
+        Ok(())
     }
 
     /// Create a new snapshot based on a given snapshot
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<(), io::Error> {
-        let (stdout, stderr) = self.to_active()?;
+        let (stdout, stderr) = self.to_active(false)?;
 
         let stdin_file = fs::File::open(stdin_path).unwrap();
 
@@ -326,7 +323,7 @@ impl FITMSnapshot {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         // stdout is mutable so it can be read later
-        let (stdout, stderr) = self.to_active()?;
+        let (stdout, stderr) = self.to_active(false)?;
         println!("==== [*] Start fuzzing {} ====", self.state_path);
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -418,7 +415,7 @@ impl FITMSnapshot {
                 continue;
             }
 
-            let (stdout, stderr) = self.to_active()?;
+            let (stdout, stderr) = self.to_active(false)?;
 
             let entry_path = entry_unwrapped.path();
             let entry_file =
@@ -466,7 +463,8 @@ impl FITMSnapshot {
 
     /// Copies the state from saved-states to active-state
     /// Returns a tuple of (stdout, stderr)
-    pub fn to_active(&self) -> Result<(File, File), io::Error> {
+    /// Initial indicates which file handles are returned
+    pub fn to_active(&self, initial: bool) -> Result<(File, File), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         let _ = fs::remove_dir_all(&format!("./active-state/{}", self.state_path));
@@ -487,18 +485,23 @@ impl FITMSnapshot {
         env::set_current_dir(format!("./active-state/{}", self.state_path))?;
 
         // Open a file for stdout and stderr to log to
-        let stdout = fs::File::create("stdout-afl")?;
-        let stderr = fs::File::create("stderr-afl")?;
-        fs::File::create("stdout")?;
-        fs::File::create("stderr")?;
-        Ok((stdout, stderr))
+        // We need to create all files(!) but only need a handle for two of them
+        let stdout_afl = fs::File::create("stdout-afl")?;
+        let stderr_afl = fs::File::create("stderr-afl")?;
+        let stdout = fs::File::create("stdout")?;
+        let stderr = fs::File::create("stderr")?;
+        if initial {
+            Ok((stdout, stderr))
+        } else {
+            Ok((stdout_afl, stderr_afl))
+        }
     }
 
     /// Generate the maps provided by afl-showmap. This is used to filter out
     /// "interesting" new seeds i.e. seeds that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
     pub fn gen_afl_maps(&self) -> Result<(), io::Error> {
-        let (stdout, stderr) = self.to_active()?;
+        let (stdout, stderr) = self.to_active(false)?;
 
         // Execute afl-showmap from the state dir. We take all the possible
         // inputs for the OTHER binary that we created with a call to `send`.
@@ -571,7 +574,7 @@ impl FITMSnapshot {
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
 
-        let (stdout, stderr) = self.to_active()?;
+        let (stdout, stderr) = self.to_active(false)?;
 
         // state has to be activated at this point
         assert!(env::current_dir().unwrap().ends_with(&self.state_path));
@@ -808,7 +811,7 @@ pub fn run(
         false,
         false,
     );
-    afl_client.init_run();
+    afl_client.init_run()?;
     // Probably: Move ./fd files (hopefully just one) to ./outputs folder
     afl_client.copy_fds_to_output()?;
 
@@ -822,7 +825,7 @@ pub fn run(
         true,
         false,
     );
-    afl_server.init_run();
+    afl_server.init_run()?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
