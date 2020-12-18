@@ -46,7 +46,7 @@ pub struct FITMSnapshot {
     /// Marks if this run is an initial state or not
     pub initial: bool,
     /// Name of the corresponding acitve dir
-    pub active_dir: &'static str,
+    pub origin_state: &'static str,
 }
 
 impl fmt::Debug for FITMSnapshot {
@@ -59,7 +59,7 @@ impl fmt::Debug for FITMSnapshot {
             .field("timeout", &self.timeout)
             .field("server", &self.server)
             .field("initial", &self.initial)
-            .field("active_dir", &self.active_dir)
+            .field("origin_state", &self.origin_state)
             .finish()
     }
 }
@@ -87,7 +87,7 @@ impl FITMSnapshot {
         server: bool,
         from_snapshot: bool,
     ) -> FITMSnapshot {
-        let active_dir = origin_state(server);
+        let origin_state = origin_state(server);
 
         let state_path = format!("fitm-gen{}-state{}", generation, state_id);
 
@@ -149,7 +149,7 @@ impl FITMSnapshot {
             server,
             base_state,
             initial: false,
-            active_dir: active_dir,
+            origin_state: origin_state,
         };
 
         // We can write a tool in the future to parse this info
@@ -205,7 +205,7 @@ impl FITMSnapshot {
 
     fn copy_base_state(&self) -> () {
         // Cleanstill existing base state folders in active-state
-        let existing_path = format!("./active-state/{}", self.active_dir);
+        let existing_path = format!("./active-state/{}", self.origin_state);
 
         // remove_dir_all panics if the target does not exist.
         // To still catch errors if sth goes wrong a match is used here.
@@ -215,7 +215,7 @@ impl FITMSnapshot {
         }
 
         // copy old snapshot folder for criu
-        let from = format!("./saved-states/{}", self.active_dir);
+        let from = format!("./saved-states/{}", self.origin_state);
         let to = format!("./active-state");
 
         // Check fs_extra docs for different copy options
@@ -478,7 +478,7 @@ impl FITMSnapshot {
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
         // otherwise criu can't restore
-        if self.active_dir != "".to_string() {
+        if self.origin_state != "".to_string() {
             self.copy_base_state();
         }
 
