@@ -4,6 +4,8 @@ use std::fs;
 use std::process::Command;
 
 use crate::FITMSnapshot;
+use std::thread::sleep;
+use std::time::Duration;
 
 pub fn mv(from: &str, to: &str) {
     copy(from, to);
@@ -13,8 +15,17 @@ pub fn mv(from: &str, to: &str) {
 
 pub fn mv_overwrite(from: &str, to: &str) {
     copy_overwrite(from, to);
-    std::fs::remove_dir_all(&from)
-        .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
+    // Sometime remove_dir_all reports that the dir is not empty. Looks like an internal race cond.?
+    // If this happens we just try for a second time
+    let removed = std::fs::remove_dir_all(&from);
+    match removed {
+        Ok(_) => (),
+        Err(_e) => {
+            sleep(Duration::from_millis(100));
+            std::fs::remove_dir_all(&from)
+                .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
+        }
+    }
 }
 
 pub fn copy(from: &str, to: &str) {
