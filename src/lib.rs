@@ -196,7 +196,6 @@ impl FITMSnapshot {
         {
             let path = entry?.path();
             let name = path.file_name().unwrap();
-            println!("copying entry: {:?}", path);
             if path.is_file() {
                 std::fs::copy(&path, dst.join(&name))?;
             }
@@ -332,12 +331,13 @@ impl FITMSnapshot {
     fn fuzz_run(&self, run_duration: &Duration) -> Result<(), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
+        // stdout is mutable so it can be read later
         let (stdout, stderr) = self.to_active()?;
-
+        println!("==== [*] Start fuzzing {} ====", self.state_path);
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
-        Command::new("../../AFLplusplus/afl-fuzz")
+        let exit_status = Command::new("../../AFLplusplus/afl-fuzz")
             .args(&[
                 format!("-i"),
                 format!("./in"),
@@ -379,16 +379,33 @@ impl FITMSnapshot {
         // wait for 50 millis
         sleep(Duration::from_millis(50));
 
+        if !exit_status.success() {
+            let info =
+                "[!] Error during afl-fuzz execution. Please check latest statefolder for output";
+            println!("{}", info);
+            std::process::exit(1);
+        }
+
+        // Doesn't work since File has no copy trait and Stdio:from doesn't take ref :(
+        // let mut stdout_content = String::new();
+        // stdout.read_to_string(&mut stdout_content).unwrap();
+        // println!("==== [*] AFL++ stdout: \n{}", stdout_content);
+
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../"))?;
 
-        // println!("==== [*] Generating outputs for: {} ====", self.state_path);
-        //self.create_outputs();
+        println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
         Ok(())
     }
 
     pub fn create_outputs(&self, input_path: &str, output_path: &str) -> Result<(), io::Error> {
+        println!(
+            "==== [*] Creating outputs for state: {} ====",
+            self.state_path
+        );
+
+        // Iterate through all entries of given folder and create output for each
         for (_, entry) in fs::read_dir(input_path)
             .expect(&format!(
                 "[!] Could not read queue of state: {}",
@@ -406,7 +423,7 @@ impl FITMSnapshot {
             let entry_path = entry_unwrapped.path();
             let entry_file =
                 fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
-            println!("using output: {:?}", entry_path);
+            println!("==== [*] Using input: {:?} ====", entry_path);
             Command::new("setsid")
                 .args(&[
                     format!("stdbuf"),
@@ -429,6 +446,8 @@ impl FITMSnapshot {
             // Didn't investigate further.
             sleep(Duration::new(0, 50000000));
 
+            // Move created outputs to a given folder
+            // Probably saved states, as current active-state folder will be deleted with next to_active()
             for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
                 let cur_file = entry.unwrap().file_name();
                 let from = format!("./fd/{}", &cur_file.to_str().unwrap());
@@ -561,12 +580,10 @@ impl FITMSnapshot {
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
     fn afl_cmin(&self, input_dir: &str, output_dir: &str) -> Result<(), io::Error> {
-        // Make sure we use absolute paths
-        let cwd = env::current_dir().unwrap();
-        let cwd = cwd.to_str().unwrap();
-        let input_dir = format!("{}/{}", &cwd, &input_dir);
-        let output_dir = format!("{}/{}", &cwd, &output_dir);
-
+        let input_dir = build_create_absolute_path(input_dir)
+            .expect("[!] Error while constructing absolute input_dir path");
+        let output_dir = build_create_absolute_path(output_dir)
+            .expect("[!] Error while constructing absolute output_dir path");
         let (stdout, stderr) = self.to_active()?;
         // state has to be activated at this point
         assert!(env::current_dir().unwrap().ends_with(&self.state_path));
@@ -646,23 +663,6 @@ pub fn process_stage(
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
     for snap in current_snaps {
-        /*
-        state:
-        - snapshot (already read stdin)
-            - fds
-        - afl directory (queue)
-        - outputs directory (queue->cmin->single run)
-
-
-        criu_restore(input_fd)
-            dup2(input_fd, 0)
-            close(input_fd)
-            close(0)
-            criu_snapshot()
-            dup2(input_fd, 0)
-
-        */
-
         let cmin_tmp_dir = format!("cmin-tmp");
 
         // remove old tmp if it exists, then recreate
@@ -678,30 +678,25 @@ pub fn process_stage(
         let _ = snap.copy_queue_to(&Path::new(&cmin_tmp_dir), false);
 
         // cmin all files to the in dir
-        let _ = std::fs::remove_dir_all(&format!("./saved-states/{}/in", snap.state_path));
-
         let saved_state_dir = &format!("saved-states/{}/in", snap.state_path);
-        let output_dir = Path::new(&saved_state_dir).as_os_str().to_str().unwrap();
+        let _ = std::fs::remove_dir_all(&saved_state_dir);
 
-        snap.afl_cmin(&cmin_tmp_dir, &output_dir)?;
+        snap.afl_cmin(&cmin_tmp_dir, &saved_state_dir)?;
 
         // afl_cmin exports minimized input to saved-states/$state/in
         // fuzz_run activates saved-states/$state and uses ./in as input
         snap.fuzz_run(&run_time)?;
 
+        // current output to cmin-tmp
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
         snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)?;
 
-        // Replace the old stored queue with the new cminned queue
-        let _ = std::fs::remove_dir_all(&format!(
-            "./saved-states/{}/out/main/queue",
-            snap.state_path
-        ));
-
-        let cmin_post_exec = format!("./saved-states/{}/out/main/queue", snap.state_path);
+        // Replace the old stored queue with the new, cminned queue
+        let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
+        let _ = std::fs::remove_dir_all(&cmin_post_exec);
         snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec)?;
 
-        let outputs = format!("./saved-states/{}/outputs", snap.state_path);
+        let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
         for entry in fs::read_dir(&cmin_post_exec)? {
@@ -739,6 +734,27 @@ fn generation_input_dir(gen_id: usize) -> String {
 // Make sure the given folder exists
 fn ensure_dir_exists(dir: &str) {
     fs_extra::dir::create_all(dir, false).expect("Could not create dir");
+}
+
+// Constructs an absolute path from a relative one. Creates the directory if it doesn't exist yet
+fn build_create_absolute_path(relative: &str) -> Result<String, io::Error> {
+    let canonicalized_string = PathBuf::from(relative).canonicalize();
+    let os_string = match canonicalized_string {
+        Ok(val) => val.into_os_string(),
+        Err(_e) => {
+            ensure_dir_exists(relative);
+            PathBuf::from(relative)
+                .canonicalize()
+                .unwrap()
+                .into_os_string()
+        }
+    };
+    let absolute_str = String::from(
+        os_string
+            .to_str()
+            .expect("[!] Could not convert os_string to str"),
+    );
+    Ok(absolute_str)
 }
 
 /// Naming scheme:
