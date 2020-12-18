@@ -607,7 +607,9 @@ impl FITMSnapshot {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("CRIU_SNAPSHOT_DIR", "./snapshot")
-            // We launch sh first, which is (hopefully) not instrumented
+            // We launch sh first, which is (hopefully) not instrumented.
+            // Also, we cannot restore a snapshot more than once.
+            // In afl++ 3.01 cmin, this option will run the bin only once.
             .env("AFL_SKIP_BIN_CHECK", "1")
             .env("AFL_NO_UI", "1")
             // Give criu forkserver up to a minute to spawn
