@@ -278,16 +278,10 @@ impl FITMSnapshot {
     }
 
     /// Create a new snapshot based on a given snapshot
-    pub fn snapshot_run(&self, stdin: String) -> Result<(), io::Error> {
-        // Create a copy of the state folder in `active-state`
-        // from which the "to-be-fuzzed" state was snapshotted from,
-        // otherwise criu can't restore
-        if self.base_state != "".to_string() {
-            self.copy_base_state();
-        }
+    pub fn snapshot_run(&self, stdin_path: &str) -> Result<(), io::Error> {
         let (stdout, stderr) = self.to_active()?;
 
-        let stdin_file = fs::File::open(stdin.clone()).unwrap();
+        let stdin_file = fs::File::open(stdin_path).unwrap();
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -300,7 +294,7 @@ impl FITMSnapshot {
                 format!("stdbuf"),
                 format!("-oL"),
                 format!("./restore.sh"),
-                stdin,
+                stdin_path.to_string(),
             ])
             .stdin(Stdio::from(stdin_file))
             .stdout(Stdio::from(stdout))
@@ -484,7 +478,7 @@ impl FITMSnapshot {
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
         // otherwise criu can't restore
-        if self.base_state != "".to_string() {
+        if self.active_dir != "".to_string() {
             self.copy_base_state();
         }
 
@@ -550,18 +544,8 @@ impl FITMSnapshot {
     pub fn create_next_snapshot(
         &self,
         state_id: usize,
-        input: &str,
+        input_path: &str,
     ) -> Result<FITMSnapshot, io::Error> {
-        let input_path: String = format!("active-state/{}/outputs/{}", self.state_path, input);
-
-        // Only mutate cur_state in this method. So next_state_path gets a
-        // readable copy. We update cur_state here with a new tuple.
-        // cur_state = next_state_path(cur_state, true);
-        // We create a new state for the other binary that is not fuzzed by
-        // "self". For this new state previous_state is "self". And
-        // base_state is self.previous as we generated the maps on
-        // self.previous and thus create the new state from that
-        // snapsho
         let afl = FITMSnapshot::new(
             self.generation + 2,
             state_id,
@@ -573,14 +557,7 @@ impl FITMSnapshot {
             true,
         );
 
-        let seed_file_path = format!("active-state/{}/in/{}", afl.state_path, input);
-
-        fs::copy(input_path, &seed_file_path).expect("[!] Could not copy to new afl.state_path");
-
-        // let seed_file = fs::File::open(seed_file_path)
-        //     .expect("[!] Could not create input file");
-
-        afl.snapshot_run(format!("in/{}", input))?;
+        afl.snapshot_run(input_path)?;
 
         Ok(afl)
     }
@@ -593,7 +570,9 @@ impl FITMSnapshot {
             .expect("[!] Error while constructing absolute input_dir path");
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
+
         let (stdout, stderr) = self.to_active()?;
+
         // state has to be activated at this point
         assert!(env::current_dir().unwrap().ends_with(&self.state_path));
 
@@ -708,7 +687,9 @@ pub fn process_stage(
         let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
-        for entry in fs::read_dir(&cmin_post_exec)? {
+        let absolut_cmin_post_exec = build_create_absolute_path(&cmin_post_exec)
+            .expect("[!] Error while constructing absolute input_dir path");
+        for entry in fs::read_dir(&absolut_cmin_post_exec)? {
             let entry = entry?;
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
