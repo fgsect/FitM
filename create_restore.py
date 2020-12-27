@@ -12,7 +12,7 @@ def main():
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
     cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
     if argv[1]:
-        base_state = f"{getcwd()}/active-state/{argv[1]}"[1:]
+        base_state = f"{getcwd()}/saved-states/{argv[1]}"[1:]
 
         lines.append(f"    --inherit-fd \"fd[1]:{base_state}/stdout\" \\")
         lines.append(f"    --inherit-fd \"fd[2]:{base_state}/stderr\" \\")
