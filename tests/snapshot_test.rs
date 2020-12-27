@@ -1,205 +1,52 @@
-use fitm::{utils, FITMSnapshot};
+use fitm::FITMSnapshot;
 mod common;
 
-use fs_extra::dir::CopyOptions;
-use regex::Regex;
-use std::env;
-use std::fs::{remove_file, File};
-use std::io::Write;
-use std::process::Command;
-use std::thread::sleep;
+use crate::common::teardown;
 use std::time::Duration;
 
-use rand::Rng;
-
-// init_run_test should check if a snapshot could be successfully be created.
-// As the test does not have access to criu server responses or other logs it
-// relies on the correct creation of various files
+static SERVER_BIN: &str = "./tests/targets/pseudoserver_simple";
+#[allow(dead_code)]
+static CLIENT_BIN: &str = "./tests/targets/pseudoclient_simple";
 
 #[test]
-fn init_run_test() {
-    // pwd == root dir of repo
+fn repeated_cmin_test_() {
     common::setup();
 
-    // creating the afl_client object manually would make the test even more
-    // precise
-    let afl_client: FITMSnapshot = FITMSnapshot::new(
-        0,
-        0,
-        "tests/targets/pseudoclient".to_string(),
+    let server0: FITMSnapshot = FITMSnapshot::new(
         1,
+        0,
+        SERVER_BIN.to_string(),
+        Duration::from_secs(2),
         "".to_string(),
-        "".to_string(),
-        false,
-        false,
-    );
-
-    // tested function
-    afl_client.init_run();
-
-    // relevant files
-    let pipes = std::fs::read_to_string("./active-state/fitm-gen0-state0/pipes")
-        .expect("Pipes file missing");
-    let run_info = std::fs::read_to_string("./active-state/fitm-gen0-state0/run-info")
-        .expect("run-info file missing");
-    let stdout = std::fs::read_to_string("./active-state/fitm-gen0-state0/stdout")
-        .expect("stdout file missing");
-    let stderr = std::fs::read_to_string("./active-state/fitm-gen0-state0/stderr")
-        .expect("stderr file missing");
-
-    // expected outputs
-    let run_info_expected = "FITMSnapshot { state_path: \"fitm-gen0-state0\", previous_state_path: \"\", base_state: \"\", target_bin: \"tests/targets/pseudoclient\", timeout: 1, server: false, initial: false, active_dir: \"fitm-gen0-state0\" }";
-
-    // the regex matches e.g. "pipe:[123456]\npipe:[7890]\n"
-    // \d{3,7} - 3 to 7 decimal digits
-    // max PID should be 7 digits:
-    // https://stackoverflow.com/questions/6294133/maximum-pid-in-linux
-    let pipes_regex: Regex = Regex::new(r"^pipe:\[\d{3,7}]\npipe:\[\d{3,7}]\n$").unwrap();
-
-    let stdout_expected = "client sent: R\n";
-    let stderr_expected = "";
-
-    // required assertions
-    assert!(pipes_regex.is_match(&pipes));
-    assert_eq!(run_info, run_info_expected);
-    assert_eq!(
-        stdout, stdout_expected,
-        "Stdout expectation did not match. \
-        Check whether pseudoclient_simple.c test target is compiled."
-    );
-    assert_eq!(stderr, stderr_expected);
-
-    common::teardown();
-}
-
-// create_next_snapshot_test checks if the method with the same name works correctly
-// and the produced snapshot can be restored using restore.sh
-
-#[test]
-fn create_next_snapshot_test() {
-    // pwd == root dir of repo
-    common::setup();
-
-    // We need this folder as FITMSnapshot::new copies the fd folder from there
-    let base_state = "fitm-gen0-state0";
-    fs_extra::dir::create_all(format!("./saved-states/{}/fd", base_state), false)
-        .expect("Could not create dummy fd folder");
-
-    // creating the afl_client object manually would make the test even more
-    // precise previous_state needs to be the same as base_state as
-    // create_next_snapshot would normally generate new FITMSnapshots for the opposite
-    // binary to the one currently fuzzed. So if bin 1 was just fuzzed,
-    // consolidated and produced new outputs (and thus new paths in bin 2),
-    // then create_next_snapshot would produce new FITMSnapshots based on binary 2.
-    let afl_client: FITMSnapshot = FITMSnapshot::new(
-        0,
-        0,
-        "tests/targets/snapshot_creation".to_string(),
-        1,
-        "".to_string(),
-        base_state.to_string(),
-        false,
-        false,
-    );
-
-    // required input for tested function
-    let input_filepath = "input.txt";
-    let mut stdin = File::create(format!(
-        "./active-state/{}/in/{}",
-        afl_client.state_path, input_filepath
-    ))
-    .expect("Could not create input file");
-    stdin.write_all(b"a random teststring").unwrap();
-
-    afl_client.init_run();
-
-    let stdout = std::fs::read_to_string("./active-state/fitm-gen0-state0/stdout")
-        .expect("stdout file missing");
-    let stderr = std::fs::read_to_string("./active-state/fitm-gen0-state0/stderr")
-        .expect("stderr file missing");
-    let stdout_expected = "00\n";
-    let stderr_expected = "";
-    assert_eq!(stdout, stdout_expected);
-    assert_eq!(stderr, stderr_expected);
-
-    let outputs_file = "foo.out";
-    File::create(format!(
-        "./active-state/{}/outputs/{}",
-        afl_client.state_path, outputs_file
-    ))
-    .expect("Couldn't create dummy output file");
-
-    // let input = format!("./in/{}", input_filepath);
-    // tested function
-    let new_run = afl_client.create_next_snapshot(
-        afl_client.generation + 2,
-        1,
-        outputs_file.to_string(),
-        1,
         true,
+        false,
     );
 
-    assert_eq!(new_run.state_path, "fitm-c1s0");
-    // As long as target_bin selection in create_next_snapshot is hardcoded,
-    // this is what's expected at this point
-    assert_eq!(new_run.target_bin, "tests/targets/snapshot_creation");
-    assert_eq!(new_run.previous_state_path, "fitm-gen0-state0");
-    assert_eq!(new_run.timeout, 1);
-    // afl_client was a client run, so the following run needs to be a server
-    // run
-    assert_eq!(new_run.server, false);
-    assert_eq!(new_run.base_state, "fitm-gen0-state0");
-    assert_eq!(new_run.initial, false);
+    server0.init_run().expect("[!] Init run on server0 failed");
 
-    let options = CopyOptions::new();
-    fs_extra::dir::copy("./saved-states/fitm-c1s0", "./active-state/", &options)
-        .expect("[!] Could not copy snapshot dir from previous state");
+    // =========== snapshot on gen1 =============
+    let file_name = "tmp-input-0";
+    std::fs::write(file_name, "R").expect("[!] Writing Test payload to tmp file failed");
 
-    // Restore the snapshotted process, because only by doing so can we be sure
-    // that the snapshot actually worked
-    env::set_current_dir(format!("./active-state/{}", new_run.state_path)).unwrap();
-    Command::new("sh")
-        .args(&[
-            format!("../../restore.sh"),
-            format!("{}", new_run.state_path),
-            "in/foo.out".to_string(),
-        ])
-        .spawn()
-        .expect("[!] Could not spawn snapshot run")
-        .wait()
-        .expect("[!] Snapshot run failed");
-    // fokn sleep seems necessary everywhere - w/o the process is not done
-    // printing before the assert is done
-    sleep(Duration::new(0, 20000000));
+    let input_path = std::path::Path::new(file_name)
+        .canonicalize()
+        .expect("[!] Could not canonicalize tmp-input path");
 
-    env::set_current_dir("../../").unwrap();
+    let server1 = server0
+        .create_next_snapshot(0, input_path.to_str().unwrap())
+        .expect("[!] Create_next_snapshot for server0 failed");
 
-    // Remove this when debugging race condition is done
-    let num = rand::thread_rng().gen_range(0, 50000);
+    // =========== snapshot on gen3 =============
+    let file_name = "tmp-input-1";
+    std::fs::write(file_name, "ACK!").expect("[!] Writing Test payload to tmp file failed");
 
-    let dest = format!("/tmp/fitm-{}", num);
-    fs_extra::dir::create_all(&dest, true).expect("Could not create test folder");
-    utils::copy(&"./active-state/fitm-c1s0/".to_string(), &dest);
+    let input_path = std::path::Path::new(file_name)
+        .canonicalize()
+        .expect("[!] Could not canonicalize tmp-input path");
 
-    let stdout =
-        std::fs::read_to_string("./active-state/fitm-c1s0/stdout").expect("stdout file missing");
-    let stderr =
-        std::fs::read_to_string("./active-state/fitm-c1s0/stderr").expect("stderr file missing");
-    let stdout_expected = "Success\nRestored\nOK\n01\n02\n";
+    let _server2 = server1
+        .create_next_snapshot(0, input_path.to_str().unwrap())
+        .expect("[!] Create_next_snapshot for server0 failed");
 
-    let stderr_expected = "";
-    assert_eq!(
-        stdout, stdout_expected,
-        "Stdout expectation did not match. \
-        Check whether snapshot_creation.c test target is compiled."
-    );
-    assert_eq!(stderr, stderr_expected);
-
-    // teardown
-    remove_file(format!(
-        "./active-state/{}/in/{}",
-        afl_client.state_path, input_filepath
-    ))
-    .expect("Could not clean up input file");
-    common::teardown();
+    teardown();
 }
