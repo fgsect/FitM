@@ -17,6 +17,7 @@ pub mod utils;
 
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
+pub const ACTIVE_STATE: &str = "active-state";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
@@ -93,36 +94,35 @@ impl FITMSnapshot {
 
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
-        if Path::new(&format!("saved-states/{}", state_path)).exists() {
+        if Path::new(ACTIVE_STATE).exists() {
             println!(
-                "[!] saved-states/{} already exists! Recreating..",
-                state_path
+                "[!] active-state already exists! Recreating.."
             );
             let delete = true;
             if delete {
                 // expect already panics so we don't need to exit manually
-                fs::remove_dir(format!("saved-states/{}", state_path))
+                fs::remove_dir(ACTIVE_STATE)
                     .expect("[-] Could not remove duplicate state dir!");
             }
         }
 
         // Create the new directories and files to make afl feel at home
-        fs::create_dir(format!("saved-states/{}", state_path))
+        fs::create_dir(ACTIVE_STATE)
             .expect("[-] Could not create state dir!");
 
-        fs::create_dir(format!("saved-states/{}/in", state_path))
+        fs::create_dir(format!("{}/in", ACTIVE_STATE))
             .expect("[-] Could not create in dir!");
 
-        fs::create_dir(format!("saved-states/{}/out", state_path))
+        fs::create_dir(format!("{}/out", ACTIVE_STATE))
             .expect("[-] Could not create out dir!");
 
-        fs::create_dir(format!("saved-states/{}/outputs", state_path))
+        fs::create_dir(format!("{}/outputs", ACTIVE_STATE))
             .expect("[-] Could not create outputs dir!");
 
-        fs::create_dir(format!("saved-states/{}/out/maps", state_path))
+        fs::create_dir(format!("{}/out/maps", ACTIVE_STATE))
             .expect("[-] Could not create out/maps dir!");
 
-        let fd_path = format!("saved-states/{}/fd", state_path);
+        let fd_path = format!("{}/fd", ACTIVE_STATE);
         fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
@@ -132,11 +132,11 @@ impl FITMSnapshot {
             if base_state != "".to_string() {
                 // copy old fd folder for new state
                 let from = format!("./saved-states/{}/fd", base_state);
-                let to = format!("./saved-states/{}/", state_path);
+                let to = format!("{}", ACTIVE_STATE);
                 utils::copy(&from, &to);
             }
         } else {
-            fs::create_dir(format!("saved-states/{}/snapshot", state_path))
+            fs::create_dir(format!("{}/snapshot", ACTIVE_STATE))
                 .expect("[-] Could not create snapshot dir!");
         };
 
@@ -154,7 +154,7 @@ impl FITMSnapshot {
 
         // We can write a tool in the future to parse this info
         // and print a visualization of the state order
-        let path = format!("./saved-states/{}/run-info", new_run.state_path);
+        let path = format!("{}/run-info", ACTIVE_STATE);
         let mut file = fs::File::create(path).expect("[!] Could not create FITMSnapshot file");
         file.write(format!("{:?}", new_run).as_bytes())
             .expect("[!] Could not write to FITMSnapshot file");
@@ -207,23 +207,22 @@ impl FITMSnapshot {
     }
 
     fn copy_base_state(&self) -> () {
-        // Cleanstill existing base state folders in active-state
-        let existing_path = format!("./active-state/{}", self.origin_state);
-
         // remove_dir_all panics if the target does not exist.
         // To still catch errors if sth goes wrong a match is used here.
-        match std::fs::remove_dir_all(existing_path.clone()) {
+        match std::fs::remove_dir_all(ACTIVE_STATE) {
             Result::Ok(_) => (),
             Result::Err(err) => println!(
                 "[!] Error while deleting old active origin state folder ({}): {}",
-                &existing_path, err
+                ACTIVE_STATE, err
             ),
         }
 
         // copy old snapshot folder for criu
         let from = format!("./saved-states/{}", self.origin_state);
-        let to = format!("./active-state");
+        let to = ACTIVE_STATE;
 
+        std::fs::create_dir_all(ACTIVE_STATE)
+            .expect("[!] Could not create active_state dir during copy_base_state");
         // Check fs_extra docs for different copy options
         let mut options = CopyOptions::new();
         options.overwrite = true;
@@ -234,7 +233,11 @@ impl FITMSnapshot {
     /// Needed for the two initial snapshots created based on the target
     /// binaries
     pub fn init_run(&self) -> Result<(), io::Error> {
-        let (stdout, stderr) = self.to_active(true)?;
+        // Change into our state directory and generate the afl maps there
+        env::set_current_dir(ACTIVE_STATE)?;
+
+        // Open a file for stdout and stderr to log to
+        let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
 
         // create the .cur_input so that criu snapshots a fd connected to
         // .cur_input
@@ -272,10 +275,7 @@ impl FITMSnapshot {
         // With snapshot_run we move the state folder instead of copying it,
         // but in this initial case we need to use
         // the state folder shortly after running this function
-        utils::mv_overwrite(
-            &format!("./active-state/{}", self.state_path),
-            &format!("./saved-states"),
-        );
+        utils::mv_overwrite(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
         Ok(())
     }
@@ -469,26 +469,27 @@ impl FITMSnapshot {
 
     /// Copies the state from saved-states to active-state
     /// Returns a tuple of (stdout, stderr)
-    /// Initial indicates which file handles are returned
+    /// We have to copy to an active state, because each state can only be restored once in CRIU
+    /// Initial indicates which file handles (stdout, stderr) are returned
     pub fn to_active(&self, initial: bool) -> Result<(File, File), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
-        let _ = fs::remove_dir_all(&format!("./active-state/{}", self.state_path));
-        utils::copy_ignore(
-            &format!("./saved-states/{}", self.state_path),
-            &format!("./active-state"),
-        );
+        let _ = fs::remove_dir_all(ACTIVE_STATE);
+        // Copying and renaming in one go doesn't seem to work in rust, so let's so it in two steps
+        utils::copy(&format!("./saved-states/{}", self.state_path), ".");
+        std::fs::rename(&self.state_path, ACTIVE_STATE)
+            .expect("[!] Rename during to_active failed");
 
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
         // otherwise criu can't restore
-        if self.origin_state != "".to_string() {
-            self.copy_base_state();
-        }
+        // if self.origin_state != "".to_string() {
+        //     self.copy_base_state();
+        // }
 
         utils::create_restore_sh(self);
         // Change into our state directory and generate the afl maps there
-        env::set_current_dir(format!("./active-state/{}", self.state_path))?;
+        env::set_current_dir(ACTIVE_STATE)?;
 
         // Open a file for stdout and stderr to log to
         let (stdout, stderr) = if initial {
@@ -628,11 +629,6 @@ impl FITMSnapshot {
         }
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../../")).unwrap();
-
-        /*
-        utils::copy("./active_state/cmin_tmp", output_dir);
-        utils::rm("./active_state/cmin_tmp");
-        */
 
         println!(
             "==== [*] Wrote cmin contents from {} to {} ====",

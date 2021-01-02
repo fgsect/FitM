@@ -10,15 +10,16 @@ import json
 def main():
     open_fds = ""
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
-    cur_state = f"{getcwd()}/active-state/{argv[2]}"[1:]
+    cur_state = f"{getcwd()}/active-state/"[1:]
     if argv[1]:
-        base_state = f"{getcwd()}/saved-states/{argv[1]}"[1:]
+        base_state_saved = f"{getcwd()}/saved-states/{argv[1]}"[1:]
+        base_state_active = f"{getcwd()}/active-state/"[1:]
 
-        lines.append(f"    --inherit-fd \"fd[1]:{base_state}/stdout\" \\")
-        lines.append(f"    --inherit-fd \"fd[2]:{base_state}/stderr\" \\")
+        lines.append(f"    --inherit-fd \"fd[1]:{base_state_active}/stdout\" \\")
+        lines.append(f"    --inherit-fd \"fd[2]:{base_state_active}/stderr\" \\")
 
-        call(f"crit decode -i /{base_state}/snapshot/files.img --pretty -o ./file".split())
-        call(f"crit decode -i /{base_state}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
+        call(f"crit decode -i /{base_state_saved}/snapshot/files.img --pretty -o ./file".split())
+        call(f"crit decode -i /{base_state_saved}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
 
         file_info = json.load(open("./file", "r"))
         fd_info = json.load(open("./fdinfo", "r"))

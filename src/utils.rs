@@ -3,7 +3,7 @@ use fs_extra::dir::CopyOptions;
 use std::fs;
 use std::process::Command;
 
-use crate::FITMSnapshot;
+use crate::{FITMSnapshot, ACTIVE_STATE};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -62,7 +62,7 @@ pub fn rm(dir: &str) {
 pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
-    let new_snapshot = format!("./saved-states/{}/", state_path);
+    let new_snapshot = format!("{}", ACTIVE_STATE);
 
     // Check fs_extra docs for different copy options
     let options = CopyOptions::new();
@@ -71,7 +71,7 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
 
     // copy old pipes file so restore.sh knows which pipes are open
     let old_pipes = format!("./saved-states/{}/pipes", base_state);
-    let new_pipes = format!("./saved-states/{}/pipes", state_path);
+    let new_pipes = format!("{}/pipes", ACTIVE_STATE);
     fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
 }
 
