@@ -214,7 +214,10 @@ impl FITMSnapshot {
         // To still catch errors if sth goes wrong a match is used here.
         match std::fs::remove_dir_all(existing_path.clone()) {
             Result::Ok(_) => (),
-            Result::Err(err) => println!("[!] Error while deleting old active origin state folder ({}): {}", &existing_path, err),
+            Result::Err(err) => println!(
+                "[!] Error while deleting old active origin state folder ({}): {}",
+                &existing_path, err
+            ),
         }
 
         // copy old snapshot folder for criu
@@ -488,16 +491,15 @@ impl FITMSnapshot {
         env::set_current_dir(format!("./active-state/{}", self.state_path))?;
 
         // Open a file for stdout and stderr to log to
-        // We need to create all files(!) but only need a handle for two of them
-        let stdout_afl = fs::File::create("stdout-afl")?;
-        let stderr_afl = fs::File::create("stderr-afl")?;
-        let stdout = fs::File::create("stdout")?;
-        let stderr = fs::File::create("stderr")?;
-        if initial {
-            Ok((stdout, stderr))
+        let (stdout, stderr) = if initial {
+            (fs::File::create("stdout")?, fs::File::create("stderr")?)
         } else {
-            Ok((stdout_afl, stderr_afl))
-        }
+            (
+                fs::File::create("stdout-afl")?,
+                fs::File::create("stderr-afl")?,
+            )
+        };
+        Ok((stdout, stderr))
     }
 
     /// Generate the maps provided by afl-showmap. This is used to filter out
@@ -578,9 +580,6 @@ impl FITMSnapshot {
 
         // state has to be activated at this point
         assert!(env::current_dir().unwrap().ends_with(&self.state_path));
-
-        // fs::File::create("stdout").unwrap();
-        // fs::File::create("stderr").unwrap();
 
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -801,7 +800,7 @@ pub fn run(
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
-    
+
     // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
     let afl_client_snap: FITMSnapshot = FITMSnapshot::new(
         2,
@@ -812,7 +811,7 @@ pub fn run(
         false,
         false,
     );
-    
+
     afl_client_snap.init_run()?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
