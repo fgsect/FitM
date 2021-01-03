@@ -6,7 +6,7 @@
 
 export INPUT_FILENAME=$(realpath $1)
 
-ENVFILE="../envfile"
+ENVFILE="envfile"
 env | sort > $ENVFILE
 pwd
 PIPE1=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
@@ -36,5 +36,3 @@ criu restore -d \
     -vvv \
     -o ./restore.log \
     --images-dir ./snapshot \
-    --inherit-fd "fd[198]:$PIPE1" \
-    --inherit-fd "fd[199]:$PIPE2" \

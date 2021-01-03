@@ -6316,14 +6316,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             if (arg3 == 0) {
                 return 0;
             } else {
-                if(sent) {
-                    _ = system("echo 'true' > /tmp/qemu_read042");
-                } else {
-                _ = system("echo 'false' > /tmp/qemu_read042");
-            }
-//            if(sent && (is_socket >> arg1) & 1){
             if(sent && (is_socket >> arg1) & 1){
-                puts("should not be here");
                 if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
                     exit(0);
                 }
