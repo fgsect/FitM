@@ -6,7 +6,6 @@ use std::process::{Command, Stdio};
 use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
 
-use fs_extra::dir::DirEntryAttr::Accessed;
 use fs_extra::dir::*;
 use regex::Regex;
 use std::thread::sleep;

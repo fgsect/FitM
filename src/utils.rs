@@ -4,7 +4,6 @@ use std::fs;
 use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
-use std::path::Path;
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
@@ -60,6 +59,22 @@ pub fn rm(dir: &str) {
         .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
 }
 
+fn cp_stdfiles(base_state: &str) {
+    // stdout
+    fs::copy(
+        format!("./saved-states/{}/stdout", base_state),
+        format!("{}/stdout", ACTIVE_STATE),
+    )
+    .expect("[!] Could not copy old stdout file to active-state");
+
+    // stderr
+    fs::copy(
+        format!("./saved-states/{}/stderr", base_state),
+        format!("{}/stderr", ACTIVE_STATE),
+    )
+    .expect("[!] Could not copy old stdout file to active-state");
+}
+
 pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
@@ -71,6 +86,9 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     let old_pipes = format!("./saved-states/{}/pipes", base_state);
     let new_pipes = format!("{}/pipes", ACTIVE_STATE);
     fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
+
+    // copy old stdout/err since they are part of the process' state
+    cp_stdfiles(base_state);
 }
 
 pub fn create_restore_sh(afl: &FITMSnapshot) {

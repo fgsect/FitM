@@ -10,7 +10,7 @@ import json
 def main():
     open_fds = ""
     lines = [x.strip("\n") for x in open("./restore.sh.tmp", "r").readlines()]
-    cur_state = f"{getcwd()}/active-state/"[1:]
+    cur_state = f"{getcwd()}/active-state"[1:]
     if argv[1]:
         base_state_saved = f"{getcwd()}/saved-states/{argv[1]}"[1:]
         base_state_active = f"{getcwd()}/active-state"[1:]
