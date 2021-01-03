@@ -277,7 +277,7 @@ impl FITMSnapshot {
 
     /// Create a new snapshot based on a given snapshot
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<(), io::Error> {
-        let (stdout, stderr) = self.to_active(false)?;
+        let (stdout, stderr) = self.create_environment()?;
 
         let stdin_file = fs::File::open(stdin_path).unwrap();
 
@@ -309,10 +309,7 @@ impl FITMSnapshot {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
-        utils::mv_rename(
-            &format!("./active-state/{}", self.state_path),
-            &format!("./saved-states"),
-        );
+        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
         Ok(())
     }
@@ -324,7 +321,7 @@ impl FITMSnapshot {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
         // stdout is mutable so it can be read later
-        let (stdout, stderr) = self.to_active(false)?;
+        let (stdout, stderr) = self.to_active()?;
         println!("==== [*] Start fuzzing {} ====", self.state_path);
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -416,7 +413,7 @@ impl FITMSnapshot {
                 continue;
             }
 
-            let (stdout, stderr) = self.to_active(false)?;
+            let (stdout, stderr) = self.to_active()?;
 
             let entry_path = entry_unwrapped.path();
             let entry_file =
@@ -462,35 +459,31 @@ impl FITMSnapshot {
         Ok(())
     }
 
-    /// Copies the state from saved-states to active-state
-    /// Returns a tuple of (stdout, stderr)
-    /// We have to copy to an active state, because each state can only be restored once in CRIU
-    /// Initial indicates which file handles (stdout, stderr) are returned
-    pub fn to_active(&self, initial: bool) -> Result<(File, File), io::Error> {
-        // If not currently needed, all states should reside in `saved-state`.
-        // Thus they need to be copied to be fuzzed
-        utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
-
-        // Create a copy of the state folder in `active-state`
-        // from which the "to-be-fuzzed" state was snapshotted from,
-        // otherwise criu can't restore
-        // if self.origin_state != "".to_string() {
-        //     self.copy_base_state();
-        // }
-
+    pub fn create_environment(&self) -> Result<(File, File), io::Error> {
         utils::create_restore_sh(self);
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(ACTIVE_STATE)?;
 
         // Open a file for stdout and stderr to log to
-        let (stdout, stderr) = if initial {
-            (fs::File::create("stdout")?, fs::File::create("stderr")?)
-        } else {
-            (
-                fs::File::create("stdout-afl")?,
-                fs::File::create("stderr-afl")?,
-            )
-        };
+        let (stdout, stderr) = (
+            fs::File::create("stdout-afl")?,
+            fs::File::create("stderr-afl")?,
+        );
+
+        Ok((stdout, stderr))
+    }
+
+    /// Copies the state from saved-states to active-state
+    /// Returns a tuple of (stdout, stderr)
+    /// We have to copy to an active state, because each state can only be restored once in CRIU
+    /// Initial indicates which file handles (stdout, stderr) are returned
+    pub fn to_active(&self) -> Result<(File, File), io::Error> {
+        // If not currently needed, all states should reside in `saved-state`.
+        // Thus they need to be copied to be fuzzed
+        utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
+
+        let (stdout, stderr) = self.create_environment()?;
+
         Ok((stdout, stderr))
     }
 
@@ -498,7 +491,7 @@ impl FITMSnapshot {
     /// "interesting" new seeds i.e. seeds that will make the OTHER
     /// binary produce paths, which we haven't seen yet.
     pub fn gen_afl_maps(&self) -> Result<(), io::Error> {
-        let (stdout, stderr) = self.to_active(false)?;
+        let (stdout, stderr) = self.to_active()?;
 
         // Execute afl-showmap from the state dir. We take all the possible
         // inputs for the OTHER binary that we created with a call to `send`.
@@ -568,7 +561,7 @@ impl FITMSnapshot {
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
 
-        let (stdout, stderr) = self.to_active(false)?;
+        let (stdout, stderr) = self.to_active()?;
 
         // state has to be activated at this point
         assert!(env::current_dir().unwrap().ends_with(&self.state_path));

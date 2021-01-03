@@ -13,7 +13,7 @@ def main():
     cur_state = f"{getcwd()}/active-state/"[1:]
     if argv[1]:
         base_state_saved = f"{getcwd()}/saved-states/{argv[1]}"[1:]
-        base_state_active = f"{getcwd()}/active-state/"[1:]
+        base_state_active = f"{getcwd()}/active-state"[1:]
 
         lines.append(f"    --inherit-fd \"fd[1]:{base_state_active}/stdout\" \\")
         lines.append(f"    --inherit-fd \"fd[2]:{base_state_active}/stderr\" \\")
