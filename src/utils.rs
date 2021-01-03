@@ -4,34 +4,35 @@ use std::fs;
 use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
-use std::thread::sleep;
-use std::time::Duration;
+use std::path::Path;
 
 pub fn mv(from: &str, to: &str) {
-    copy(from, to);
-    std::fs::remove_dir_all(&from)
-        .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
+    let options = CopyOptions::new();
+    fs_extra::dir::move_dir(&from, &to, &options)
+        .expect(format!("utils::mv failed to move '{}' to '{}'", from, to).as_str());
 }
 
-pub fn mv_overwrite(from: &str, to: &str) {
-    copy_overwrite(from, to);
-    // Sometime remove_dir_all reports that the dir is not empty. Looks like an internal race cond.?
-    // If this happens we just try for a second time
-    let removed = std::fs::remove_dir_all(&from);
-    match removed {
-        Ok(_) => (),
-        Err(_e) => {
-            sleep(Duration::from_millis(100));
-            std::fs::remove_dir_all(&from)
-                .expect(format!("Could not remove '{}' in utils::mv", from).as_str());
-        }
-    }
+pub fn mv_rename(from: &str, to: &str) {
+    cp_recursive(from, to);
+    std::fs::remove_dir_all(from)
+        .expect(format!("[!] Could not remove '{}' in utils::mv_rename", from).as_str());
 }
 
 pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::copy(&from, &to, &options)
         .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+}
+
+pub fn cp_recursive(from: &str, to: &str) {
+    // std::fs::rename can not rename filled dirs -.-
+
+    Command::new("cp")
+        .args(&["-r", from, to])
+        .spawn()
+        .expect("[!] Could not spawn cp cmd")
+        .wait()
+        .expect("[!] Failed to wait for cp");
 }
 
 pub fn copy_overwrite(from: &str, to: &str) {
@@ -64,10 +65,7 @@ pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("{}", ACTIVE_STATE);
 
-    // Check fs_extra docs for different copy options
-    let options = CopyOptions::new();
-    fs_extra::dir::copy(old_snapshot, new_snapshot, &options)
-        .expect("[!] Could not copy snapshot dir from previous state");
+    cp_recursive(old_snapshot.as_str(), new_snapshot.as_str());
 
     // copy old pipes file so restore.sh knows which pipes are open
     let old_pipes = format!("./saved-states/{}/pipes", base_state);

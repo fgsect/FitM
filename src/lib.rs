@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
 
+use fs_extra::dir::DirEntryAttr::Accessed;
 use fs_extra::dir::*;
 use regex::Regex;
 use std::thread::sleep;
@@ -17,7 +18,7 @@ pub mod utils;
 
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
-pub const ACTIVE_STATE: &str = "active-state";
+pub const ACTIVE_STATE: &str = "./active-state";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
@@ -95,26 +96,20 @@ impl FITMSnapshot {
         // If the new state directory already exists we may have old data there
         // so we optionally delete it
         if Path::new(ACTIVE_STATE).exists() {
-            println!(
-                "[!] active-state already exists! Recreating.."
-            );
+            println!("[!] active-state already exists! Recreating..");
             let delete = true;
             if delete {
                 // expect already panics so we don't need to exit manually
-                fs::remove_dir(ACTIVE_STATE)
-                    .expect("[-] Could not remove duplicate state dir!");
+                fs::remove_dir(ACTIVE_STATE).expect("[-] Could not remove duplicate state dir!");
             }
         }
 
         // Create the new directories and files to make afl feel at home
-        fs::create_dir(ACTIVE_STATE)
-            .expect("[-] Could not create state dir!");
+        fs::create_dir(ACTIVE_STATE).expect("[-] Could not create state dir!");
 
-        fs::create_dir(format!("{}/in", ACTIVE_STATE))
-            .expect("[-] Could not create in dir!");
+        fs::create_dir(format!("{}/in", ACTIVE_STATE)).expect("[-] Could not create in dir!");
 
-        fs::create_dir(format!("{}/out", ACTIVE_STATE))
-            .expect("[-] Could not create out dir!");
+        fs::create_dir(format!("{}/out", ACTIVE_STATE)).expect("[-] Could not create out dir!");
 
         fs::create_dir(format!("{}/outputs", ACTIVE_STATE))
             .expect("[-] Could not create outputs dir!");
@@ -270,12 +265,12 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
         // After spawning the run we go back into the base directory
-        env::set_current_dir(&Path::new("../../")).unwrap();
+        env::set_current_dir(&Path::new("../")).unwrap();
 
         // With snapshot_run we move the state folder instead of copying it,
         // but in this initial case we need to use
         // the state folder shortly after running this function
-        utils::mv_overwrite(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
         Ok(())
     }
@@ -312,9 +307,9 @@ impl FITMSnapshot {
         sleep(Duration::new(0, 50000000));
 
         // After spawning the run we go back into the base directory
-        env::set_current_dir(&Path::new("../../")).unwrap();
+        env::set_current_dir(&Path::new("../")).unwrap();
 
-        utils::mv_overwrite(
+        utils::mv_rename(
             &format!("./active-state/{}", self.state_path),
             &format!("./saved-states"),
         );
@@ -389,7 +384,7 @@ impl FITMSnapshot {
         // println!("==== [*] AFL++ stdout: \n{}", stdout_content);
 
         // After finishing the run we go back into the base directory
-        env::set_current_dir(&Path::new("../../"))?;
+        env::set_current_dir(&Path::new("../"))?;
 
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
@@ -463,7 +458,7 @@ impl FITMSnapshot {
         }
 
         // After creating the outputs we go back into the base directory
-        env::set_current_dir(&Path::new("../../")).unwrap();
+        env::set_current_dir(&Path::new("../")).unwrap();
         Ok(())
     }
 
@@ -474,11 +469,7 @@ impl FITMSnapshot {
     pub fn to_active(&self, initial: bool) -> Result<(File, File), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
-        let _ = fs::remove_dir_all(ACTIVE_STATE);
-        // Copying and renaming in one go doesn't seem to work in rust, so let's so it in two steps
-        utils::copy(&format!("./saved-states/{}", self.state_path), ".");
-        std::fs::rename(&self.state_path, ACTIVE_STATE)
-            .expect("[!] Rename during to_active failed");
+        utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
 
         // Create a copy of the state folder in `active-state`
         // from which the "to-be-fuzzed" state was snapshotted from,
@@ -544,7 +535,7 @@ impl FITMSnapshot {
         sleep(Duration::new(0, 50000000));
 
         // After spawning showmap command we go back into the base directory
-        env::set_current_dir(&Path::new("../../"))?;
+        env::set_current_dir(&Path::new("../"))?;
         Ok(())
     }
 
@@ -628,7 +619,7 @@ impl FITMSnapshot {
             std::process::exit(1);
         }
         // After finishing the run we go back into the base directory
-        env::set_current_dir(&Path::new("../../")).unwrap();
+        env::set_current_dir(&Path::new("../")).unwrap();
 
         println!(
             "==== [*] Wrote cmin contents from {} to {} ====",
