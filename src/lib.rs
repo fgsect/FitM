@@ -247,8 +247,8 @@ impl FITMSnapshot {
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
-                format!("../../AFLplusplus/afl-qemu-trace"),
-                format!("../../{}", self.target_bin),
+                format!("../AFLplusplus/afl-qemu-trace"),
+                format!("../{}", self.target_bin),
                 format!("{}", dev_null),
             ])
             .stdin(Stdio::from(stdin))
@@ -329,7 +329,7 @@ impl FITMSnapshot {
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
-        let exit_status = Command::new("../../AFLplusplus/afl-fuzz")
+        let exit_status = Command::new("../AFLplusplus/afl-fuzz")
             .args(&[
                 format!("-i"),
                 format!("./in"),
@@ -504,7 +504,7 @@ impl FITMSnapshot {
         // inputs for the OTHER binary that we created with a call to `send`.
         // We then save the generated maps inside `out/maps` where they are used
         // later.
-        Command::new("../../AFLplusplus/afl-showmap")
+        Command::new("../AFLplusplus/afl-showmap")
             .args(&[
                 format!("-i"),
                 format!("./out/main/queue"),
@@ -576,7 +576,7 @@ impl FITMSnapshot {
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
-        let exit_status = Command::new("../../AFLplusplus/afl-cmin")
+        let exit_status = Command::new("../AFLplusplus/afl-cmin")
             .args(&[
                 format!("-i"),
                 format!("{}", input_dir),
