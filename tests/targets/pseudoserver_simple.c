@@ -47,6 +47,7 @@ int main() {
         perror("accept");
         exit(EXIT_FAILURE);
     }
+    printf("server booted successfully\n");
 
     // recv 1
     char *buf = (char *)calloc(100, 1);

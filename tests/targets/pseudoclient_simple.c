@@ -35,6 +35,8 @@ int main()
         printf("\nConnection Failed \n");
         return -1;
     }
+    printf("client booted successfully\n");
+
     // TODO: This is a quick fix for our init_run being developed only with server binaries in mind
     // I am not sure atm if `recv` is the right point to snapshot the client.
     send(sock , msg , strlen(msg) , 0 );
