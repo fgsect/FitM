@@ -59,14 +59,15 @@ char *getenv_from_file(const char *var) {
         free(string);
         return NULL;
     }
-
     found++;
-    char *ret = (char *)calloc(strlen(found), 1);
+    char *ret = (char *)calloc(strlen(found+1), 1);
     if (!ret) {
         perror("alloc");
         exit(-1);
     }
     strncpy(ret, found, strlen(found));
+    ret[strlen(ret)] = '\0';
     free(string);
+
     return ret;
 }
