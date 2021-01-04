@@ -36,3 +36,5 @@ criu restore -d \
     -vvv \
     -o ./restore.log \
     --images-dir ./snapshot \
+    --inherit-fd "fd[198]:$PIPE1" \
+    --inherit-fd "fd[199]:$PIPE2" \
