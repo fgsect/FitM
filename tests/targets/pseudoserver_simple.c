@@ -7,7 +7,7 @@
 
 int main() {
     printf("Starting server..\n");
-    system("touch /tmp/fitm-server-0");
+
     // open socket
     int server_fd, new_socket;
     struct sockaddr_in address;
