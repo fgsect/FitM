@@ -1,3 +1,5 @@
+.PHONY: all afl qemu criu fitm debug
+
 CRIUPATH?=./criu
 
 all: build_afl build_qemu build_criu
