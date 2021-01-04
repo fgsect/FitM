@@ -6,7 +6,8 @@
 #include <string.h>
 
 int main() {
-
+    printf("Starting server..\n");
+    system("touch /tmp/fitm-server-0");
     // open socket
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -41,6 +42,7 @@ int main() {
         perror("listen");
         exit(EXIT_FAILURE);
     }
+    printf("server pre accept\n");
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
                          (socklen_t*)&addrlen))<0)
     {
