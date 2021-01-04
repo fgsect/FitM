@@ -20,7 +20,13 @@ pub fn teardown() {
     let active_state = "./active-state";
     let saved_states = "./saved-states";
 
-    std::fs::remove_dir_all(active_state).expect("[!] Can't delete ./active-state");
+    match std::fs::remove_dir_all(active_state) {
+        Ok(()) => (),
+        Err(_) => println!("[!] No ./active-state to delete"),
+    };
 
-    std::fs::remove_dir_all(saved_states).expect("[!] Can't delete ./saved-states");
+    match std::fs::remove_dir_all(saved_states) {
+        Ok(()) => (),
+        Err(_) => println!("[!] No ./saved-states to delete"),
+    };
 }

@@ -6,7 +6,6 @@ use std::process::{Command, Stdio};
 use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
 
-use fs_extra::dir::*;
 use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
@@ -121,7 +120,7 @@ impl FITMSnapshot {
 
         if from_snapshot {
             // Grab old snapshot from which we want to create a new one here
-            utils::copy_snapshot_base(&base_state, &state_path);
+            utils::copy_snapshot_base(&base_state);
 
             if base_state != "".to_string() {
                 // copy old fd folder for new state
@@ -198,30 +197,6 @@ impl FITMSnapshot {
             }
         }
         Ok(())
-    }
-
-    fn copy_base_state(&self) -> () {
-        // remove_dir_all panics if the target does not exist.
-        // To still catch errors if sth goes wrong a match is used here.
-        match std::fs::remove_dir_all(ACTIVE_STATE) {
-            Result::Ok(_) => (),
-            Result::Err(err) => println!(
-                "[!] Error while deleting old active origin state folder ({}): {}",
-                ACTIVE_STATE, err
-            ),
-        }
-
-        // copy old snapshot folder for criu
-        let from = format!("./saved-states/{}", self.origin_state);
-        let to = ACTIVE_STATE;
-
-        std::fs::create_dir_all(ACTIVE_STATE)
-            .expect("[!] Could not create active_state dir during copy_base_state");
-        // Check fs_extra docs for different copy options
-        let mut options = CopyOptions::new();
-        options.overwrite = true;
-        fs_extra::dir::copy(from, to, &options)
-            .expect("[!] Could not copy base state dir from saved-states");
     }
 
     /// Needed for the two initial snapshots created based on the target

@@ -75,7 +75,7 @@ fn cp_stdfiles(base_state: &str) {
     .expect("[!] Could not copy old stdout file to active-state");
 }
 
-pub fn copy_snapshot_base(base_state: &str, state_path: &str) -> () {
+pub fn copy_snapshot_base(base_state: &str) -> () {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("{}", ACTIVE_STATE);
