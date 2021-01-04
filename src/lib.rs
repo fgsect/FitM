@@ -16,7 +16,7 @@ pub mod utils;
 
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
-pub const ACTIVE_STATE: &str = "./active-state";
+pub const ACTIVE_STATE: &str = "active-state";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
@@ -538,7 +538,7 @@ impl FITMSnapshot {
         let (stdout, stderr) = self.to_active()?;
 
         // state has to be activated at this point
-        assert!(env::current_dir().unwrap().ends_with(&self.state_path));
+        assert!(env::current_dir().unwrap().ends_with(ACTIVE_STATE));
 
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
