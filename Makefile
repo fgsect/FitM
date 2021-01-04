@@ -1,14 +1,14 @@
 CRIUPATH?=./criu
 
-build: build_afl build_qemu build_criu
+all: build_afl build_qemu build_criu
 
-build_afl:
+afl:
 	make -C ./AFLplusplus
 
-build_qemu:
+qemu:
 	cd ./qemu/qemu/ && ./build-for-afl.sh
 
-build_criu:
+criu:
 	make -C ./criu
 
 fitm:
