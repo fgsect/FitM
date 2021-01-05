@@ -116,13 +116,9 @@ impl FITMSnapshot {
 
         if from_snapshot {
             // Grab old snapshot from which we want to create a new one here
-            utils::copy_snapshot_base(&base_state);
 
             if base_state != "".to_string() {
-                // copy old fd folder for new state
-                let from = format!("./saved-states/{}/fd", base_state);
-                let to = format!("{}", ACTIVE_STATE);
-                utils::copy(&from, &to);
+                utils::copy_snapshot_base(&base_state);
             }
         } else {
             fs::create_dir(format!("{}/snapshot", ACTIVE_STATE))

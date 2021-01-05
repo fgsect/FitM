@@ -50,7 +50,7 @@ int main()
     printf("client send #2: %s\n", new_msg);
 
     free(buffer);
-    buffer = (char *) calloc(100, 1);
+    buffer = (char *) calloc(10, 1);
     recv(sock, buffer, 100, 0);
     printf("client recv #2: %s\n", buffer);
     return 0;

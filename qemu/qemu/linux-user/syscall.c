@@ -2311,22 +2311,27 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
 
-        if (fcntl(FRKSRV_READ_FD, F_GETFD) == -1) {
-            int read_pipe[2];
-            int write_pipe[2];
-            if (pipe(read_pipe) == -1) {
-                printf("QEMU: Could not open AFL Forkserver read pipe!");
-            }
-            if (pipe(write_pipe) == -1) {
-                printf("QEMU: Could not open AFL Forkserver read pipe!");
-            }
-            dup2(read_pipe[0], FRKSRV_READ_FD);
-            dup2(write_pipe[1], FRKSRV_WRITE_FD);
-            close(read_pipe[0]);
-            close(read_pipe[1]);
-            close(write_pipe[0]);
-            close(write_pipe[1]);
+        if (fcntl(FRKSRV_READ_FD, F_GETFD) != -1) {
+            close(FRKSRV_READ_FD);
         }
+        if (fcntl(FRKSRV_WRITE_FD, F_GETFD) != -1) {
+            close(FRKSRV_WRITE_FD);
+        }
+
+        int read_pipe[2];
+        int write_pipe[2];
+        if (pipe(read_pipe) == -1) {
+            printf("QEMU: Could not open AFL Forkserver read pipe!");
+        }
+        if (pipe(write_pipe) == -1) {
+            printf("QEMU: Could not open AFL Forkserver read pipe!");
+        }
+        dup2(read_pipe[0], FRKSRV_READ_FD);
+        dup2(write_pipe[1], FRKSRV_WRITE_FD);
+        close(read_pipe[0]);
+        close(read_pipe[1]);
+        close(write_pipe[0]);
+        close(write_pipe[1]);
 
         FILE *f = fopen("./pipes", "w");
         char *buff = calloc(200, 1);

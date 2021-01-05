@@ -88,6 +88,11 @@ pub fn copy_snapshot_base(base_state: &str) -> () {
     let new_pipes = format!("{}/pipes", ACTIVE_STATE);
     fs::copy(old_pipes, new_pipes).expect("[!] Could not copy old pipes file to new state-dir");
 
+    // copy old fd folder for new state
+    let from = format!("./saved-states/{}/fd", base_state);
+    let to = format!("{}", ACTIVE_STATE);
+    copy(&from, &to);
+
     // copy old stdout/err since they are part of the process' state
     cp_stdfiles(base_state);
 }

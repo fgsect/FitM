@@ -9,6 +9,9 @@ export INPUT_FILENAME=$(realpath $1)
 ENVFILE="envfile"
 env | sort > $ENVFILE
 pwd
+# When running with afl-fuzz this script receives 198/199 as pipes for RPC with the forkserver.
+# To forward these into the restored process we use --inherit-fd.
+# The target for --inherit-fd within the restored process are the named pipes that are stored in the pipes file.
 PIPE1=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
 PIPE2=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
 
