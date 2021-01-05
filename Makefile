@@ -2,7 +2,7 @@
 
 CRIUPATH?=./criu
 
-all: build_afl build_qemu build_criu
+all: criu symlink qemu afl
 
 afl:
 	make -C ./AFLplusplus
