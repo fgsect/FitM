@@ -181,17 +181,14 @@ impl FITMSnapshot {
     /// this is used on the initial client state to generate intitial inputs for the first server run
     fn copy_queue_to(&self, dst: &Path, active: bool) -> Result<(), io::Error> {
         fs::create_dir_all(dst)?;
-        for (_, entry) in fs::read_dir(&format!(
-            "./{}/{}/out/main/queue",
-            if active {
-                "active-state"
-            } else {
-                "saved-states"
-            },
-            self.state_path
-        ))?
-        .enumerate()
-        {
+        // used string as type because format!().as_str offended the borrow checker,
+        // even if the string is saved in a tmp variable first
+        let from = if active {
+            "active-state/out/main/queue".to_string()
+        } else {
+            format!("saved-states/{}/out/main/queue", self.state_path)
+        };
+        for (_, entry) in fs::read_dir(from)?.enumerate() {
             let path = entry?.path();
             let name = path.file_name().unwrap();
             if path.is_file() {
