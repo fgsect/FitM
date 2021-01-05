@@ -2375,7 +2375,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
     }
     // read did not read anything without setting FD to the beginning of the file.
 //    lseek(0, 0, SEEK_SET);
-    return read(0, (char *)msg, len);;
+    return read(0, (char *)msg, len);
 }
 
 #ifdef TARGET_NR_socketcall

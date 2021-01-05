@@ -30,7 +30,7 @@ char *getenv_from_file(const char *var) {
 
     char *string = calloc(fsize + 1, 1);
     if (!string) {
-        perror("alloc");
+        perror("Failed to calloc in fitm.h:getenv_from_file");
         exit(-2);
     }
     _ = fread(string, 1, fsize, f);
@@ -60,9 +60,9 @@ char *getenv_from_file(const char *var) {
         return NULL;
     }
     found++;
-    char *ret = (char *)calloc(strlen(found+1), 1);
+    char *ret = (char *)calloc(strlen(found), 1);
     if (!ret) {
-        perror("alloc");
+        perror("Failed to calloc in fitm.h:getenv_from_file");
         exit(-1);
     }
     strncpy(ret, found, strlen(found));
