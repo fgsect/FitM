@@ -93,7 +93,8 @@ impl FITMSnapshot {
 
         // Make sure there is no old active_state folder
         match std::fs::remove_dir_all(ACTIVE_STATE) {
-            Ok(_) | (Err(e) if e.kind() == ErrorKind::NotFound) => (),
+            Ok(_) => (),
+            Err(e) if e.kind() == ErrorKind::NotFound => (),
             Err(e) => println!( "[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 

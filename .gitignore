@@ -22,3 +22,4 @@ restore.sh
 fdinfo
 file
 tests/targets/snapshot_creation
+fitm-qemu-trace
