@@ -32,7 +32,7 @@ fi
 
 ## TEMPLATE ##
 
-criu restore -d \
+../criu/criu/criu restore -d \
     -vvv \
     -o ./restore.log \
     --images-dir ./snapshot \

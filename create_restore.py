@@ -18,8 +18,8 @@ def main():
         lines.append(f"    --inherit-fd \"fd[1]:{base_state_active}/stdout\" \\")
         lines.append(f"    --inherit-fd \"fd[2]:{base_state_active}/stderr\" \\")
 
-        call(f"crit decode -i /{base_state_saved}/snapshot/files.img --pretty -o ./file".split())
-        call(f"crit decode -i /{base_state_saved}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
+        call(f"./criu/crit/crit-python3 decode -i /{base_state_saved}/snapshot/files.img --pretty -o ./file".split())
+        call(f"./criu/crit/crit-python3 decode -i /{base_state_saved}/snapshot/fdinfo-2.img --pretty -o ./fdinfo".split())
 
         file_info = json.load(open("./file", "r"))
         fd_info = json.load(open("./fdinfo", "r"))
