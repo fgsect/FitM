@@ -91,16 +91,18 @@ impl FITMSnapshot {
 
         let state_path = state_path_for(generation, state_id);
 
-        // If the new state directory already exists we may have old data there
-        // so we optionally delete it
-        if Path::new(ACTIVE_STATE).exists() {
-            println!("[!] active-state already exists! Recreating..");
-            let delete = true;
-            if delete {
-                // expect already panics so we don't need to exit manually
-                fs::remove_dir(ACTIVE_STATE).expect("[-] Could not remove duplicate state dir!");
-            }
-        }
+        // Make sure there is no old active_state folder
+        match std::fs::remove_dir_all(ACTIVE_STATE) {
+            Ok(_) => (),
+            // fs_extra::error:ErrorKind::NotFound can not be compared to e.kind()
+            // because of type mismatch. Thus this seems like the simplest solution.
+            // We depend on unix through cp_recursive anyways
+            Err(e) if e.raw_os_error().unwrap() == 2 => (),
+            Err(e) => println!(
+                "[!] Error while removing {}: {:?} (maybe the error code is different on your OS?",
+                ACTIVE_STATE, e
+            ),
+        };
 
         // Create the new directories and files to make afl feel at home
         fs::create_dir(ACTIVE_STATE).expect("[-] Could not create state dir!");
@@ -454,6 +456,13 @@ impl FITMSnapshot {
     pub fn to_active(&self) -> Result<(File, File), io::Error> {
         // If not currently needed, all states should reside in `saved-state`.
         // Thus they need to be copied to be fuzzed
+        // clear active-state first to make sure fuzzed state folder ends up
+        // as "active-state" and not within "active-state"
+        match std::fs::remove_dir_all(ACTIVE_STATE) {
+            Ok(_) => (),
+            Err(e) => println!("Error on removing {}: {:?}", ACTIVE_STATE, E),
+        };
+
         utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
 
         let (stdout, stderr) = self.create_environment()?;
