@@ -23,3 +23,7 @@ fdinfo
 file
 tests/targets/snapshot_creation
 fitm-qemu-trace
+
+cmin-tmp/
+tests/targets/pseudoclient_simple
+tests/targets/pseudoserver_simple
