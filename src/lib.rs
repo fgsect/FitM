@@ -641,7 +641,8 @@ pub fn process_stage(
 
         // current output to cmin-tmp
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
-        snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)?;
+        snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)
+            .expect(format!("[!] copy_queue_to failed for snap: {}", snap.state_path).as_str());
 
         // Replace the old stored queue with the new, cminned queue
         let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
@@ -752,7 +753,7 @@ pub fn run(
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
-    let run_timeout = Duration::from_secs(10);
+    let run_timeout = Duration::from_secs(3);
 
     // set the directory to base_path for all of this criu madness to work.
     env::set_current_dir(base_path)?;
