@@ -2349,8 +2349,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
 
-	create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
-	timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+        create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+        timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
         if (!timewarp_mode) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
@@ -6365,12 +6365,12 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 // Weird bug making criu restore crash - this solves it
                 sleep(0.2);
                 system("touch /tmp/after_docriu");
-		create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
-		timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+                create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+                timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
                 if (timewarp_mode) {
                     exit(0);
-		}
+                }
                 if (!timewarp_mode) {
                     char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
                     char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
