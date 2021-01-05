@@ -1,10 +1,10 @@
-use std::{fs, io::ErrorKind};
 use std::io;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
+use std::{fs, io::ErrorKind};
 
 use regex::Regex;
 use std::thread::sleep;
@@ -95,7 +95,7 @@ impl FITMSnapshot {
         match std::fs::remove_dir_all(ACTIVE_STATE) {
             Ok(_) => (),
             Err(e) if e.kind() == ErrorKind::NotFound => (),
-            Err(e) => println!( "[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
+            Err(e) => println!("[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 
         // Create the new directories and files to make afl feel at home
@@ -451,7 +451,8 @@ impl FITMSnapshot {
         // as "active-state" and not within "active-state"
         match std::fs::remove_dir_all(ACTIVE_STATE) {
             Ok(_) => (),
-            Err(e) => println!("Error while removing {}: {:?}", ACTIVE_STATE, e),
+            Err(e) if e.kind() == ErrorKind::NotFound => (),
+            Err(e) => println!("[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 
         utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
