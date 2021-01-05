@@ -26,11 +26,6 @@ fn main() {
     env::set_var(cpu, "1");
     env::set_var(debug, "1");
 
-    if !Path::new("active-state").exists() && fs::create_dir("active-state").is_err() {
-        println!("Could not create the states dir, aborting!");
-        process::exit(0);
-    }
-
     if !Path::new("saved-states").exists() && fs::create_dir("saved-states").is_err() {
         println!("Could not create saved-states dir, aborting!");
         process::exit(0);
