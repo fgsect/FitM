@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, io::ErrorKind};
 use std::io;
 use std::io::Write;
 use std::path::Path;
@@ -97,11 +97,8 @@ impl FITMSnapshot {
             // fs_extra::error:ErrorKind::NotFound can not be compared to e.kind()
             // because of type mismatch. Thus this seems like the simplest solution.
             // We depend on unix through cp_recursive anyways
-            Err(e) if e.raw_os_error().unwrap() == 2 => (),
-            Err(e) => println!(
-                "[!] Error while removing {}: {:?} (maybe the error code is different on your OS?",
-                ACTIVE_STATE, e
-            ),
+            Err(e) if e.kind() == ErrorKind::NotFound => (),
+            Err(e) => println!( "[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 
         // Create the new directories and files to make afl feel at home
@@ -457,7 +454,7 @@ impl FITMSnapshot {
         // as "active-state" and not within "active-state"
         match std::fs::remove_dir_all(ACTIVE_STATE) {
             Ok(_) => (),
-            Err(e) => println!("Error on removing {}: {:?}", ACTIVE_STATE, E),
+            Err(e) => println!("Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 
         utils::cp_recursive(&format!("./saved-states/{}", self.state_path), ACTIVE_STATE);
