@@ -131,10 +131,14 @@
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
 bool sent = true;
+// If true, we are supposed to write the outputs to a file.
+bool create_outputs = true; //TODO: works? getenv_from_file("FITM_CREATE_OUTPUTS");
+// If true, please do snapshot.
+// we are restored or snapshottet or something.
+bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 // every position in this bitstring is interpreted as a fd. pos x == fd x
 // If a position holds a 1 it is a socket
 long long int is_socket = 0;
-
 
 
 extern unsigned int afl_forksrv_pid;
@@ -2279,7 +2283,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
 {
     sent = true;
     // Only write sth to the fd if we are in consolidation
-    if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+    if(!create_outputs) {
         return (ssize_t)len;
     } else {
         FILE *fp;
@@ -2302,7 +2306,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 {
 
     if(sent){
-        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+        if (!timewarp_mode) {
             exit(0);
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
@@ -2340,7 +2344,10 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
 
-        if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+	create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+	timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+
+        if (!timewarp_mode) {
             char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
             char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
             if(shm_env_var){
@@ -6317,7 +6324,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 return 0;
             } else {
             if(sent && (is_socket >> arg1) & 1){
-                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+                if (!timewarp_mode) {
                     exit(0);
                 }
                 sent = false; // After restore, we'll await the next sent before criuin' again
@@ -6353,10 +6360,13 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 // Weird bug making criu restore crash - this solves it
                 sleep(0.2);
                 system("touch /tmp/after_docriu");
+		create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+		timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
-                if (getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN"))
+                if (timewarp_mode) {
                     exit(0);
-                if (!getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN")) {
+		}
+                if (!timewarp_mode) {
                     char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
                     char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
                     if(shm_env_var){
@@ -6400,7 +6410,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             sent = true;
         }
         if (arg2 == 0 && arg3 == 0) {
-            if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+            if(!create_outputs) {
                 return 0;
             } else {
                 return get_errno(safe_write(arg1, 0, 0));
@@ -6413,13 +6423,13 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             memcpy(copy, p, arg3);
             ret = fd_trans_target_to_host_data(arg1)(copy, arg3);
             if (ret >= 0) {
-                if(getenv_from_file("FITM_CREATE_OUTPUTS")) {
+                if(create_outputs) {
                     ret = get_errno(safe_write(arg1, copy, ret));
                 }
             }
             g_free(copy);
         } else {
-            if(!getenv_from_file("FITM_CREATE_OUTPUTS")) {
+            if(!create_outputs) {
                 _ = system("ls -la /proc/self/fd > /tmp/fitm-arg3");
                 ret = arg3;
             } else {

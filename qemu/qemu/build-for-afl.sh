@@ -19,4 +19,4 @@ export QEMU_LDFLAGS="$LIBS"
 	    --extra-ldflags="$LIBS"
 
 make -j$(nproc) CLFAGS="$LIBS"
-cp ./x86_64-linux-user/qemu-x86_64 ../../AFLplusplus/afl-qemu-trace
+cp ./x86_64-linux-user/qemu-x86_64 ../../fitm-qemu-trace

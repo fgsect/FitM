@@ -93,11 +93,7 @@ impl FITMSnapshot {
 
         // Make sure there is no old active_state folder
         match std::fs::remove_dir_all(ACTIVE_STATE) {
-            Ok(_) => (),
-            // fs_extra::error:ErrorKind::NotFound can not be compared to e.kind()
-            // because of type mismatch. Thus this seems like the simplest solution.
-            // We depend on unix through cp_recursive anyways
-            Err(e) if e.kind() == ErrorKind::NotFound => (),
+            Ok(_) | (Err(e) if e.kind() == ErrorKind::NotFound) => (),
             Err(e) => println!( "[!] Error while removing {}: {:?}", ACTIVE_STATE, e),
         };
 
@@ -217,7 +213,7 @@ impl FITMSnapshot {
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
-                format!("../AFLplusplus/afl-qemu-trace"),
+                format!("../fitm-qemu-trace"),
                 format!("../{}", self.target_bin),
                 format!("{}", dev_null),
             ])
@@ -646,6 +642,8 @@ pub fn process_stage(
         let _ = std::fs::remove_dir_all(&cmin_post_exec);
         snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec)?;
 
+        // TODO: Make sure the same bitmap never creates a new snapshop for this state (may exist from last round already)
+
         let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
@@ -729,7 +727,7 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
         .filter(|entry| {
             entry.path().is_dir() && gen_path.find(entry.path().to_str().unwrap()).is_some()
         })
-        // return all files in outpus
+        // return all files in outputs
         .map(|entry| entry.path().join("outputs").read_dir().unwrap())
         // We now have an iterator of directories of files, flatten to iterator of files
         .flatten()
