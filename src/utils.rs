@@ -4,6 +4,7 @@ use std::fs;
 use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
+use std::io::ErrorKind;
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
@@ -16,8 +17,7 @@ pub fn mv_rename(from: &str, to: &str) {
 
     match std::fs::remove_dir_all(from) {
         Ok(_) => (),
-        // e.kind() is of ErrorKind "Other"
-        Err(e) if e.to_string() == "Directory not empty".to_string() => {
+        Err(e) if e.kind() == ErrorKind::Other => {
             // retry since this usually is a problem within remove_dir_all
             std::fs::remove_dir_all(from)
                 .expect("[!] Error while calling remove_dir_all() again in utils:mv_rename");
