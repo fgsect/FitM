@@ -44,6 +44,6 @@ def main():
 
     open(f"/{cur_state}/restore.sh", "w").write("\n".join(lines).replace("## TEMPLATE ##", open_fds))
     # Make file world executable
-    chmod(f"/{cur_state}/restore.sh", 0o661)
+    chmod(f"/{cur_state}/restore.sh", 0o755)
 if __name__ == "__main__":
     main()
