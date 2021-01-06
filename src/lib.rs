@@ -6,6 +6,7 @@ use std::{env, fs::File};
 use std::{fmt, path::PathBuf};
 use std::{fs, io::ErrorKind};
 
+use crate::utils::cp_recursive;
 use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
@@ -188,6 +189,13 @@ impl FITMSnapshot {
         Ok(())
     }
 
+    fn save_fuzz_results(&self) -> Result<(), io::Error> {
+        let from = format!("{}/out", ACTIVE_STATE);
+        let to = format!("./saved-states/{}/out_postrun", self.state_path);
+        cp_recursive(from.as_str(), to.as_str());
+        Ok(())
+    }
+
     /// Needed for the two initial snapshots created based on the target
     /// binaries
     pub fn init_run(&self) -> Result<(), io::Error> {
@@ -345,6 +353,8 @@ impl FITMSnapshot {
 
         // After finishing the run we go back into the base directory
         env::set_current_dir(&Path::new("../"))?;
+
+        self.save_fuzz_results()?;
 
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
@@ -576,7 +586,8 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
 
-        if !exit_status.success() {
+        // We want to quit if cmin breaks (0) but not if it found a crash in the target (2)
+        if exit_status.code().unwrap() != 0 && exit_status.code().unwrap() != 2 {
             let info =
                 "[!] Error during afl-cmin execution. Please check latest statefolder for output";
             println!("{}", info);
