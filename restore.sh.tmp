@@ -12,8 +12,11 @@ pwd
 # When running with afl-fuzz this script receives 198/199 as pipes for RPC with the forkserver.
 # To forward these into the restored process we use --inherit-fd.
 # The target for --inherit-fd within the restored process are the named pipes that are stored in the pipes file.
-PIPE1=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f1)
-PIPE2=$(cat ./pipes | grep "pipe:\[.*\]" | tail -n 2 | cut -d$'\n' -f2)
+PIPE1=$(cat ./pipes | grep -o "pipe:\[.*\]" | head -n 1 )
+PIPE2=$(cat ./pipes | grep -o "pipe:\[.*\]" | head -n 2 | tail -n 1 )
+
+# echo "PIPE1:\"$PIPE1\""
+# echo "PIPE2:\"$PIPE2\""
 
 #echo "======="
 #cp $INPUT_FILENAME /tmp

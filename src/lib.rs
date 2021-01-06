@@ -309,7 +309,7 @@ impl FITMSnapshot {
                 format!("-t"),
                 format!("{}", self.timeout.as_millis()),
                 format!("--"),
-                format!("sh"),
+                format!("bash"),
                 // Our restore script
                 format!("./restore.sh"),
                 // The fuzzer input file
@@ -386,7 +386,7 @@ impl FITMSnapshot {
                 .args(&[
                     format!("stdbuf"),
                     format!("-oL"),
-                    format!("sh"),
+                    format!("bash"),
                     format!("./restore.sh"),
                     String::from(entry_path.clone().to_str().unwrap()),
                 ])
@@ -478,7 +478,7 @@ impl FITMSnapshot {
                 format!("none"),
                 format!("-U"),
                 format!("--"),
-                format!("sh"),
+                format!("bash"),
                 format!("./restore.sh"),
                 format!("@@"),
             ])
@@ -553,7 +553,7 @@ impl FITMSnapshot {
                 format!("none"),
                 format!("-U"),
                 format!("--"),
-                format!("sh"),
+                format!("bash"),
                 // Our restore script
                 format!("./restore.sh"),
                 // The fuzzer input file
