@@ -3,8 +3,8 @@
     "tasks": [
         {
             "label": "Remove old state dirs",
-            "command": "sudo",
-            "args": ["rm", "-rf", "active-state/", "saved-states/"],
+            "command": "rm",
+            "args": ["-rf", "active-state/", "saved-states/", "cmin-tmp/", "generation_inputs/", "file", "fdinfo"],
             "type": "shell"
         },
         {
