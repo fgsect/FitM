@@ -12,6 +12,7 @@ int main()
 {
     int sock = 0;
     struct sockaddr_in serv_addr;
+    char stack_buf[64];
     char *msg = "R";
     char *buffer = (char *)calloc(100, 1);
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -50,8 +51,8 @@ int main()
     printf("client send #2: %s\n", new_msg);
 
     free(buffer);
-    buffer = (char *) calloc(10, 1);
-    recv(sock, buffer, 100, 0);
+
+    recv(sock, stack_buf, 100, 0);
     printf("client recv #2: %s\n", buffer);
     return 0;
 }
