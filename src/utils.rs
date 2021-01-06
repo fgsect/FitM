@@ -13,8 +13,20 @@ pub fn mv(from: &str, to: &str) {
 
 pub fn mv_rename(from: &str, to: &str) {
     cp_recursive(from, to);
-    std::fs::remove_dir_all(from)
-        .expect(format!("[!] Could not remove '{}' in utils::mv_rename", from).as_str());
+
+    match std::fs::remove_dir_all(from) {
+        Ok(_) => (),
+        // e.kind() is of ErrorKind "Other"
+        Err(e) if e.to_string() == "Directory not empty".to_string() => {
+            // retry since this usually is a problem within remove_dir_all
+            std::fs::remove_dir_all(from)
+                .expect("[!] Error while calling remove_dir_all() again in utils:mv_rename");
+        }
+        Err(e) => println!(
+            "[!] Could not remove '{}' in utils::mv_rename: {:?}",
+            from, e
+        ),
+    };
 }
 
 pub fn copy(from: &str, to: &str) {
