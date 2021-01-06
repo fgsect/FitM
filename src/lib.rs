@@ -392,7 +392,7 @@ impl FITMSnapshot {
             let entry_file =
                 fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
             println!("==== [*] Using input: {:?} ====", entry_path);
-            Command::new("setsid")
+            let exit_status = Command::new("setsid")
                 .args(&[
                     format!("stdbuf"),
                     format!("-oL"),
@@ -413,6 +413,13 @@ impl FITMSnapshot {
             // No new states are discovered if this sleep is not there
             // Didn't investigate further.
             sleep(Duration::new(0, 50000000));
+
+            if !exit_status.success() {
+                let info =
+                    "[!] Error during create_outputs execution. Please check latest statefolder for output";
+                println!("{}", info);
+                std::process::exit(1);
+            }
 
             // Move created outputs to a given folder
             // Probably saved states, as current active-state folder will be deleted with next to_active()
