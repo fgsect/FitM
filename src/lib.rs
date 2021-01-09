@@ -1,5 +1,6 @@
-#![feature(never_type)]
 #![feature(asm)]
+#![feature(rustc_attrs)]
+#![feature(never_type)]
 
 use std::io;
 use std::io::Write;
