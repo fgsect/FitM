@@ -197,7 +197,7 @@ fn main() {
             println!("");
             system("ps -aux");
         }
-
+        
         std::thread::sleep(Duration::from_secs(10));
         // child.wait().unwrap();
         // let exit_status = afl.wait().expect("waitpid failed");

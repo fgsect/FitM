@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -x
+set -x
 # This file has to write the entire env into the envfile
 # Expects relative path to state folder it's supposed to restore as arg
 # TODO: Clean this up, this looks/is ugly

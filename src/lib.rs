@@ -1,3 +1,6 @@
+#![feature(never_type)]
+#![feature(asm)]
+
 use std::io;
 use std::io::Write;
 use std::path::Path;
@@ -11,6 +14,7 @@ use regex::Regex;
 use std::thread::sleep;
 use std::time::Duration;
 
+pub mod namespacing;
 pub mod utils;
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
@@ -652,6 +656,11 @@ pub fn process_stage(
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
         snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)
             .expect(format!("[!] copy_queue_to failed for snap: {}", snap.state_path).as_str());
+
+        // [DBG] WAIT FOR KEYPRESS
+        let mut foo = String::new();
+        println!("[DBG] Awaiting ENTER");
+        io::stdin().read_line(&mut foo).expect("DEBUG FAILED");
 
         // Replace the old stored queue with the new, cminned queue
         let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
