@@ -213,24 +213,44 @@ mod tests {
 
     #[test]
     fn test_namespacing1() {
-        run_in_namespace(|| {
+        let mut child = run_in_namespace(|| {
             // mount("none","/", None, libc::MS_REC | libc::MS_PRIVATE, None); // Make / private (meaning changes wont propagate to the default namespace)
-            mount("none", "/proc", None, libc::MS_REC | libc::MS_PRIVATE, None).expect("mounting proc private failed");
+            mount("none", "/proc", None, libc::MS_REC | libc::MS_PRIVATE, None)
+                .expect("mounting proc private failed");
             mount(
                 "proc",
                 "/proc",
                 Some("proc"),
                 libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
                 None,
-            ).expect("proc remounting failed");
+            )
+            .expect("proc remounting failed");
+
+            unsafe { libc::setsid() };
 
             println!("PID: {}", id());
             println!("SID: {}", unsafe { libc::getsid(id() as _) });
             println!("UID: {}", unsafe { libc::getuid() });
 
+            Command::new("setsid")
+                .arg("bash")
+                .arg("-c")
+                .arg("sleep 5s; echo 'hi'")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
             system("ps -aux");
-            std::process::exit(0);
+
+            system("criu dump -t 2 -v -o dump.log --images-dir dump/ --leave-running");
+            system("chown 1000:1000 dump/dump.log");
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            std::process::exit(10);
         })
         .unwrap();
+
+        let ret = child.wait().unwrap();
+        println!("{:?}", ret.code());
     }
 }
