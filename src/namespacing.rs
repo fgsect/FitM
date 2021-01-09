@@ -214,8 +214,7 @@ mod tests {
     #[test]
     fn test_namespacing1() {
         run_in_namespace(|| {
-            // libc::mount(b"none\0".as_ptr() as _, b"/\0".as_ptr() as _, 0 as _, libc::MS_REC | libc::MS_PRIVATE, 0 as _);
-
+            // mount("none","/", None, libc::MS_REC | libc::MS_PRIVATE, None); // Make / private (meaning changes wont propagate to the default namespace)
             mount("none", "/proc", None, libc::MS_REC | libc::MS_PRIVATE, None).expect("mounting proc private failed");
             mount(
                 "proc",
