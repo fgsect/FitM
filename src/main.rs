@@ -36,7 +36,7 @@ fn main() {
     let criu_stderr = fs::File::create("criu_stderr").expect("[!] Could not create criu_stderr");
     let foo = std::env::current_dir().unwrap();
     println!("cwd: {:?}", foo);
-    let _criu_server = Command::new("/home/xcv/repos/FitM/criu/criu/criu")
+    let _criu_server = Command::new("./criu/criu/criu")
         .args(&[
             format!("service"),
             format!("-v4"),
