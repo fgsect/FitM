@@ -113,7 +113,6 @@ struct clone_argsV2 {
 
 unsafe fn clone3(args: &clone_args) -> io::Result<Option<i32>> {
     let ret: pid_t;
-    println!("{}", std::mem::size_of::<clone_args>());
     asm!(
         "syscall",
         in("rax") libc::SYS_clone3,
@@ -138,6 +137,9 @@ unsafe fn clone3(args: &clone_args) -> io::Result<Option<i32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::{File, OpenOptions};
+    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::os::unix::{fs::OpenOptionsExt, io::AsRawFd};
     use std::process::{id, Child, Command, Stdio};
 
     #[test]
@@ -232,6 +234,7 @@ mod tests {
             println!("SID: {}", unsafe { libc::getsid(id() as _) });
             println!("UID: {}", unsafe { libc::getuid() });
 
+            // TODO spawn this process with a specific PID
             Command::new("setsid")
                 .arg("bash")
                 .arg("-c")
@@ -241,10 +244,11 @@ mod tests {
                 .stderr(Stdio::piped())
                 .spawn()
                 .unwrap();
-            system("ps -aux");
 
+            system("ps -aux");
             system("criu dump -t 2 -v -o dump.log --images-dir dump/ --leave-running");
             system("chown 1000:1000 dump/dump.log");
+
             std::thread::sleep(std::time::Duration::from_secs(10));
             std::process::exit(10);
         })
@@ -252,5 +256,108 @@ mod tests {
 
         let ret = child.wait().unwrap();
         println!("{:?}", ret.code());
+    }
+
+    #[test]
+    fn test_snapshot_init() {
+        let child = run_in_namespace(|| {
+            mount("none", "/proc", None, libc::MS_REC | libc::MS_PRIVATE, None)
+                .expect("mounting proc private failed");
+
+            mount(
+                "proc",
+                "/proc",
+                Some("proc"),
+                libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
+                None,
+            )
+            .expect("proc remounting failed");
+
+            unsafe { libc::setsid() };
+
+            println!("PID: {}", id());
+            println!("SID: {}", unsafe { libc::getsid(id() as _) });
+            println!("UID: {}", unsafe { libc::getuid() });
+
+            let mut file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .mode(0o644)
+                .open("/proc/sys/kernel/ns_last_pid")
+                .expect("Failed to open ns_last_pid");
+
+            let _criu_srv = Command::new("criu")
+                .args(&[
+                    "service",
+                    "-v4",
+                    "--address",
+                    "/tmp/criu_service.socket",
+                    "-o",
+                    "dump.log",
+                    "-vv",
+                ])
+                .spawn()
+                .unwrap();
+
+            println!("locking");
+            unsafe {
+                if libc::flock(file.as_raw_fd() as _, libc::LOCK_EX) != 0 {
+                    panic!("LOCKING FAILED")
+                }
+            }
+
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).unwrap();
+            println!("last pid: [{}]", contents.trim());
+
+            let (stdout, stderr) = (
+                File::create("stdout-afl").unwrap(),
+                File::create("stderr-afl").unwrap(),
+            );
+
+            let stdin_path = "/dev/null";
+            let stdin_file = File::open(stdin_path).unwrap();
+            let snapshot_dir = "./dump";
+
+            file.seek(SeekFrom::Start(0)).unwrap();
+            unsafe { libc::ftruncate(file.as_raw_fd(), 0) };
+            file.write(311336.to_string().as_bytes()).unwrap();
+
+            let mut child = Command::new("setsid")
+                .args(&[
+                    format!("stdbuf"),
+                    format!("-oL"),
+                    format!("./fitm-qemu-trace"),
+                    format!("{}", "tests/targets/pseudoserver_simple"),
+                    format!("{}", "/dev/null"),
+                ])
+                .stdin(Stdio::from(stdin_file))
+                .stdout(Stdio::from(stdout))
+                .stderr(Stdio::from(stderr))
+                .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+                .env("FITM_CREATE_OUTPUTS", "1")
+                .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+                .env("AFL_NO_UI", "1")
+                .spawn()
+                .expect("[!] Could not spawn snapshot run");
+
+            println!("CHILD PID: {}", child.id());
+            child
+                .wait()
+                .expect("[!] Could not wait for child to finish");
+
+            unsafe {
+                if libc::flock(file.as_raw_fd(), libc::LOCK_UN) != 0 {
+                    panic!("UNLOCKING FAILED")
+                }
+            }
+            drop(file);
+
+            std::process::exit(1);
+        })
+        .unwrap()
+        .wait()
+        .unwrap();
     }
 }
