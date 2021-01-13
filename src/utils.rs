@@ -45,6 +45,8 @@ pub fn cp_recursive(from: &str, to: &str) {
         .expect("[!] Could not spawn cp cmd")
         .wait()
         .expect("[!] Failed to wait for cp");
+
+    Command::new("sync").status().unwrap();
 }
 
 pub fn copy_overwrite(from: &str, to: &str) {
