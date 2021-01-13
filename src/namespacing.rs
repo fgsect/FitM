@@ -1,45 +1,5 @@
 use libc::{self, pid_t};
-use std::{
-    ffi::CString,
-    io,
-    process::{Child, ExitStatus},
-};
-
-// Structures to mimic the layout of the stdlib Child,
-// in order to correctly transmute between our structure and the original
-// since we we can't construct Child by hand
-// TESTED for rust-toolchain nightly-1.51 for x86_64-unknown-linux-gnu
-#[derive(Debug)]
-struct ChildReplacement {
-    handle: ProcessReplacement,
-    stdin: Option<ChildPipe>,
-    stdout: Option<ChildPipe>,
-    stderr: Option<ChildPipe>,
-}
-
-#[derive(Debug)]
-struct ProcessReplacement {
-    pid: pid_t,
-    status: Option<ExitStatus>,
-}
-
-#[derive(Debug)]
-struct ChildPipe {
-    inner: AnonPipe,
-}
-
-#[derive(Debug)]
-struct AnonPipe(FileDesc);
-
-#[derive(Debug)]
-#[rustc_layout_scalar_valid_range_start(0)]
-// libstd/os/raw/mod.rs assures me that every libstd-supported platform has a
-// 32-bit c_int. Below is -2, in two's complement, but that only works out
-// because c_int is 32 bits.
-#[rustc_layout_scalar_valid_range_end(0xFF_FF_FF_FE)]
-struct FileDesc {
-    fd: libc::c_int,
-}
+use std::{ffi::CString, fmt::Debug, io};
 
 fn mount(
     src: &str,
@@ -111,9 +71,10 @@ impl NamespaceContext {
         }
     }
 
-    pub fn execute<T>(self, f: T) -> io::Result<Child>
+    pub fn execute<T, E>(self, f: T) -> io::Result<Namespace>
     where
-        T: FnOnce() -> !,
+        T: FnOnce() -> Result<i32, E>,
+        E: Debug,
     {
         // Clone-process with namespaceing flags
         let clone_result = unsafe {
@@ -131,25 +92,46 @@ impl NamespaceContext {
         };
 
         Ok(match clone_result {
-            Some(child_pid) => {
-                let child = ChildReplacement {
-                    handle: ProcessReplacement {
-                        pid: child_pid,
-                        status: None,
-                    },
-                    stdin: None,
-                    stdout: None,
-                    stderr: None,
-                };
-
-                let child: Child = unsafe { std::mem::transmute(child) };
-                child
-            }
+            Some(child_pid) => Namespace {
+                init_pid: child_pid,
+                status: None,
+            },
             None => {
                 (self.init_fn)();
-                f()
+                match f() {
+                    Ok(val) => std::process::exit(val),
+                    Err(e) => panic!("Namespace call failed with error {:?}", e),
+                }
             }
         })
+    }
+}
+
+struct Namespace {
+    init_pid: pid_t,
+    status: Option<libc::c_int>,
+}
+
+impl Namespace {
+    pub fn wait(&mut self) -> io::Result<libc::c_int> {
+        if let Some(status) = self.status {
+            return Ok(status);
+        }
+
+        let mut status = 0 as libc::c_int;
+        loop {
+            let result = unsafe { libc::waitpid(self.init_pid, &mut status, 0) };
+            if result == -1 {
+                let e = io::Error::last_os_error();
+                if e.kind() != io::ErrorKind::Interrupted {
+                    return Err(e);
+                }
+            } else {
+                break;
+            }
+        }
+        self.status = Some(status);
+        Ok(status)
     }
 }
 
@@ -183,17 +165,21 @@ struct clone_argsV2 {
 }
 
 unsafe fn clone3(args: &clone_args) -> io::Result<Option<i32>> {
-    let ret: pid_t;
-    asm!(
-        "syscall",
-        in("rax") libc::SYS_clone3,
-        in("rdi") args as *const _,
-        in("rsi") std::mem::size_of::<clone_args>(),
-        out("rdx") _,
-        out("rcx") _,
-        out("r11") _,
-        lateout("rax") ret,
-    );
+    let ret: pid_t = libc::syscall(
+        libc::SYS_clone3,
+        args as *const _,
+        std::mem::size_of::<clone_args>(),
+    ) as _;
+    // asm!(
+    //     "syscall",
+    //     in("rax") libc::SYS_clone3,
+    //     in("rdi") args as *const _,
+    //     in("rsi") std::mem::size_of::<clone_args>(),
+    //     out("rdx") _,
+    //     out("rcx") _,
+    //     out("r11") _,
+    //     lateout("rax") ret,
+    // );
 
     match ret {
         0 => Ok(None),
@@ -212,30 +198,9 @@ mod tests {
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::os::unix::{fs::OpenOptionsExt, io::AsRawFd};
     use std::path::Path;
-    use std::process::{id, Child, Command, Stdio};
+    use std::process::{id, Command, Stdio};
 
     use crate::FITMSnapshot;
-
-    #[test]
-    fn test_transmute_sizes() {
-        println!(
-            "{}, {}",
-            std::mem::size_of::<Child>(),
-            std::mem::size_of::<ChildReplacement>()
-        );
-    }
-
-    #[test]
-    fn test_transmute() {
-        let foo = Command::new("/bin/sleep")
-            .arg("5s")
-            .stdin(Stdio::piped())
-            .spawn()
-            .unwrap();
-        let foo: ChildReplacement = unsafe { std::mem::transmute(foo) };
-
-        println!("{:?}", foo);
-    }
 
     fn system(command: &str) -> i32 {
         let command = CString::new(command).unwrap();
@@ -245,7 +210,7 @@ mod tests {
     #[test]
     fn test_namespacing1() {
         let mut child = NamespaceContext::new()
-            .execute(|| {
+            .execute(|| -> io::Result<i32> {
                 println!("PID: {}", id());
                 println!("SID: {}", unsafe { libc::getsid(id() as _) });
                 println!("UID: {}", unsafe { libc::getuid() });
@@ -258,26 +223,25 @@ mod tests {
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .spawn()
-                    .unwrap();
+                    .spawn()?;
 
                 system("ps -aux");
                 system("criu dump -t 2 -v -o dump.log --images-dir dump/ --leave-running");
                 system("chown 1000:1000 dump/dump.log");
 
                 std::thread::sleep(std::time::Duration::from_secs(10));
-                std::process::exit(10);
+                Ok(10)
             })
             .unwrap();
 
         let ret = child.wait().unwrap();
-        println!("{:?}", ret.code());
+        println!("{:?}", ret);
     }
 
     #[test]
     fn test_snapshot_init() {
-        let child = NamespaceContext::new()
-            .execute(|| {
+        NamespaceContext::new()
+            .execute(|| -> io::Result<i32> {
                 println!("PID: {}", id());
                 println!("SID: {}", unsafe { libc::getsid(id() as _) });
                 println!("UID: {}", unsafe { libc::getuid() });
@@ -292,8 +256,7 @@ mod tests {
                         "dump.log",
                         "-vv",
                     ])
-                    .spawn()
-                    .unwrap();
+                    .spawn()?;
 
                 let mut file = OpenOptions::new()
                     .read(true)
@@ -314,18 +277,14 @@ mod tests {
                 file.read_to_string(&mut contents).unwrap();
                 println!("last pid: [{}]", contents.trim());
 
-                let (stdout, stderr) = (
-                    File::create("stdout-afl").unwrap(),
-                    File::create("stderr-afl").unwrap(),
-                );
+                let (stdout, stderr) = (File::create("stdout-afl")?, File::create("stderr-afl")?);
 
                 let stdin_path = "/dev/null";
-                let stdin_file = File::open(stdin_path).unwrap();
-                let snapshot_dir = "./dump";
+                let stdin_file = File::open(stdin_path)?;
 
                 file.seek(SeekFrom::Start(0)).unwrap();
                 unsafe { libc::ftruncate(file.as_raw_fd(), 0) };
-                file.write(311336.to_string().as_bytes()).unwrap();
+                file.write(311336.to_string().as_bytes())?;
 
                 let mut child = Command::new("setsid")
                     .args(&[
@@ -385,7 +344,7 @@ mod tests {
 
         let server_s = afl_server_snap.clone();
         let mut child = NamespaceContext::new()
-            .execute(move || {
+            .execute(move || -> io::Result<i32> {
                 println!("PID: {}", id());
                 println!("SID: {}", unsafe { libc::getsid(id() as _) });
                 println!("UID: {}", unsafe { libc::getuid() });
@@ -430,7 +389,7 @@ mod tests {
                 }
                 drop(file);
 
-                std::process::exit(0);
+                Ok(0)
             })
             .expect("Child spawning failed");
 
@@ -442,14 +401,12 @@ mod tests {
         std::fs::write("./saved-states/fitm-gen1-state0/in/testinp", "ulullulul")
             .expect("failed to create test-input");
         NamespaceContext::new()
-            .execute(move || {
-                server_s
-                    .create_outputs(
-                        "./saved-states/fitm-gen1-state0/in",
-                        "./saved-states/fitm-gen1-state0/outputs",
-                    )
-                    .unwrap();
-                std::process::exit(0);
+            .execute(move || -> io::Result<i32> {
+                server_s.create_outputs(
+                    "./saved-states/fitm-gen1-state0/in",
+                    "./saved-states/fitm-gen1-state0/outputs",
+                )?;
+                Err(io::Error::new(io::ErrorKind::Other, "dawjdiawjid"))
             })
             .unwrap()
             .wait()
