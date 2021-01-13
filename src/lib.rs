@@ -247,16 +247,20 @@ impl FITMSnapshot {
     }
 
     /// Create a new snapshot based on a given snapshot
-    pub fn snapshot_run(&self, stdin_path: &str) -> Result<(), io::Error> {
+    /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
+    pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
         let (stdout, stderr) = self.create_environment()?;
 
         let stdin_file = fs::File::open(stdin_path).unwrap();
-
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
+
+        let snapshot_dir_new = format!("{}/snapshot_new", env::current_dir().unwrap().display());
+        fs::create_dir_all(&snapshot_dir_new)
+            .expect("[!] create_dir_all on snapshot_dir_new failed");
 
         Command::new("setsid")
             .args(&[
@@ -269,7 +273,7 @@ impl FITMSnapshot {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("CRIU_SNAPSHOT_DIR", snapshot_dir)
+            .env("CRIU_SNAPSHOT_DIR", &snapshot_dir_new)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
@@ -277,12 +281,14 @@ impl FITMSnapshot {
             .expect("[!] Snapshot run failed");
         sleep(Duration::new(0, 50000000));
 
+        let success =
+            utils::consolidate_snapshot_dirs(snapshot_dir.as_str(), snapshot_dir_new.as_str());
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
         utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
-        Ok(())
+        Ok(success)
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
@@ -524,7 +530,7 @@ impl FITMSnapshot {
         &self,
         state_id: usize,
         input_path: &str,
-    ) -> Result<FITMSnapshot, io::Error> {
+    ) -> Result<Option<FITMSnapshot>, io::Error> {
         let afl = FITMSnapshot::new(
             self.generation + 2,
             state_id,
@@ -535,9 +541,11 @@ impl FITMSnapshot {
             true,
         );
 
-        afl.snapshot_run(input_path)?;
-
-        Ok(afl)
+        if afl.snapshot_run(input_path)? {
+            Ok(Some(afl))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
@@ -669,10 +677,14 @@ pub fn process_stage(
             let entry = entry?;
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
-                next_own_snaps.push(snap.create_next_snapshot(
+                let snap_option = snap.create_next_snapshot(
                     next_gen_id_start + next_own_snaps.len(),
                     entry.path().as_os_str().to_str().unwrap(),
-                )?)
+                )?;
+                match snap_option {
+                    Some(new_snap) => next_own_snaps.push(new_snap),
+                    None => (),
+                }
             }
         }
     }

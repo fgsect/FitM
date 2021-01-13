@@ -36,17 +36,15 @@ else
   echo "Running in AFL, no dummy FDs necessary"
 fi
 
-if [[ -z "$2" ]]; then
-  SNAPSHOT_DIR="./snapshot"
-else
-  SNAPSHOT_DIR=$2
+if [[ -z "$CRIU_SNAPSHOT_DIR" ]]; then
+  CRIU_SNAPSHOT_DIR="./snapshot"
 fi
 
 ## TEMPLATE ##
 
 ../criu/criu/criu restore -d \
     -vvv \
-    -o ./restore.log \
-    --images-dir $SNAPSHOT_DIR \
+    -o ../restore.log \
+    --images-dir $CRIU_SNAPSHOT_DIR \
     --inherit-fd "fd[198]:$PIPE1" \
     --inherit-fd "fd[199]:$PIPE2" \

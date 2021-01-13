@@ -1,6 +1,7 @@
 use fs_extra;
 use fs_extra::dir::CopyOptions;
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
@@ -135,6 +136,28 @@ pub fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32
     } else {
         (state_path.0, (state_path.1) + 1)
     }
+}
+
+pub fn consolidate_snapshot_dirs(old: &str, new: &str) -> bool {
+    let path_buf_new = PathBuf::from(new);
+
+    let success = if !path_buf_new
+        .read_dir()
+        .expect("[!] Could not read_dir on PathBuf in consolidate_snapshot_dirs")
+        .next()
+        .is_none()
+    {
+        // if `new` contains something it means a new snapshot was created
+        // in this case we want to end up with the new snapshot being placed in "snapshot" (==old)
+        fs::remove_dir_all(old)
+            .expect("[!] Removing old snapshot dir failed in consolidate_snapshot_dirs");
+        fs::rename(new, old).expect("[!] Renaming snapshotdir failed in consolidate_snapshot_dirs");
+        true
+    } else {
+        false
+    };
+
+    success
 }
 
 #[cfg(test)]
