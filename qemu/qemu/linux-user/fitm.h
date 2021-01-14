@@ -33,24 +33,16 @@ char *getenv_from_file(const char *var) {
         perror("Failed to calloc in fitm.h:getenv_from_file");
         exit(-2);
     }
-    _ = fread(string, 1, fsize, f);
-    fclose(f);
-
-    char *tmp = string;
-
-    while (!found && tmp) {
-        if (!strncmp(var, tmp, strlen(var))) {
-            found = tmp;
-        }
-        tmp = strchr(tmp, '\n');
-        if (tmp) {
-            *tmp = '\0';
-            tmp++;
-        }
+    size_t ret = fread(string, 1, fsize, f);
+    if (ret != fsize) {
+        fprintf(stderr, "fread() failed: %zu\n", ret);
+        exit(EXIT_FAILURE);
     }
 
-    if (!found) {
-        free(string);
+    fclose(f);
+
+    found = strstr(string, var);
+    if(!found){
         return NULL;
     }
 
@@ -60,14 +52,18 @@ char *getenv_from_file(const char *var) {
         return NULL;
     }
     found++;
-    char *ret = (char *)calloc(strlen(found), 1);
-    if (!ret) {
-        perror("Failed to calloc in fitm.h:getenv_from_file");
+
+    char *tmp = strchr(found, '\n');
+    if (tmp) {
+        *tmp = '\0';
+    }
+    char *duplicate = strdup(found);
+    if(!duplicate){
+        perror("Failed to strdup in fitm.h:getenv_from_file");
         exit(-1);
     }
-    strncpy(ret, found, strlen(found));
-    ret[strlen(ret)] = '\0';
+
     free(string);
 
-    return ret;
+    return duplicate;
 }
