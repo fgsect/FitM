@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::process;
+use std::process::{Command, Stdio};
 use std::{env, time::Duration};
 
 fn main() {
@@ -30,6 +31,22 @@ fn main() {
         println!("Could not create saved-states dir, aborting!");
         process::exit(0);
     }
+
+    let criu_stdout = fs::File::create("criu_stdout").expect("[!] Could not create criu_stdout");
+    let criu_stderr = fs::File::create("criu_stderr").expect("[!] Could not create criu_stderr");
+    let foo = std::env::current_dir().unwrap();
+    println!("cwd: {:?}", foo);
+    let _criu_server = Command::new("./criu/criu/criu")
+        .args(&[
+            format!("service"),
+            format!("-v4"),
+            format!("--address"),
+            format!("/tmp/criu_service.socket"),
+        ])
+        .stdout(Stdio::from(criu_stdout))
+        .stderr(Stdio::from(criu_stderr))
+        .spawn()
+        .expect("[!] Could not spawn criuserver");
 
     // TODO: use argv to fill these
     match fitm::run(

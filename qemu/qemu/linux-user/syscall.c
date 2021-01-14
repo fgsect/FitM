@@ -2287,14 +2287,14 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
         return (ssize_t)len;
     } else {
         FILE *fp;
-        char *uuid = get_new_uuid();
-        char path[49] = "/tmp/fitm-";
-        strncat(path, uuid, 37);
-        fp = fopen(path, "w+");
-        fprintf(fp, "fd: %d\nmsg: %s\nlen: %ld", fd, (char *)msg, len);
-        fclose(fp);
+//        char *uuid = get_new_uuid();
+//        char path[49] = "/tmp/fitm-";
+//        strncat(path, uuid, 37);
+//        fp = fopen(path, "w+");
+//        fprintf(fp, "fd: %d\nmsg: %s\nlen: %ld", fd, (char *)msg, len);
+//        fclose(fp);
 
-        _ = system("ls -la /proc/self/fd > /tmp/fitm-sendto");
+//        _ = system("ls -la /proc/self/fd > /tmp/fitm-sendto");
         return write(fd, (char *) msg, len);
     }
 }
@@ -2369,7 +2369,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         FILE* input_file = fopen(input, "r");
 
         if(!input_file){
-            printf("fatal: could not fopen INPUT_FILENAME: %s\n", input);
+            printf("INPUT_FILENAME: %s\n", input);
+            perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
             exit(1);
         }
 
@@ -6387,7 +6388,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 char* input = getenv_from_file("INPUT_FILENAME");
                 FILE* input_file = fopen(input, "r");
                 if(!input_file){
-                    printf("fatal: could not fopen INPUT_FILENAME: %s\n", input);
+                    printf("INPUT_FILENAME: %s\n", input);
+                    perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
                     exit(1);
                 }
                 int input_fd = fileno(input_file);
@@ -6439,13 +6441,13 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 ret = arg3;
             } else {
                 _ = system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
-                FILE *fp;
-                char *uuid = get_new_uuid();
-                char path[49] = "/tmp/fitm-";
-                strncat(path, uuid, 37);
-                fp = fopen(path, "w+");
-                fprintf(fp, "arg1: %ld\np: %s\narg3: %ld", arg1, (char *)p, arg3);
-                fclose(fp);
+//                FILE *fp;
+//                char *uuid = get_new_uuid();
+//                char path[49] = "/tmp/fitm-";
+//                strncat(path, uuid, 37);
+//                fp = fopen(path, "w+");
+//                fprintf(fp, "arg1: %ld\np: %s\narg3: %ld", arg1, (char *)p, arg3);
+//                fclose(fp);
 
                 ret = get_errno(safe_write(arg1, p, arg3));
             }
