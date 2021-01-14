@@ -444,12 +444,19 @@ impl FITMSnapshot {
                 let to = destination_path
                     .to_str()
                     .expect("[!] Couldn't convert destination_path to str");
+                // append index to not overwrite fd-files
+                let to = format!(
+                    "{}-{}",
+                    to,
+                    entry_path.file_name().unwrap().to_str().unwrap()
+                );
                 fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
             }
+
+            // After creating the outputs we go back into the base directory
+            env::set_current_dir(&Path::new("../")).unwrap();
         }
 
-        // After creating the outputs we go back into the base directory
-        env::set_current_dir(&Path::new("../")).unwrap();
         Ok(())
     }
 
