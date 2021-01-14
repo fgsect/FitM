@@ -228,7 +228,6 @@ impl FITMSnapshot {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("FITM_CREATE_OUTPUTS", "1")
             .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
             .env("AFL_NO_UI", "1")
             .spawn()
