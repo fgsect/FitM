@@ -121,9 +121,6 @@ impl FITMSnapshot {
             if base_state != "".to_string() {
                 utils::copy_snapshot_base(&base_state);
             }
-        } else {
-            fs::create_dir(format!("{}/snapshot", ACTIVE_STATE))
-                .expect("[-] Could not create snapshot dir!");
         };
 
         let new_run = FITMSnapshot {
@@ -210,6 +207,11 @@ impl FITMSnapshot {
         let dev_null = "/dev/null";
         let stdin = fs::File::open(dev_null).unwrap();
 
+        let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
+        fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
+
+        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
+
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
@@ -227,7 +229,7 @@ impl FITMSnapshot {
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
             .env("FITM_CREATE_OUTPUTS", "1")
-            .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+            .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
@@ -235,6 +237,11 @@ impl FITMSnapshot {
             .expect("[!] Snapshot run failed");
 
         sleep(Duration::new(0, 50000000));
+
+        // if there is a positive difference `new` is more recent than `old` meaning some file in the folder changed
+        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
+        let _success = utils::positive_time_diff(&old, &new);
+
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
@@ -258,9 +265,7 @@ impl FITMSnapshot {
         // correct stdin, stdout and stderr file descriptors.
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
 
-        let snapshot_dir_new = format!("{}/snapshot_new", env::current_dir().unwrap().display());
-        fs::create_dir_all(&snapshot_dir_new)
-            .expect("[!] create_dir_all on snapshot_dir_new failed");
+        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
 
         Command::new("setsid")
             .args(&[
@@ -273,16 +278,19 @@ impl FITMSnapshot {
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-            .env("CRIU_SNAPSHOT_DIR", &snapshot_dir_new)
+            .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
             .env("AFL_NO_UI", "1")
             .spawn()
             .expect("[!] Could not spawn snapshot run")
             .wait()
             .expect("[!] Snapshot run failed");
+
         sleep(Duration::new(0, 50000000));
 
-        let success =
-            utils::consolidate_snapshot_dirs(snapshot_dir.as_str(), snapshot_dir_new.as_str());
+        // if there is a positive difference new is more recent than old meaning some file in the folder changed
+        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
+        let success = utils::positive_time_diff(&old, &new);
+
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
