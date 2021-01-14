@@ -375,6 +375,73 @@ impl FITMSnapshot {
         Ok(())
     }
 
+    pub fn create_outputs_file(
+        &self,
+        entry_path: PathBuf,
+        output_path: &str,
+    ) -> Result<(), io::Error> {
+        let (stdout, stderr) = self.to_active()?;
+
+        let entry_file = fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
+        println!("==== [*] Using input: {:?} ====", entry_path);
+        if self.state_path == "fitm-gen2-state0" {
+            sleep(Duration::from_millis(0));
+        }
+        let exit_status = Command::new("setsid")
+            .args(&[
+                format!("stdbuf"),
+                format!("-oL"),
+                format!("bash"),
+                format!("./restore.sh"),
+                String::from(entry_path.clone().to_str().unwrap()),
+            ])
+            .stdin(Stdio::from(entry_file))
+            .stdout(Stdio::from(stdout.try_clone().unwrap()))
+            .stderr(Stdio::from(stderr.try_clone().unwrap()))
+            .env("FITM_CREATE_OUTPUTS", "1")
+            .env("AFL_NO_UI", "1")
+            .spawn()
+            .expect("[!] Could not spawn snapshot run")
+            .wait()
+            .expect("[!] Snapshot run failed");
+
+        // No new states are discovered if this sleep is not there
+        // Didn't investigate further.
+        sleep(Duration::new(0, 50000000));
+
+        if !exit_status.success() {
+            let info =
+                "[!] Error during create_outputs execution. Please check latest statefolder for output";
+            println!("{}", info);
+            std::process::exit(1);
+        }
+
+        // Move created outputs to a given folder
+        // Probably saved states, as current active-state folder will be deleted with next to_active()
+        for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
+            let cur_file = entry.unwrap().file_name();
+            let from = format!("./fd/{}", &cur_file.to_str().unwrap());
+            let destination_path = Path::new(output_path).join(cur_file);
+            let to = destination_path
+                .to_str()
+                .expect("[!] Couldn't convert destination_path to str");
+            // append index to not overwrite fd-files
+            let to = format!(
+                "{}-{}",
+                to,
+                entry_path.file_name().unwrap().to_str().unwrap()
+            );
+            fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
+        }
+        if self.state_path == "fitm-gen2-state0" {
+            sleep(Duration::from_millis(0));
+        }
+        // After creating the outputs we go back into the base directory
+        env::set_current_dir(&Path::new("../")).unwrap();
+
+        Ok(())
+    }
+
     pub fn create_outputs(&self, input_path: &str, output_path: &str) -> Result<(), io::Error> {
         // Work with absolute paths
         let input_path = build_create_absolute_path(input_path)
@@ -399,62 +466,9 @@ impl FITMSnapshot {
             if entry_unwrapped.file_type().unwrap().is_dir() {
                 continue;
             }
-
-            let (stdout, stderr) = self.to_active()?;
-
             let entry_path = entry_unwrapped.path();
-            let entry_file =
-                fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
-            println!("==== [*] Using input: {:?} ====", entry_path);
-            let exit_status = Command::new("setsid")
-                .args(&[
-                    format!("stdbuf"),
-                    format!("-oL"),
-                    format!("bash"),
-                    format!("./restore.sh"),
-                    String::from(entry_path.clone().to_str().unwrap()),
-                ])
-                .stdin(Stdio::from(entry_file))
-                .stdout(Stdio::from(stdout.try_clone().unwrap()))
-                .stderr(Stdio::from(stderr.try_clone().unwrap()))
-                .env("FITM_CREATE_OUTPUTS", "1")
-                .env("AFL_NO_UI", "1")
-                .spawn()
-                .expect("[!] Could not spawn snapshot run")
-                .wait()
-                .expect("[!] Snapshot run failed");
 
-            // No new states are discovered if this sleep is not there
-            // Didn't investigate further.
-            sleep(Duration::new(0, 50000000));
-
-            if !exit_status.success() {
-                let info =
-                    "[!] Error during create_outputs execution. Please check latest statefolder for output";
-                println!("{}", info);
-                std::process::exit(1);
-            }
-
-            // Move created outputs to a given folder
-            // Probably saved states, as current active-state folder will be deleted with next to_active()
-            for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
-                let cur_file = entry.unwrap().file_name();
-                let from = format!("./fd/{}", &cur_file.to_str().unwrap());
-                let destination_path = Path::new(&output_path).join(cur_file);
-                let to = destination_path
-                    .to_str()
-                    .expect("[!] Couldn't convert destination_path to str");
-                // append index to not overwrite fd-files
-                let to = format!(
-                    "{}-{}",
-                    to,
-                    entry_path.file_name().unwrap().to_str().unwrap()
-                );
-                fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
-            }
-
-            // After creating the outputs we go back into the base directory
-            env::set_current_dir(&Path::new("../")).unwrap();
+            self.create_outputs_file(entry_path, output_path.as_str())?;
         }
 
         Ok(())
@@ -815,7 +829,12 @@ pub fn run(
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // This is the (theoretical) state before the initial server run.
-    afl_client_snap.copy_fds_to_output_for(0, 0)?;
+    // afl_client_snap.create_outputs("". "./saved-states/fitm-gen0-state0");
+    let outputs_path_absolute =
+        build_create_absolute_path(format!("./saved-states/fitm-gen0-state0/outputs").as_str())?;
+    afl_client_snap
+        .create_outputs_file(PathBuf::from("/dev/null"), outputs_path_absolute.as_str())?;
+    // afl_client_snap.copy_fds_to_output_for(0, 0)?;
 
     let afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
