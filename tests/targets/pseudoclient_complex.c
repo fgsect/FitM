@@ -13,6 +13,7 @@ int main()
     int sock = 0;
     struct sockaddr_in serv_addr;
     char *msg = "R";
+    char stack_buf[8];
     char *buffer = (char *)calloc(100, 1);
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -40,25 +41,20 @@ int main()
     send(sock , msg , strlen(msg) , 0 );
     printf("client sent: %s\n", msg);
     recv(sock, buffer, 100, 0);
-    system("touch /tmp/client1");
     printf("client recv #1: %s\n", buffer);
     if(!strcmp(buffer, "ACK! Got correct init signal\n")) {
         char *new_msg = "Need more state!\n";
         send(sock, new_msg, strlen(new_msg), 0);
         printf("client send #2: %s\n", new_msg);
-        system("touch /tmp/client2");
-        printf("client sock: %d\n", sock);
 
         free(buffer);
         buffer = (char *) calloc(100, 1);
 
         recv(sock, buffer, 100, 0);
-        system("touch /tmp/client3");
         printf("client recv #2: %s\n", buffer);
         if (!strcmp(buffer, "make client go b00m.\n\n")) {
             printf("dingdingding, client goes bum");
-            char *foo = 0;
-            printf("%s", foo);
+            memcpy(buffer, stack_buf, sizeof(buffer));
         } else {
             printf("client did not go bum\n");
         }

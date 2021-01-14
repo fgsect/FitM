@@ -5,6 +5,7 @@ use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
 use std::io::ErrorKind;
+use std::time::{Duration, SystemTime, SystemTimeError};
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
@@ -134,6 +135,61 @@ pub fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32
         ((state_path.0) + 1, state_path.1)
     } else {
         (state_path.0, (state_path.1) + 1)
+    }
+}
+
+/// @param snapshot_dir: str of path pointing to a dir with depth 1
+/// @return: the most recent SystemTime of all the files in snapshot_dir
+pub fn get_latest_mod_time(snapshot_dir: &str) -> SystemTime {
+    let modified_old = fs::metadata(snapshot_dir)
+        .expect("[!] Could not get metadata from snapshot_dir")
+        .modified()
+        .expect("[!] Could not get modified SystemTime from snapshot_dir");
+
+    let mut latest = SystemTime::now();
+    for (_, entry) in fs::read_dir(snapshot_dir)
+        .expect(&format!(
+            "[!] Could not read snapshot dir : {}",
+            snapshot_dir
+        ))
+        .enumerate()
+    {
+        let entry_unwrapped = entry.unwrap();
+        // ignore dirs. if this happens I didn't think of a particular case or sth is broken
+        if entry_unwrapped.file_type().unwrap().is_dir() {
+            panic!("[!] consolidate_snapshot_dirs got dir that does not have depth 1")
+        }
+
+        let metadata = entry_unwrapped
+            .metadata()
+            .expect("[!] Could not get metadata from entry");
+        let modified_new = metadata
+            .modified()
+            .expect("[!] Could not get modified SystemTime from metadata");
+
+        latest = match modified_new.duration_since(modified_old) {
+            Ok(diff) if diff >= Duration::from_secs(0) => modified_new,
+            // SystemTimeError shows us that modified_old is new than modified_new
+            // Does not return any other errors per docs
+            Err(_system_time_error) => modified_old,
+            _ => panic!(
+                "[!] duration_since failed to retrieve duration. System clock may have drifted"
+            ),
+        }
+    }
+
+    latest
+}
+
+/// @return: a boolean indicating if there is a positivie time difference between old and new
+pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
+    let diff = new
+        .duration_since(*old)
+        .expect("[!] duration_since failed to retrieve duration. System clock may have drifted");
+    if diff > Duration::from_secs(0) {
+        true
+    } else {
+        false
     }
 }
 
