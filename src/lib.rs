@@ -8,6 +8,7 @@ use std::{fs, io::ErrorKind};
 
 use crate::utils::cp_recursive;
 use regex::Regex;
+use std::fs::remove_dir_all;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -151,9 +152,7 @@ impl FITMSnapshot {
         let state_path = state_path_for(gen, state);
         // Make sure state dir outputs exists
         let _ = fs::create_dir_all(&format!("./saved-states/{}/outputs", state_path));
-        for (i, entry) in
-            fs::read_dir(&format!("./saved-states/{}/fd", self.state_path))?.enumerate()
-        {
+        for (i, entry) in fs::read_dir(&format!("./{}/fd", ACTIVE_STATE))?.enumerate() {
             let path = entry?.path();
             if path.is_file() {
                 std::fs::copy(
@@ -195,9 +194,11 @@ impl FITMSnapshot {
 
     /// Needed for the two initial snapshots created based on the target
     /// binaries
-    pub fn init_run(&self) -> Result<(), io::Error> {
+    pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
+        ensure_dir_exists(ACTIVE_STATE);
         // Change into our state directory and generate the afl maps there
-        env::set_current_dir(ACTIVE_STATE)?;
+        env::set_current_dir(ACTIVE_STATE)
+            .expect("[!] Could not change into active_state during init_run");
 
         // Open a file for stdout and stderr to log to
         let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
@@ -216,7 +217,9 @@ impl FITMSnapshot {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
-        Command::new("setsid")
+        let mut command = Command::new("setsid");
+
+        command
             .args(&[
                 format!("stdbuf"),
                 format!("-oL"),
@@ -227,9 +230,18 @@ impl FITMSnapshot {
             .stdin(Stdio::from(stdin))
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
-            .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
             .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
-            .env("AFL_NO_UI", "1")
+            .env("AFL_NO_UI", "1");
+
+        if create_outputs {
+            command.env("FITM_CREATE_OUTPUTS", "1");
+        }
+
+        if create_snapshot {
+            command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
+        }
+
+        command
             .spawn()
             .expect("[!] Could not spawn snapshot run")
             .wait()
@@ -244,10 +256,19 @@ impl FITMSnapshot {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
-        // With snapshot_run we move the state folder instead of copying it,
-        // but in this initial case we need to use
-        // the state folder shortly after running this function
-        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        if create_snapshot {
+            // With snapshot_run we move the state folder instead of copying it,
+            // but in this initial case we need to use
+            // the state folder shortly after running this function
+            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        }
+
+        if create_outputs {
+            self.copy_fds_to_output_for(0, 0)?;
+
+            remove_dir_all(ACTIVE_STATE)
+                .expect("[!] Could not remove active_state during init_run");
+        }
 
         Ok(())
     }
@@ -824,16 +845,23 @@ pub fn run(
         false,
     );
 
-    afl_client_snap.init_run()?;
+    // first create a snapshot, without outputs
+    afl_client_snap.init_run(false, true)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // This is the (theoretical) state before the initial server run.
     // afl_client_snap.create_outputs("". "./saved-states/fitm-gen0-state0");
-    let outputs_path_absolute =
-        build_create_absolute_path(format!("./saved-states/fitm-gen0-state0/outputs").as_str())?;
-    afl_client_snap
-        .create_outputs_file(PathBuf::from("/dev/null"), outputs_path_absolute.as_str())?;
-    // afl_client_snap.copy_fds_to_output_for(0, 0)?;
+    // we just need tmp to create outputs
+    let tmp = FITMSnapshot::new(
+        2,
+        0,
+        client_bin.to_string(),
+        run_timeout,
+        "".to_string(),
+        false,
+        false,
+    );
+    tmp.init_run(true, false)?;
 
     let afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -844,7 +872,7 @@ pub fn run(
         true,
         false,
     );
-    afl_server.init_run()?;
+    afl_server.init_run(false, true)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
