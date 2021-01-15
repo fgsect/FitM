@@ -7,6 +7,7 @@ use std::{env, fmt};
 use crate::namespacing::NamespaceContext;
 use crate::utils::{advance_pid, cp_recursive, spawn_criu};
 use regex::Regex;
+use std::fs::remove_dir_all;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -18,6 +19,9 @@ pub mod utils;
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
+
+pub const CRIU_STDOUT: &str = "criu_stdout";
+pub const CRIU_STDERR: &str = "criu_stderr";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
@@ -151,9 +155,7 @@ impl FITMSnapshot {
         let state_path = state_path_for(gen, state);
         // Make sure state dir outputs exists
         let _ = fs::create_dir_all(&format!("./saved-states/{}/outputs", state_path));
-        for (i, entry) in
-            fs::read_dir(&format!("./saved-states/{}/fd", self.state_path))?.enumerate()
-        {
+        for (i, entry) in fs::read_dir(&format!("./{}/fd", ACTIVE_STATE))?.enumerate() {
             let path = entry?.path();
             if path.is_file() {
                 std::fs::copy(
@@ -195,9 +197,14 @@ impl FITMSnapshot {
 
     /// Needed for the two initial snapshots created based on the target
     /// binaries
-    pub fn init_run(&self) -> Result<(), io::Error> {
+    pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
+        ensure_dir_exists(ACTIVE_STATE);
+
+        let _old = utils::count_snapshots(CRIU_STDERR);
+
         // Change into our state directory and generate the afl maps there
-        env::set_current_dir(ACTIVE_STATE)?;
+        env::set_current_dir(ACTIVE_STATE)
+            .expect("[!] Could not change into active_state during init_run");
 
         // Open a file for stdout and stderr to log to
         let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
@@ -210,8 +217,6 @@ impl FITMSnapshot {
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
         fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
 
-        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
-
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
@@ -223,7 +228,9 @@ impl FITMSnapshot {
                 advance_pid(1 << 17);
                 // Force the target PID to be in the Order of ~300k (random choice)
 
-                Command::new("setsid")
+                let mut command = Command::new("setsid");
+
+                command
                     .args(&[
                         format!("stdbuf"),
                         format!("-oL"),
@@ -234,10 +241,18 @@ impl FITMSnapshot {
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
-                    .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-                    .env("FITM_CREATE_OUTPUTS", "1")
                     .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
-                    .env("AFL_NO_UI", "1")
+                    .env("AFL_NO_UI", "1");
+        
+                if create_outputs {
+                    command.env("FITM_CREATE_OUTPUTS", "1");
+                }
+        
+                if create_snapshot {
+                    command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
+                }
+        
+                command
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
@@ -250,17 +265,24 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
 
-        // if there is a positive difference `new` is more recent than `old` meaning some file in the folder changed
-        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
-        let _success = utils::positive_time_diff(&old, &new);
-
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
-        // With snapshot_run we move the state folder instead of copying it,
-        // but in this initial case we need to use
-        // the state folder shortly after running this function
-        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        let _new = utils::count_snapshots(crate::CRIU_STDERR);
+
+        if create_snapshot {
+            // With snapshot_run we move the state folder instead of copying it,
+            // but in this initial case we need to use
+            // the state folder shortly after running this function
+            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        }
+
+        if create_outputs {
+            self.copy_fds_to_output_for(0, 0)?;
+
+            remove_dir_all(ACTIVE_STATE)
+                .expect("[!] Could not remove active_state during init_run");
+        }
 
         Ok(())
     }
@@ -268,6 +290,8 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
+        let old = utils::count_snapshots(CRIU_STDERR);
+
         let (stdout, stderr) = self.create_environment()?;
 
         let stdin_file = fs::File::open(stdin_path).unwrap();
@@ -277,14 +301,12 @@ impl FITMSnapshot {
         // correct stdin, stdout and stderr file descriptors.
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
 
-        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
-
         let exit_code = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
 
-                Command::new("setsid")
+                    Command::new("setsid")
                     .args(&[
                         format!("stdbuf"),
                         format!("-oL"),
@@ -313,12 +335,11 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
 
-        // if there is a positive difference new is more recent than old meaning some file in the folder changed
-        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
-        let success = utils::positive_time_diff(&old, &new);
-
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
+
+        let new = utils::count_snapshots(CRIU_STDERR);
+        let success = new > old;
 
         utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
@@ -611,8 +632,16 @@ impl FITMSnapshot {
         );
 
         if afl.snapshot_run(input_path)? {
+            println!(
+                "==== [*] New snapshot: {} with input {} ====",
+                afl.state_path, input_path
+            );
             Ok(Some(afl))
         } else {
+            println!(
+                "==== [*] No snapshot: {} with input {} ====",
+                afl.state_path, input_path
+            );
             Ok(None)
         }
     }
@@ -634,41 +663,44 @@ impl FITMSnapshot {
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
+
         let exit_status = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 let exit_status = Command::new("../AFLplusplus/afl-cmin")
-                    .args(&[
-                        format!("-i"),
-                        format!("{}", input_dir),
-                        format!("-o"),
-                        format!("{}", output_dir),
-                        // No mem limit
-                        format!("-t"),
-                        format!("{}", self.timeout.as_millis()),
-                        format!("-m"),
-                        format!("none"),
-                        format!("-U"),
-                        format!("--"),
-                        format!("bash"),
-                        // Our restore script
-                        format!("./restore.sh"),
-                        // The fuzzer input file
-                        format!("@@"),
-                    ])
-                    .stdout(Stdio::from(stdout))
-                    .stderr(Stdio::from(stderr))
-                    .env("CRIU_SNAPSHOT_DIR", "./snapshot")
-                    // We launch sh first, which is (hopefully) not instrumented.
-                    // Also, we cannot restore a snapshot more than once.
-                    // In afl++ 3.01 cmin, this option will run the bin only once.
-                    .env("AFL_SKIP_BIN_CHECK", "1")
-                    .env("AFL_NO_UI", "1")
-                    // Give criu forkserver up to a minute to spawn
-                    .env("AFL_FORKSRV_INIT_TMOUT", "60000")
-                    .env("AFL_DEBUG_CHILD_OUTPUT", "1")
-                    .env("AFL_DEBUG", "1")
-                    .spawn()?
-                    .wait()?;
+                .args(&[
+                    format!("-i"),
+                    format!("{}", input_dir),
+                    format!("-o"),
+                    format!("{}", output_dir),
+                    // No mem limit
+                    format!("-t"),
+                    format!("{}", self.timeout.as_millis()),
+                    format!("-m"),
+                    format!("none"),
+                    format!("-U"),
+                    format!("--"),
+                    format!("bash"),
+                    // Our restore script
+                    format!("./restore.sh"),
+                    // The fuzzer input file
+                    format!("@@"),
+                ])
+                .stdout(Stdio::from(stdout))
+                .stderr(Stdio::from(stderr))
+                .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+                // We launch sh first, which is (hopefully) not instrumented.
+                // Also, we cannot restore a snapshot more than once.
+                // In afl++ 3.01 cmin, this option will run the bin only once.
+                .env("AFL_SKIP_BIN_CHECK", "1")
+                .env("AFL_NO_UI", "1")
+                // Give criu forkserver up to a minute to spawn
+                .env("AFL_FORKSRV_INIT_TMOUT", "60000")
+                .env("AFL_DEBUG_CHILD_OUTPUT", "1")
+                .env("AFL_DEBUG", "1")
+                // afl-cmin will keep the showmap traces in `.traces` after each run
+                .env("AFL_KEEP_TRACES", "1")
+                .spawn()?
+                .wait()?;
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
@@ -758,12 +790,24 @@ pub fn process_stage(
             let entry = entry?;
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
-                let snap_option = snap.create_next_snapshot(
-                    next_gen_id_start + next_own_snaps.len(),
-                    entry.path().as_os_str().to_str().unwrap(),
-                )?;
+                let state_id = next_gen_id_start + next_own_snaps.len();
+                // TODO: Check if a snapshot for this cmin .trace already exists
+                let snap_option = snap
+                    .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
                 match snap_option {
-                    Some(new_snap) => next_own_snaps.push(new_snap),
+                    Some(new_snap) => {
+                        // Copy the .trace to the new snapshot dir
+                        let trace_file = format!(
+                            "{}/.traces/{}",
+                            &absolut_cmin_post_exec,
+                            entry.file_name().into_string().unwrap()
+                        );
+                        let to = format!("./saved-states/{}/snapshot_map", &new_snap.state_path);
+                        println!("saving trace_file: {} to: {}", &trace_file, &to);
+                        fs::copy(&trace_file, &to)?;
+                        // Commit this fresly-baked snapshot to our vec.
+                        next_own_snaps.push(new_snap);
+                    }
                     None => (),
                 }
             }
@@ -877,16 +921,23 @@ pub fn run(
         false,
     );
 
-    afl_client_snap.init_run()?;
+    // first create a snapshot, without outputs
+    afl_client_snap.init_run(false, true)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // This is the (theoretical) state before the initial server run.
     // afl_client_snap.create_outputs("". "./saved-states/fitm-gen0-state0");
-    let outputs_path_absolute =
-        build_create_absolute_path(format!("./saved-states/fitm-gen0-state0/outputs").as_str())?;
-    afl_client_snap
-        .create_outputs_file(PathBuf::from("/dev/null"), outputs_path_absolute.as_str())?;
-    // afl_client_snap.copy_fds_to_output_for(0, 0)?;
+    // we just need tmp to create outputs
+    let tmp = FITMSnapshot::new(
+        2,
+        0,
+        client_bin.to_string(),
+        run_timeout,
+        "".to_string(),
+        false,
+        false,
+    );
+    tmp.init_run(true, false)?;
 
     let afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -897,7 +948,7 @@ pub fn run(
         true,
         false,
     );
-    afl_server.init_run()?;
+    afl_server.init_run(false, true)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);

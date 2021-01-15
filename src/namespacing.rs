@@ -377,7 +377,7 @@ mod tests {
                 unsafe { libc::ftruncate(file.as_raw_fd(), 0) };
                 file.write(311336.to_string().as_bytes()).unwrap();
 
-                server_s.init_run().unwrap();
+                server_s.init_run(false, true).unwrap();
 
                 unsafe {
                     if libc::flock(file.as_raw_fd(), libc::LOCK_UN) != 0 {

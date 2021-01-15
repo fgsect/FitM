@@ -1,3 +1,4 @@
+use fitm::{CRIU_STDERR, CRIU_STDOUT};
 use std::fs;
 use std::path::Path;
 use std::process;
@@ -40,7 +41,7 @@ fn main() {
         ".",
         "./tests/targets/pseudoclient_complex",
         "./tests/targets/pseudoserver_complex",
-        &Duration::from_secs(60),
+        &Duration::from_secs(10),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}

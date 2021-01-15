@@ -131,7 +131,10 @@
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
 bool sent = true;
+bool env_init = false;
 // If true, we are supposed to write the outputs to a file.
+// This is set after each restore. Before the first restore we are doing the init run. Within the init run we don't want
+// any outputs as they will mess up the outputs of the following snapshots
 bool create_outputs = true; //TODO: works? getenv_from_file("FITM_CREATE_OUTPUTS");
 // If true, please do snapshot.
 // we are restored or snapshottet or something.
@@ -2281,6 +2284,12 @@ static abi_long do_socketpair(int domain, int type, int protocol,
 static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
+    if(!env_init){
+        create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+        timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+
+        env_init = true;
+    }
     sent = true;
     // Only write sth to the fd if we are in consolidation
     if(!create_outputs) {
@@ -2304,6 +2313,12 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
+    if(!env_init){
+        create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+        timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+
+        env_init = true;
+    }
 
     if(sent){
         if (!timewarp_mode) {
@@ -6326,6 +6341,12 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
+            if(!env_init){
+                create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+                timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+
+                env_init = true;
+            }
             if (arg3 == 0) {
                 return 0;
             } else {
@@ -6412,6 +6433,12 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         }
         return ret;
     case TARGET_NR_write:
+        if(!env_init){
+            create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
+            timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+
+            env_init = true;
+        }
         if ((is_socket >> arg1) & 1){
             // TODO: Julian, can you checkout how to patch this properly?
             sent = true;
