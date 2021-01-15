@@ -200,8 +200,6 @@ impl FITMSnapshot {
     pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
-        let _old = utils::count_snapshots(CRIU_STDERR);
-
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(ACTIVE_STATE)
             .expect("[!] Could not change into active_state during init_run");
@@ -256,8 +254,6 @@ impl FITMSnapshot {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
-        let _new = utils::count_snapshots(crate::CRIU_STDERR);
-
         if create_snapshot {
             // With snapshot_run we move the state folder instead of copying it,
             // but in this initial case we need to use
@@ -278,7 +274,7 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
-        let old = utils::count_snapshots(CRIU_STDERR);
+        let old = utils::latest_snapshot_time(CRIU_STDERR);
 
         let (stdout, stderr) = self.create_environment()?;
 
@@ -312,7 +308,7 @@ impl FITMSnapshot {
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
 
-        let new = utils::count_snapshots(CRIU_STDERR);
+        let new = utils::latest_snapshot_time(CRIU_STDERR);
         let success = new > old;
 
         utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
@@ -764,7 +760,7 @@ pub fn process_stage(
                             &absolut_cmin_post_exec.as_str(),
                             entry.file_name().into_string().unwrap().as_str(),
                             &new_snap.state_path,
-                        );
+                        )?;
 
                         // Commit this fresly-baked snapshot to our vec.
                         next_own_snaps.push(new_snap);
