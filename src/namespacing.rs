@@ -46,8 +46,8 @@ fn mount(
     }
 }
 
-struct NamespaceContext {
-    init_fn: Box<dyn FnOnce()>,
+pub struct NamespaceContext {
+    pub init_fn: Box<dyn FnOnce()>,
 }
 
 impl NamespaceContext {
@@ -107,9 +107,9 @@ impl NamespaceContext {
     }
 }
 
-struct Namespace {
-    init_pid: pid_t,
-    status: Option<libc::c_int>,
+pub struct Namespace {
+    pub init_pid: pid_t,
+    pub status: Option<libc::c_int>,
 }
 
 impl Namespace {
@@ -321,9 +321,6 @@ mod tests {
             .wait()
             .unwrap();
     }
-
-    #[test]
-    fn test_snapshot_restore() {}
 
     #[test]
     fn test_snapshot_init2() {

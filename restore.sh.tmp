@@ -29,18 +29,20 @@ PIPE2=$(cat ./pipes | grep -o "pipe:\[.*\]" | head -n 2 | tail -n 1 )
 
 echo -n "" > ./out/.cur_input
 
-if [[ -z "${__AFL_SHM_ID}" ]]; then
-  exec 198< /dev/null
-  exec 199> /dev/null
-else
-  echo "Running in AFL, no dummy FDs necessary"
-fi
-
 if [[ -z "$CRIU_SNAPSHOT_DIR" ]]; then
   CRIU_SNAPSHOT_DIR="./snapshot"
 fi
 
 ## TEMPLATE ##
+
+if [[ -z "${__AFL_SHM_ID}" ]]; then
+  exec 198< /dev/null
+  exec 199> /dev/null
+  # We are in a snapshot run force PIDs out of the usual range
+  echo "$((1<<18))" > /proc/sys/kernel/ns_last_pid
+else
+  echo "Running in AFL, no dummy FDs necessary"
+fi
 
 ../criu/criu/criu restore -d \
     -vvv \

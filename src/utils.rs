@@ -1,10 +1,10 @@
 use fs_extra;
 use fs_extra::dir::CopyOptions;
 use std::fs;
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind, Write};
 use std::time::{Duration, SystemTime, SystemTimeError};
 
 pub fn mv(from: &str, to: &str) {
@@ -193,6 +193,34 @@ pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
     }
 }
 
+/// Sets the PID-counter to a specific target
+/// Assumes no other processes are concurrently spawning/accessing PID-counter
+/// The generated PIDs are not checked against target
+pub fn advance_pid(target: u64) {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open("/proc/sys/kernel/ns_last_pid")
+        .expect("Failed to open ns_last_pid");
+
+    file.write((target - 1).to_string().as_bytes())
+        .expect("Writing failed");
+}
+
+pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
+    let criu_stdout = fs::File::create("criu_stdout").expect("[!] Could not create criu_stdout");
+    let criu_stderr = fs::File::create("criu_stderr").expect("[!] Could not create criu_stderr");
+    Command::new(criu_path)
+        .args(&[
+            format!("service"),
+            format!("-v4"),
+            format!("--address"),
+            format!("{}", socket_path),
+        ])
+        .stdout(Stdio::from(criu_stdout))
+        .stderr(Stdio::from(criu_stderr))
+        .spawn()
+}
 #[cfg(test)]
 mod tests {
     use crate::utils;
