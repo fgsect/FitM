@@ -67,6 +67,10 @@ impl NamespaceContext {
                 .expect("proc remounting failed");
 
                 unsafe { libc::setsid() };
+                
+                println!("[*] Entering namespace");
+                // std::process::Command::new("stat").arg("/proc/self/ns/pid").status().unwrap();
+                // std::process::Command::new("ps").arg("-aux").status().unwrap();
             }),
         }
     }
@@ -98,6 +102,7 @@ impl NamespaceContext {
             },
             None => {
                 (self.init_fn)();
+                println!("[*] Exiting namespace");
                 match f() {
                     Ok(val) => std::process::exit(val),
                     Err(e) => panic!("Namespace call failed with error {:?}", e),
@@ -339,74 +344,14 @@ mod tests {
             false,
         );
 
-        let server_s = afl_server_snap.clone();
-        let mut child = NamespaceContext::new()
-            .execute(move || -> io::Result<i32> {
-                println!("PID: {}", id());
-                println!("SID: {}", unsafe { libc::getsid(id() as _) });
-                println!("UID: {}", unsafe { libc::getuid() });
-
-                let _criu_srv = Command::new("criu")
-                    .args(&[
-                        "service",
-                        "-v4",
-                        "--address",
-                        "/tmp/criu_service.socket",
-                        "-o",
-                        "dump.log",
-                        "-vv",
-                    ])
-                    .spawn()
-                    .unwrap();
-
-                let mut file = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true)
-                    .mode(0o644)
-                    .open("/proc/sys/kernel/ns_last_pid")
-                    .expect("Failed to open ns_last_pid");
-
-                println!("locking");
-                unsafe {
-                    if libc::flock(file.as_raw_fd() as _, libc::LOCK_EX) != 0 {
-                        panic!("LOCKING FAILED")
-                    }
-                }
-
-                unsafe { libc::ftruncate(file.as_raw_fd(), 0) };
-                file.write(311336.to_string().as_bytes()).unwrap();
-
-                server_s.init_run(false, true).unwrap();
-
-                unsafe {
-                    if libc::flock(file.as_raw_fd(), libc::LOCK_UN) != 0 {
-                        panic!("UNLOCKING FAILED")
-                    }
-                }
-                drop(file);
-
-                Ok(0)
-            })
-            .expect("Child spawning failed");
-
-        let exit_status = child.wait().expect("waiting failed");
-        println!("Exit: {}", exit_status);
-
-        let server_s = afl_server_snap.clone();
+        afl_server_snap.init_run(false, true).unwrap();
 
         std::fs::write("./saved-states/fitm-gen1-state0/in/testinp", "ulullulul")
             .expect("failed to create test-input");
-        NamespaceContext::new()
-            .execute(move || -> io::Result<i32> {
-                server_s.create_outputs(
-                    "./saved-states/fitm-gen1-state0/in",
-                    "./saved-states/fitm-gen1-state0/outputs",
-                )?;
-                Err(io::Error::new(io::ErrorKind::Other, "dawjdiawjid"))
-            })
-            .unwrap()
-            .wait()
-            .unwrap();
+        
+        afl_server_snap.create_outputs(
+            "./saved-states/fitm-gen1-state0/in",
+            "./saved-states/fitm-gen1-state0/outputs",
+            ).unwrap();
     }
 }
