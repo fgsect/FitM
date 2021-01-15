@@ -20,6 +20,9 @@ pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 
+pub const CRIU_STDOUT: &str = "criu_stdout";
+pub const CRIU_STDERR: &str = "criu_stderr";
+
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
 #[derive(Clone)]
 pub struct FITMSnapshot {
@@ -196,6 +199,9 @@ impl FITMSnapshot {
     /// binaries
     pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
+
+        let _old = utils::count_snapshots(CRIU_STDERR);
+
         // Change into our state directory and generate the afl maps there
         env::set_current_dir(ACTIVE_STATE)
             .expect("[!] Could not change into active_state during init_run");
@@ -210,8 +216,6 @@ impl FITMSnapshot {
 
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
         fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
-
-        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -249,12 +253,10 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
 
-        // if there is a positive difference `new` is more recent than `old` meaning some file in the folder changed
-        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
-        let _success = utils::positive_time_diff(&old, &new);
-
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
+
+        let _new = utils::count_snapshots(crate::CRIU_STDERR);
 
         if create_snapshot {
             // With snapshot_run we move the state folder instead of copying it,
@@ -276,6 +278,8 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
+        let old = utils::count_snapshots(CRIU_STDERR);
+
         let (stdout, stderr) = self.create_environment()?;
 
         let stdin_file = fs::File::open(stdin_path).unwrap();
@@ -284,8 +288,6 @@ impl FITMSnapshot {
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
         let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
-
-        let old = utils::get_latest_mod_time(snapshot_dir.as_str());
 
         Command::new("setsid")
             .args(&[
@@ -307,12 +309,11 @@ impl FITMSnapshot {
 
         sleep(Duration::new(0, 50000000));
 
-        // if there is a positive difference new is more recent than old meaning some file in the folder changed
-        let new = utils::get_latest_mod_time(snapshot_dir.as_str());
-        let success = utils::positive_time_diff(&old, &new);
-
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
+
+        let new = utils::count_snapshots(CRIU_STDERR);
+        let success = new > old;
 
         utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
 
@@ -591,8 +592,16 @@ impl FITMSnapshot {
         );
 
         if afl.snapshot_run(input_path)? {
+            println!(
+                "==== [*] New snapshot: {} with input {} ====",
+                afl.state_path, input_path
+            );
             Ok(Some(afl))
         } else {
+            println!(
+                "==== [*] No snapshot: {} with input {} ====",
+                afl.state_path, input_path
+            );
             Ok(None)
         }
     }
@@ -726,10 +735,9 @@ pub fn process_stage(
             let entry = entry?;
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
-                let snap_option = snap.create_next_snapshot(
-                    next_gen_id_start + next_own_snaps.len(),
-                    entry.path().as_os_str().to_str().unwrap(),
-                )?;
+                let state_id = next_gen_id_start + next_own_snaps.len();
+                let snap_option = snap
+                    .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
                 match snap_option {
                     Some(new_snap) => next_own_snaps.push(new_snap),
                     None => (),

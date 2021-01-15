@@ -5,7 +5,7 @@ use std::process::Command;
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
 use std::io::ErrorKind;
-use std::time::{Duration, SystemTime, SystemTimeError};
+use std::time::{Duration, SystemTime};
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
@@ -140,45 +140,23 @@ pub fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32
 
 /// @param snapshot_dir: str of path pointing to a dir with depth 1
 /// @return: the most recent SystemTime of all the files in snapshot_dir
-pub fn get_latest_mod_time(snapshot_dir: &str) -> SystemTime {
-    let modified_old = fs::metadata(snapshot_dir)
-        .expect("[!] Could not get metadata from snapshot_dir")
-        .modified()
-        .expect("[!] Could not get modified SystemTime from snapshot_dir");
-
-    let mut latest = SystemTime::now();
-    for (_, entry) in fs::read_dir(snapshot_dir)
-        .expect(&format!(
-            "[!] Could not read snapshot dir : {}",
-            snapshot_dir
-        ))
-        .enumerate()
-    {
-        let entry_unwrapped = entry.unwrap();
-        // ignore dirs. if this happens I didn't think of a particular case or sth is broken
-        if entry_unwrapped.file_type().unwrap().is_dir() {
-            panic!("[!] consolidate_snapshot_dirs got dir that does not have depth 1")
-        }
-
-        let metadata = entry_unwrapped
-            .metadata()
-            .expect("[!] Could not get metadata from entry");
-        let modified_new = metadata
-            .modified()
-            .expect("[!] Could not get modified SystemTime from metadata");
-
-        latest = match modified_new.duration_since(modified_old) {
-            Ok(diff) if diff >= Duration::from_secs(0) => modified_new,
-            // SystemTimeError shows us that modified_old is new than modified_new
-            // Does not return any other errors per docs
-            Err(_system_time_error) => modified_old,
-            _ => panic!(
-                "[!] duration_since failed to retrieve duration. System clock may have drifted"
-            ),
+pub fn count_snapshots(criu_stderr: &str) -> u32 {
+    let mut count = 0;
+    let server_log =
+        fs::read_to_string(criu_stderr).expect("[!] Could not read criu_stderr in count_snapshots");
+    let lines: Vec<&str> = server_log.split("\n").collect();
+    for line in lines {
+        // timestamp has constant length - remove it
+        let splits: Vec<&str> = line.rsplitn(2, " ").collect();
+        if splits.len() >= 2 && splits[1].ends_with("exited with") {
+            if splits[0] == "0" {
+                count += 1;
+            } else {
+                panic!("[!] Criu server failed to create new snapshot. Check active-state dir.")
+            }
         }
     }
-
-    latest
+    count
 }
 
 /// @return: a boolean indicating if there is a positivie time difference between old and new
@@ -186,6 +164,7 @@ pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
     let diff = new
         .duration_since(*old)
         .expect("[!] duration_since failed to retrieve duration. System clock may have drifted");
+    println!("time diff: {:?}", diff);
     if diff > Duration::from_secs(0) {
         true
     } else {
@@ -196,6 +175,7 @@ pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::utils;
+    use crate::utils::count_snapshots;
     use std::fs;
     use std::path::Path;
 
@@ -225,6 +205,12 @@ mod tests {
         // Returns true if the given path points to a directory
         let metadata = fs::metadata(to_path).expect("Could not find copy 'to' folder");
         metadata.file_type().is_dir()
+    }
+
+    #[test]
+    fn test_count_snapshots() {
+        let count = count_snapshots("criu_stderr");
+        assert_eq!(count, 3);
     }
 
     #[test]
