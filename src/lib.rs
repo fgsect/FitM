@@ -200,25 +200,25 @@ impl FITMSnapshot {
     pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
-        // Change into our state directory and generate the afl maps there
-        env::set_current_dir(ACTIVE_STATE)
-            .expect("[!] Could not change into active_state during init_run");
-
-        let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
-        fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
-
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
         NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
-                spawn_criu("../criu/criu/criu", "/tmp/criu_service.socket")
+                let mut criu = spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
-                
-                // Force the target PID to be in the Order of ~300k (random choice)
+
+                // Change into our state directory and generate the afl maps there
+                env::set_current_dir(ACTIVE_STATE)
+                    .expect("[!] Could not change into active_state during init_run");
+
+                let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
+                fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
+
+                // Force the target PID to be in the Order of ~100k (random choice)
                 advance_pid(1 << 17);
-                
+
                 // Open a file for stdout and stderr to log to
                 let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
 
@@ -241,30 +241,32 @@ impl FITMSnapshot {
                     .stderr(Stdio::from(stderr))
                     .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("AFL_NO_UI", "1");
-        
+
                 if create_outputs {
                     command.env("FITM_CREATE_OUTPUTS", "1");
                 }
-        
+
                 if create_snapshot {
                     command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
                 }
-        
+
                 command
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
                     .expect("[!] Snapshot run failed");
+
                 Ok(0)
             })
             .expect("[!] Namespace creation failed")
             .wait()
             .expect("[!] Namespace wait failed");
 
-        sleep(Duration::new(0, 50000000));
-
-        // After spawning the run we go back into the base directory
-        env::set_current_dir(&Path::new("../")).unwrap();
+        // 
+        // WAIT FOR INPUT
+        // println!("[DBG] Wait for input");
+        // let mut buf = String::new();
+        // io::stdin().read_line(&mut buf);
 
         if create_snapshot {
             // With snapshot_run we move the state folder instead of copying it,
@@ -286,7 +288,7 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
-        let old = utils::latest_snapshot_time(CRIU_STDERR);
+        let old = 0.0; // utils::latest_snapshot_time(CRIU_STDERR);
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -295,7 +297,7 @@ impl FITMSnapshot {
 
         let exit_code = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
-                spawn_criu("../criu/criu/criu", "/tmp/criu_service.socket")
+                spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
 
                 let (stdout, stderr) = self.create_environment()?;
@@ -329,9 +331,14 @@ impl FITMSnapshot {
             panic!("Error in namespaced process occured");
         }
 
-        sleep(Duration::new(0, 50000000));
-
+        // sleep(Duration::new(0, 50000000));
+        // WAIT FOR INPUT
+        // println!("[DBG] Wait for input");
+        // let mut buf = String::new();
+        // io::stdin().read_line(&mut buf);
+        
         let new = utils::latest_snapshot_time(CRIU_STDERR);
+        println!("LAST SNAPSHOT: {}", new);
         let success = new > old;
 
         utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
@@ -424,17 +431,16 @@ impl FITMSnapshot {
         entry_path: PathBuf,
         output_path: &str,
     ) -> Result<(), io::Error> {
-
         let exit_status = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
-
                 let (stdout, stderr) = self.to_active()?;
 
-                let entry_file = fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
+                let entry_file =
+                    fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
                 println!("==== [*] Using input: {:?} ====", entry_path);
                 if self.state_path == "fitm-gen2-state0" {
                     sleep(Duration::from_millis(0));
-                }        
+                }
 
                 let exit_status = Command::new("setsid")
                     .args(&[
@@ -453,14 +459,15 @@ impl FITMSnapshot {
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
                     .expect("[!] Snapshot run failed");
+
+                // No new states are discovered if this sleep is not there
+                // Didn't investigate further.
+                sleep(Duration::from_secs(5));
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
             .wait()
             .expect("[!] Namespace wait failed");
-        // No new states are discovered if this sleep is not there
-        // Didn't investigate further.
-        sleep(Duration::new(0, 50000000));
 
         if exit_status != 0 {
             let info =
@@ -468,6 +475,11 @@ impl FITMSnapshot {
             println!("{}", info);
             std::process::exit(1);
         }
+
+        // WAIT FOR INPUT
+        // println!("[DBG] Wait for input");
+        // let mut buf = String::new();
+        // io::stdin().read_line(&mut buf);
 
         env::set_current_dir(ACTIVE_STATE)?;
         // Move created outputs to a given folder
@@ -610,47 +622,45 @@ impl FITMSnapshot {
 
         let exit_status = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
-
                 let (stdout, stderr) = self.to_active()?;
                 // state has to be activated at this point
                 assert!(env::current_dir().unwrap().ends_with(ACTIVE_STATE));
 
                 let mut child = Command::new("../AFLplusplus/afl-cmin")
-                .args(&[
-                    format!("-i"),
-                    format!("{}", input_dir),
-                    format!("-o"),
-                    format!("{}", output_dir),
-                    // No mem limit
-                    format!("-t"),
-                    format!("{}", self.timeout.as_millis()),
-                    format!("-m"),
-                    format!("none"),
-                    format!("-U"),
-                    format!("--"),
-                    format!("bash"),
-                    // Our restore script
-                    format!("./restore.sh"),
-                    // The fuzzer input file
-                    format!("@@"),
-                ])
-                .stdout(Stdio::from(stdout))
-                .stderr(Stdio::from(stderr))
-                .env("CRIU_SNAPSHOT_DIR", "./snapshot")
-                // We launch sh first, which is (hopefully) not instrumented.
-                // Also, we cannot restore a snapshot more than once.
-                // In afl++ 3.01 cmin, this option will run the bin only once.
-                .env("AFL_SKIP_BIN_CHECK", "1")
-                .env("AFL_NO_UI", "1")
-                // Give criu forkserver up to a minute to spawn
-                .env("AFL_FORKSRV_INIT_TMOUT", "60000")
-                .env("AFL_DEBUG_CHILD_OUTPUT", "1")
-                .env("AFL_DEBUG", "1")
-                // afl-cmin will keep the showmap traces in `.traces` after each run
-                .env("AFL_KEEP_TRACES", "1")
-                .spawn()?;
-                
-                Command::new("ls").arg("-la").status().unwrap();
+                    .args(&[
+                        format!("-i"),
+                        format!("{}", input_dir),
+                        format!("-o"),
+                        format!("{}", output_dir),
+                        // No mem limit
+                        format!("-t"),
+                        format!("{}", self.timeout.as_millis()),
+                        format!("-m"),
+                        format!("none"),
+                        format!("-U"),
+                        format!("--"),
+                        format!("bash"),
+                        // Our restore script
+                        format!("./restore.sh"),
+                        // The fuzzer input file
+                        format!("@@"),
+                    ])
+                    .stdout(Stdio::from(stdout))
+                    .stderr(Stdio::from(stderr))
+                    .env("CRIU_SNAPSHOT_DIR", "./snapshot")
+                    // We launch sh first, which is (hopefully) not instrumented.
+                    // Also, we cannot restore a snapshot more than once.
+                    // In afl++ 3.01 cmin, this option will run the bin only once.
+                    .env("AFL_SKIP_BIN_CHECK", "1")
+                    .env("AFL_NO_UI", "1")
+                    // Give criu forkserver up to a minute to spawn
+                    .env("AFL_FORKSRV_INIT_TMOUT", "60000")
+                    .env("AFL_DEBUG_CHILD_OUTPUT", "1")
+                    .env("AFL_DEBUG", "1")
+                    // afl-cmin will keep the showmap traces in `.traces` after each run
+                    .env("AFL_KEEP_TRACES", "1")
+                    .spawn()?;
+
                 let exit_status = child.wait()?;
                 Ok(exit_status.code().unwrap())
             })

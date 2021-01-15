@@ -3,7 +3,7 @@ use fs_extra::dir::CopyOptions;
 use std::fs;
 use std::process::{Child, Command, Stdio};
 
-use crate::{FITMSnapshot, ACTIVE_STATE};
+use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use std::io::{self, ErrorKind, Write};
 use std::str::FromStr;
@@ -191,14 +191,15 @@ pub fn advance_pid(target: u64) {
 }
 
 pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
-    let criu_stdout = fs::File::create("criu_stdout").expect("[!] Could not create criu_stdout");
-    let criu_stderr = fs::File::create("criu_stderr").expect("[!] Could not create criu_stderr");
+    let criu_stdout = fs::File::create(CRIU_STDOUT).expect("[!] Could not create criu_stdout");
+    let criu_stderr = fs::File::create(CRIU_STDERR).expect("[!] Could not create criu_stderr");
     Command::new(criu_path)
         .args(&[
             format!("service"),
             format!("-v4"),
             format!("--address"),
             format!("{}", socket_path),
+            format!("--display-stats"),
         ])
         .stdout(Stdio::from(criu_stdout))
         .stderr(Stdio::from(criu_stderr))

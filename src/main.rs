@@ -1,8 +1,6 @@
-use fitm::{CRIU_STDERR, CRIU_STDOUT};
 use std::fs;
 use std::path::Path;
 use std::process;
-use std::process::{Command, Stdio};
 use std::{env, time::Duration};
 
 fn main() {
@@ -39,8 +37,8 @@ fn main() {
     // TODO: use argv to fill these
     match fitm::run(
         ".",
-        "./tests/targets/pseudoclient_complex",
-        "./tests/targets/pseudoserver_complex",
+        "./tests/targets/pseudoclient_simple",
+        "./tests/targets/pseudoserver_simple",
         &Duration::from_secs(10),
     ) {
         Err(e) => println!("Error {:?}", e),
