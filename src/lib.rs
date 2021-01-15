@@ -303,7 +303,10 @@ impl FITMSnapshot {
             .wait()
             .expect("[!] Snapshot run failed");
 
-        sleep(Duration::new(0, 50000000));
+        // Reason Nr1: It seems like things are happening even after .wait() has returned
+        // Reason Nr2: latest_snapshot_time parses criu server logs and thus races against
+        // the completion of the snapshot - if there is any.
+        sleep(Duration::from_millis(200));
 
         // After spawning the run we go back into the base directory
         env::set_current_dir(&Path::new("../")).unwrap();
@@ -311,7 +314,13 @@ impl FITMSnapshot {
         let new = utils::latest_snapshot_time(CRIU_STDERR);
         let success = new > old;
 
-        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        if self.state_path == "fitm-gen4-state0" {
+            sleep(Duration::from_millis(0));
+        }
+
+        if success {
+            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        }
 
         Ok(success)
     }
@@ -605,7 +614,12 @@ impl FITMSnapshot {
     /// Start a single fuzz run in afl which gets restored from an earlier
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
-    fn afl_cmin(&self, input_dir: &str, output_dir: &str) -> Result<(), io::Error> {
+    fn afl_cmin(
+        &self,
+        input_dir: &str,
+        output_dir: &str,
+        keep_traces: bool,
+    ) -> Result<(), io::Error> {
         let input_dir = build_create_absolute_path(input_dir)
             .expect("[!] Error while constructing absolute input_dir path");
         let output_dir = build_create_absolute_path(output_dir)
@@ -619,7 +633,8 @@ impl FITMSnapshot {
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
         // accidentally using different resources than we expect.
-        let exit_status = Command::new("../AFLplusplus/afl-cmin")
+        let mut command = Command::new("../AFLplusplus/afl-cmin");
+        command
             .args(&[
                 format!("-i"),
                 format!("{}", input_dir),
@@ -649,11 +664,15 @@ impl FITMSnapshot {
             // Give criu forkserver up to a minute to spawn
             .env("AFL_FORKSRV_INIT_TMOUT", "60000")
             .env("AFL_DEBUG_CHILD_OUTPUT", "1")
-            .env("AFL_DEBUG", "1")
+            .env("AFL_DEBUG", "1");
+
+        // Don't keep traces BEFORE fuzzing, only afterwards.
+        if keep_traces {
             // afl-cmin will keep the showmap traces in `.traces` after each run
-            .env("AFL_KEEP_TRACES", "1")
-            .spawn()?
-            .wait()?;
+            command.env("AFL_KEEP_TRACES", "1");
+        }
+
+        let exit_status = command.spawn()?.wait()?;
 
         sleep(Duration::new(0, 50000000));
 
@@ -723,7 +742,8 @@ pub fn process_stage(
         let saved_state_dir = &format!("saved-states/{}/in", snap.state_path);
         let _ = std::fs::remove_dir_all(&saved_state_dir);
 
-        snap.afl_cmin(&cmin_tmp_dir, &saved_state_dir)?;
+        // don't keep traces here
+        snap.afl_cmin(&cmin_tmp_dir, &saved_state_dir, false)?;
 
         // afl_cmin exports minimized input to saved-states/$state/in
         // fuzz_run activates saved-states/$state and uses ./in as input
@@ -737,7 +757,9 @@ pub fn process_stage(
         // Replace the old stored queue with the new, cminned queue
         let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
         let _ = std::fs::remove_dir_all(&cmin_post_exec);
-        snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec)?;
+
+        // keep traces for snapshot creation
+        snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec, true)?;
 
         // TODO: Make sure the same bitmap never creates a new snapshop for this state (may exist from last round already)
 
@@ -769,6 +791,9 @@ pub fn process_stage(
                 }
             }
         }
+
+        fs::remove_dir_all(format!("{}/.traces", &absolut_cmin_post_exec))
+            .expect("[!] Could not remove .traces after saving program maps");
     }
 
     Ok(next_own_snaps)
