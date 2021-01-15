@@ -654,6 +654,8 @@ impl FITMSnapshot {
             .env("AFL_FORKSRV_INIT_TMOUT", "60000")
             .env("AFL_DEBUG_CHILD_OUTPUT", "1")
             .env("AFL_DEBUG", "1")
+            // afl-cmin will keep the showmap traces in `.traces` after each run
+            .env("AFL_KEEP_TRACES", "1")
             .spawn()?
             .wait()?;
 
@@ -736,10 +738,23 @@ pub fn process_stage(
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
                 let state_id = next_gen_id_start + next_own_snaps.len();
+                // TODO: Check if a snapshot for this cmin .trace already exists
                 let snap_option = snap
                     .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
                 match snap_option {
-                    Some(new_snap) => next_own_snaps.push(new_snap),
+                    Some(new_snap) => {
+                        // Copy the .trace to the new snapshot dir
+                        let trace_file = format!(
+                            "{}/.traces/{}",
+                            &absolut_cmin_post_exec,
+                            entry.file_name().into_string().unwrap()
+                        );
+                        let to = format!("./saved-states/{}/snapshot_map", &new_snap.state_path);
+                        println!("saving trace_file: {} to: {}", &trace_file, &to);
+                        fs::copy(&trace_file, &to)?;
+                        // Commit this fresly-baked snapshot to our vec.
+                        next_own_snaps.push(new_snap);
+                    }
                     None => (),
                 }
             }
