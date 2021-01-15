@@ -4,7 +4,9 @@ use std::fs;
 use std::process::{Child, Command, Stdio};
 
 use crate::{FITMSnapshot, ACTIVE_STATE};
+
 use std::io::{self, ErrorKind, Write};
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 pub fn mv(from: &str, to: &str) {
@@ -139,24 +141,26 @@ pub fn next_state_path(state_path: (u32, u32), cur_is_server: bool) -> (u32, u32
 }
 
 /// @param snapshot_dir: str of path pointing to a dir with depth 1
-/// @return: the most recent SystemTime of all the files in snapshot_dir
-pub fn count_snapshots(criu_stderr: &str) -> u32 {
-    let mut count = 0;
+/// @return: the most recent timestamp of a successfull criu worker exiting in the criu server log
+pub fn latest_snapshot_time(criu_stderr: &str) -> f64 {
+    let mut timestamp_cleaned = "0";
     let server_log =
         fs::read_to_string(criu_stderr).expect("[!] Could not read criu_stderr in count_snapshots");
     let lines: Vec<&str> = server_log.split("\n").collect();
     for line in lines {
         // timestamp has constant length - remove it
-        let splits: Vec<&str> = line.rsplitn(2, " ").collect();
-        if splits.len() >= 2 && splits[1].ends_with("exited with") {
-            if splits[0] == "0" {
-                count += 1;
+        let splits: Vec<&str> = line.split(" ").collect();
+        // Relevant lines look like this: "(00.055739) Worker(pid 43750) exited with 0"
+        if splits.contains(&"Worker(pid") {
+            if splits.last().unwrap() == &"0" {
+                let timestamp = splits.first().unwrap();
+                timestamp_cleaned = timestamp.trim_start_matches("(").trim_end_matches(")");
             } else {
                 panic!("[!] Criu server failed to create new snapshot. Check active-state dir.")
             }
         }
     }
-    count
+    f64::from_str(timestamp_cleaned).expect("[!] Error parsing timestamp str to float")
 }
 
 /// @return: a boolean indicating if there is a positivie time difference between old and new
@@ -203,7 +207,7 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
 #[cfg(test)]
 mod tests {
     use crate::utils;
-    use crate::utils::count_snapshots;
+    use crate::utils::latest_snapshot_time;
     use std::fs;
     use std::path::Path;
 
@@ -236,9 +240,12 @@ mod tests {
     }
 
     #[test]
-    fn test_count_snapshots() {
-        let count = count_snapshots("criu_stderr");
-        assert_eq!(count, 3);
+    fn test_latest_snapshot_time() {
+        let count = latest_snapshot_time("criu_stderr");
+        assert_eq!(
+            count, 10.672444,
+            "Update the expected value if you actually want to test the function"
+        );
     }
 
     #[test]
