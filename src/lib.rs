@@ -679,6 +679,23 @@ impl FITMSnapshot {
     }
 }
 
+fn cpy_trace(queue: &str, input: &str, state_path: &str) -> Result<(), io::Error> {
+    // Copy the .trace to the new snapshot dir
+    let trace_file = format!("{}/.traces/{}", queue, input);
+    let to = format!("./saved-states/{}/snapshot_map", state_path);
+    println!("saving trace_file: {} to: {}", &trace_file, &to);
+    fs::copy(&trace_file, &to).expect(
+        format!(
+            "[!] cpy_trace failed to copy trace_file: {} to: {}",
+            trace_file,
+            to.as_str()
+        )
+        .as_str(),
+    );
+
+    Ok(())
+}
+
 /// Run afl_fuzz for each snapshot with all inputs for the current gen
 /// @param current_snaps: list of snapshots for this stage
 /// @param current_inputs: path to inputs for this stage
@@ -743,15 +760,12 @@ pub fn process_stage(
                     .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
                 match snap_option {
                     Some(new_snap) => {
-                        // Copy the .trace to the new snapshot dir
-                        let trace_file = format!(
-                            "{}/.traces/{}",
-                            &absolut_cmin_post_exec,
-                            entry.file_name().into_string().unwrap()
+                        cpy_trace(
+                            &absolut_cmin_post_exec.as_str(),
+                            entry.file_name().into_string().unwrap().as_str(),
+                            &new_snap.state_path,
                         );
-                        let to = format!("./saved-states/{}/snapshot_map", &new_snap.state_path);
-                        println!("saving trace_file: {} to: {}", &trace_file, &to);
-                        fs::copy(&trace_file, &to)?;
+
                         // Commit this fresly-baked snapshot to our vec.
                         next_own_snaps.push(new_snap);
                     }
