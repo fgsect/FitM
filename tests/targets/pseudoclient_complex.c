@@ -54,7 +54,7 @@ int main()
         printf("client recv #2: %s\n", buffer);
         if (!strcmp(buffer, "make client go b000000000000m.\n")) {
             printf("dingdingding, client goes bum");
-            memcpy(buffer, stack_buf, sizeof(buffer));
+            char a = *(char*)NULL;
         } else {
             printf("client did not go bum\n");
         }

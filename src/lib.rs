@@ -341,7 +341,13 @@ impl FITMSnapshot {
         println!("LAST SNAPSHOT: {}", new);
         let success = new > old;
 
-        utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        if self.state_path == "fitm-gen4-state0" {
+            sleep(Duration::from_millis(0));
+        }
+
+        if success {
+            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+        }
 
         Ok(success)
     }
@@ -610,7 +616,12 @@ impl FITMSnapshot {
     /// Start a single fuzz run in afl which gets restored from an earlier
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
-    fn afl_cmin(&self, input_dir: &str, output_dir: &str) -> Result<(), io::Error> {
+    fn afl_cmin(
+        &self,
+        input_dir: &str,
+        output_dir: &str,
+        keep_traces: bool,
+    ) -> Result<(), io::Error> {
         let input_dir = build_create_absolute_path(input_dir)
             .expect("[!] Error while constructing absolute input_dir path");
         let output_dir = build_create_absolute_path(output_dir)
@@ -626,8 +637,8 @@ impl FITMSnapshot {
                 // state has to be activated at this point
                 assert!(env::current_dir().unwrap().ends_with(ACTIVE_STATE));
 
-                let mut child = Command::new("../AFLplusplus/afl-cmin")
-                    .args(&[
+                let mut command = Command::new("../AFLplusplus/afl-cmin");
+                command.args(&[
                         format!("-i"),
                         format!("{}", input_dir),
                         format!("-o"),
@@ -658,9 +669,15 @@ impl FITMSnapshot {
                     .env("AFL_DEBUG_CHILD_OUTPUT", "1")
                     .env("AFL_DEBUG", "1")
                     // afl-cmin will keep the showmap traces in `.traces` after each run
-                    .env("AFL_KEEP_TRACES", "1")
-                    .spawn()?;
+                    .env("AFL_KEEP_TRACES", "1");
 
+                // Don't keep traces BEFORE fuzzing, only afterwards.
+                if keep_traces {
+                    // afl-cmin will keep the showmap traces in `.traces` after each run
+                    command.env("AFL_KEEP_TRACES", "1");
+                }
+                
+                let mut child = command.spawn()?;
                 let exit_status = child.wait()?;
                 Ok(exit_status.code().unwrap())
             })
@@ -734,7 +751,8 @@ pub fn process_stage(
         let saved_state_dir = &format!("saved-states/{}/in", snap.state_path);
         let _ = std::fs::remove_dir_all(&saved_state_dir);
 
-        snap.afl_cmin(&cmin_tmp_dir, &saved_state_dir)?;
+        // don't keep traces here
+        snap.afl_cmin(&cmin_tmp_dir, &saved_state_dir, false)?;
 
         // afl_cmin exports minimized input to saved-states/$state/in
         // fuzz_run activates saved-states/$state and uses ./in as input
@@ -753,7 +771,9 @@ pub fn process_stage(
         // Replace the old stored queue with the new, cminned queue
         let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
         let _ = std::fs::remove_dir_all(&cmin_post_exec);
-        snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec)?;
+
+        // keep traces for snapshot creation
+        snap.afl_cmin(&cmin_tmp_dir, &cmin_post_exec, true)?;
 
         // TODO: Make sure the same bitmap never creates a new snapshop for this state (may exist from last round already)
 
@@ -785,6 +805,9 @@ pub fn process_stage(
                 }
             }
         }
+
+        fs::remove_dir_all(format!("{}/.traces", &absolut_cmin_post_exec))
+            .expect("[!] Could not remove .traces after saving program maps");
     }
 
     Ok(next_own_snaps)

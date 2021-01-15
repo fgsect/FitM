@@ -154,7 +154,10 @@ pub fn latest_snapshot_time(criu_stderr: &str) -> f64 {
         if splits.contains(&"Worker(pid") {
             if splits.last().unwrap() == &"0" {
                 let timestamp = splits.first().unwrap();
-                timestamp_cleaned = timestamp.trim_start_matches("(").trim_end_matches(")");
+                let timestamp_cleaned_new = timestamp.trim_start_matches("(").trim_end_matches(")");
+                if timestamp_cleaned_new > timestamp_cleaned {
+                    timestamp_cleaned = timestamp_cleaned_new;
+                }
             } else {
                 panic!("[!] Criu server failed to create new snapshot. Check active-state dir.")
             }
