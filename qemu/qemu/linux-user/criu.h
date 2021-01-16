@@ -76,7 +76,7 @@ int do_criu(void){
     strncat(path, uuid, 37);
     close(open(path, O_RDWR | O_CREAT, 0644));
 
-    char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_DIR");
+    char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_OUT_DIR");
 
     dir_fd = open(snapshot_dir, O_DIRECTORY);
     if (dir_fd == -1) {

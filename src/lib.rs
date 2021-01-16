@@ -239,7 +239,8 @@ impl FITMSnapshot {
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
-                    .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
+                    // .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
+                    .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
                     .env("AFL_NO_UI", "1");
 
                 if create_outputs {
@@ -262,7 +263,7 @@ impl FITMSnapshot {
             .wait()
             .expect("[!] Namespace wait failed");
 
-        // 
+        //
         // WAIT FOR INPUT
         // println!("[DBG] Wait for input");
         // let mut buf = String::new();
@@ -290,6 +291,8 @@ impl FITMSnapshot {
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
         let old = 0.0; // utils::latest_snapshot_time(CRIU_STDERR);
 
+        println!("[*] Running snapshot run for input: \"{}\"", stdin_path);
+        let _ = io::stdout().flush();
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
@@ -304,7 +307,11 @@ impl FITMSnapshot {
                 let stdin_file = fs::File::open(stdin_path).unwrap();
                 let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
 
-                Command::new("setsid")
+                let next_snapshot_dir =
+                    format!("{}/next_snapshot", env::current_dir().unwrap().display());
+                fs::create_dir(&next_snapshot_dir).expect("[-] Could not create snapshot dir!");
+
+                let exit_status = Command::new("setsid")
                     .args(&[
                         format!("stdbuf"),
                         format!("-oL"),
@@ -316,11 +323,15 @@ impl FITMSnapshot {
                     .stderr(Stdio::from(stderr))
                     .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
                     .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
+                    .env("CRIU_SNAPSHOT_OUT_DIR", &next_snapshot_dir)
                     .env("AFL_NO_UI", "1")
+                    .env("FITM_CREATE_OUTPUTS", "1")
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
                     .expect("[!] Snapshot run failed");
+
+                println!("Snapshot Exit: {:?}", exit_status.code());
                 Ok(0)
             })
             .expect("[!] Namespace creation failed")
@@ -331,21 +342,33 @@ impl FITMSnapshot {
             panic!("Error in namespaced process occured");
         }
 
-        // sleep(Duration::new(0, 50000000));
-        // WAIT FOR INPUT
-        // println!("[DBG] Wait for input");
-        // let mut buf = String::new();
-        // io::stdin().read_line(&mut buf);
-        
-        let new = utils::latest_snapshot_time(CRIU_STDERR);
-        println!("LAST SNAPSHOT: {}", new);
-        let success = new > old;
+        let next_snapshot_path = format!(
+            "{}/{}/next_snapshot",
+            env::current_dir().unwrap().display(),
+            ACTIVE_STATE
+        );
+        let next = fs::read_dir(next_snapshot_path).expect("Couldn't open next-snapshot-dir");
 
-        if self.state_path == "fitm-gen4-state0" {
-            sleep(Duration::from_millis(0));
+        let contents: Vec<_> = next.collect();
+        println!("dir: {:?}", contents);
+
+        let success = contents.len() > 0;
+        if contents.len() == 1 {
+            // WAIT FOR INPUT
+            println!("[DBG] Wait for input");
+            let mut buf = String::new();
+            io::stdin().read_line(&mut buf);
         }
-
         if success {
+            fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
+                .expect("Failed to remove old snapshot");
+            fs::rename(
+                &format!("./{}/next_snapshot", ACTIVE_STATE),
+                &format!("./{}/snapshot", ACTIVE_STATE),
+            )
+            .expect("Failed to move folder");
+            fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
+                .expect("Failed to reinitialize ./next_snapshot");
             utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
         }
 
@@ -526,6 +549,7 @@ impl FITMSnapshot {
             "==== [*] Creating outputs for state: {} ====",
             self.state_path
         );
+        let _ = io::stdout().flush();
 
         // Iterate through all entries of given folder and create output for each
         for (_, entry) in fs::read_dir(input_path)
@@ -638,7 +662,8 @@ impl FITMSnapshot {
                 assert!(env::current_dir().unwrap().ends_with(ACTIVE_STATE));
 
                 let mut command = Command::new("../AFLplusplus/afl-cmin");
-                command.args(&[
+                command
+                    .args(&[
                         format!("-i"),
                         format!("{}", input_dir),
                         format!("-o"),
@@ -676,7 +701,7 @@ impl FITMSnapshot {
                     // afl-cmin will keep the showmap traces in `.traces` after each run
                     command.env("AFL_KEEP_TRACES", "1");
                 }
-                
+
                 let mut child = command.spawn()?;
                 let exit_status = child.wait()?;
                 Ok(exit_status.code().unwrap())

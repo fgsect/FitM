@@ -110,8 +110,12 @@ impl NamespaceContext {
                 let res = f();
                 println!("[*] Force FS-SYNC");
                 std::thread::sleep(std::time::Duration::from_millis(1));
-                std::process::Command::new("sync").arg("-f").status().unwrap();
+                std::process::Command::new("sync")
+                    .arg("-f")
+                    .status()
+                    .unwrap();
                 println!("[*] Exiting namespace");
+                let _ = io::stdout().flush();
                 match res {
                     Ok(val) => std::process::exit(val),
                     Err(e) => panic!("Namespace call failed with error {:?}", e),
