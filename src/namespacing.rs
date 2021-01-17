@@ -109,7 +109,7 @@ impl NamespaceContext {
                 (self.init_fn)();
                 let res = f();
                 println!("[*] Force FS-SYNC");
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                std::thread::sleep(std::time::Duration::from_millis(5));
                 std::process::Command::new("sync")
                     .arg("-f")
                     .status()

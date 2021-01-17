@@ -251,12 +251,13 @@ impl FITMSnapshot {
                     command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
                 }
 
-                command
+                let res = command
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
                     .expect("[!] Snapshot run failed");
 
+                println!("Exitcode: {}", res);
                 Ok(0)
             })
             .expect("[!] Namespace creation failed")

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export LIBS='-lprotobuf-c -luuid'
+export LIBS='-lprotobuf-c -luuid -L ../../../criu/lib/c/ -L ../../../criu/images/ -lcriu'
 export LDFLAGS="$LIBS"
 export QEMU_LDFLAGS="$LIBS"
 ./configure --disable-system --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \

@@ -118,11 +118,11 @@
 
 #include <fcntl.h>
 
-#include "criu.h"
-
 #include "tcg/tcg-op.h"
 
 #include "../../patches/afl-qemu-common.h"
+
+#include "fitm-criu.h"
 
 // Filedescriptors used by AFL to communicate between forkserver & child
 #define FRKSRV_READ_FD             (198)
@@ -6338,6 +6338,13 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 
         cpu_list_unlock();
         preexit_cleanup(cpu_env, arg1);
+
+
+        if ((arg1 & 0xFF) == 42) {
+            printf( "Target tried to exit with reseved exit code (42).\n"
+                    "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
+            _exit(43);
+        }
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
@@ -8417,6 +8424,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         /* new thread calls */
     case TARGET_NR_exit_group:
         preexit_cleanup(cpu_env, arg1);
+        if ((arg1 & 0xFF) == 42) {
+            printf( "Target tried to exit with reseved exit code (42).\n"
+                    "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
+            return get_errno(exit_group(43));
+        }
         return get_errno(exit_group(arg1));
 #endif
     case TARGET_NR_setdomainname:
