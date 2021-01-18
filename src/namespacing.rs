@@ -169,6 +169,7 @@ struct clone_args {
 // Das ist V2 aber mein kernel is zu alt ...
 #[repr(align(8))]
 #[repr(C)]
+#[allow(dead_code)]
 struct clone_argsV2 {
     flags: u64,        /* Flags bit mask */
     pidfd: u64,        /* Where to store PID file descriptor (pid_t *) */

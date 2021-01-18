@@ -206,7 +206,7 @@ impl FITMSnapshot {
         // correct stdin, stdout and stderr file descriptors.
         NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
-                let mut criu = spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
+                spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
 
                 // Change into our state directory and generate the afl maps there
@@ -290,14 +290,8 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
-        let old = 0.0; // utils::latest_snapshot_time(CRIU_STDERR);
-
         println!("[*] Running snapshot run for input: \"{}\"", stdin_path);
         let _ = io::stdout().flush();
-        // Start the initial snapshot run. We use our patched qemu to emulate
-        // until the first recv of the target is hit. We have to use setsid to
-        // circumvent the --shell-job problem of criu and stdbuf to have the
-        // correct stdin, stdout and stderr file descriptors.
 
         let exit_code = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
@@ -358,7 +352,7 @@ impl FITMSnapshot {
             // WAIT FOR INPUT
             println!("[DBG] Wait for input");
             let mut buf = String::new();
-            io::stdin().read_line(&mut buf);
+            let _ = io::stdin().read_line(&mut buf);
         }
         if success {
             fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
