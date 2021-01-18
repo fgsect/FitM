@@ -1,8 +1,6 @@
-use fitm::{CRIU_STDERR, CRIU_STDOUT};
 use std::fs;
 use std::path::Path;
 use std::process;
-use std::process::{Command, Stdio};
 use std::{env, time::Duration};
 
 fn main() {
@@ -33,30 +31,17 @@ fn main() {
         process::exit(0);
     }
 
-    let criu_stdout = fs::File::create(CRIU_STDOUT).expect("[!] Could not create criu_stdout");
-    let criu_stderr = fs::File::create(CRIU_STDERR).expect("[!] Could not create criu_stderr");
     let foo = std::env::current_dir().unwrap();
     println!("cwd: {:?}", foo);
-    let _criu_server = Command::new("./criu/criu/criu")
-        .args(&[
-            format!("service"),
-            format!("-v4"),
-            format!("--address"),
-            format!("/tmp/criu_service.socket"),
-        ])
-        .stdout(Stdio::from(criu_stdout))
-        .stderr(Stdio::from(criu_stderr))
-        .spawn()
-        .expect("[!] Could not spawn criuserver");
 
     // TODO: use argv to fill these
     match fitm::run(
         ".",
-        "./tests/targets/pseudoclient_complex",
-        "./tests/targets/pseudoserver_complex",
+        "./tests/targets/pseudoclient_simple",
+        "./tests/targets/pseudoserver_simple",
         &Duration::from_secs(10),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
-    }
+    };
 }

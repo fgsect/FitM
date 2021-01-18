@@ -22,7 +22,9 @@ fn repeated_cmin_test_() {
         false,
     );
 
-    server0.init_run().expect("[!] Init run on server0 failed");
+    server0
+        .init_run(false, true)
+        .expect("[!] Init run on server0 failed");
 
     // =========== snapshot on gen1 =============
     let file_name = "tmp-input-0";
@@ -34,7 +36,8 @@ fn repeated_cmin_test_() {
 
     let server1 = server0
         .create_next_snapshot(0, input_path.to_str().unwrap())
-        .expect("[!] Create_next_snapshot for server0 failed");
+        .expect("[!] Create_next_snapshot for server0 failed")
+        .unwrap();
 
     // =========== snapshot on gen3 =============
     let file_name = "tmp-input-1";
