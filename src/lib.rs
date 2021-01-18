@@ -949,10 +949,19 @@ pub fn run(
     afl_client_snap.pid = afl_client_snap.init_run(false, true)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
-    // This is the (theoretical) state before the initial server run.
-    // afl_client_snap.create_outputs("". "./saved-states/fitm-gen0-state0");
     // we just need tmp to create outputs
-    afl_client_snap.init_run(true, false)?;
+    // something fails if we don't use this tmp object
+    let tmp = FITMSnapshot::new(
+        2,
+        0,
+        client_bin.to_string(),
+        run_timeout,
+        "".to_string(),
+        false,
+        false,
+        None,
+    );
+    tmp.init_run(true, false)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
