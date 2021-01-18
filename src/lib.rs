@@ -301,7 +301,10 @@ impl FITMSnapshot {
     /// Create a new snapshot based on a given snapshot
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
-        println!("[*] Running snapshot run for input: \"{}\"", stdin_path);
+        println!(
+            "==== [*] Running snapshot run for input: \"{}\" ====",
+            stdin_path
+        );
         let _ = io::stdout().flush();
 
         let exit_code = NamespaceContext::new()
@@ -331,7 +334,6 @@ impl FITMSnapshot {
                     .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("CRIU_SNAPSHOT_OUT_DIR", &next_snapshot_dir)
                     .env("AFL_NO_UI", "1")
-                    .env("FITM_CREATE_OUTPUTS", "1")
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
@@ -347,10 +349,6 @@ impl FITMSnapshot {
             .code()
             .unwrap();
 
-        if exit_code != 42 {
-            panic!("Error in namespaced process occured");
-        }
-
         let _next_snapshot_path = format!(
             "{}/{}/next_snapshot",
             env::current_dir().unwrap().display(),
@@ -358,12 +356,6 @@ impl FITMSnapshot {
         );
 
         let success = exit_code == 42;
-        if success {
-            // WAIT FOR INPUT
-            println!("[DBG] Wait for input");
-            let mut buf = String::new();
-            let _ = io::stdin().read_line(&mut buf);
-        }
         if success {
             fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
                 .expect("Failed to remove old snapshot");
@@ -443,9 +435,6 @@ impl FITMSnapshot {
             .code()
             .unwrap();
 
-        // wait for 50 millis
-        sleep(Duration::from_millis(50));
-
         if exit_status != 0 {
             let info =
                 "[!] Error during afl-fuzz execution. Please check latest statefolder for output";
@@ -476,9 +465,6 @@ impl FITMSnapshot {
                 let entry_file =
                     fs::File::open(entry_path.clone()).expect("[!] Could not open queue file");
                 println!("==== [*] Using input: {:?} ====", entry_path);
-                if self.state_path == "fitm-gen2-state0" {
-                    sleep(Duration::from_millis(0));
-                }
 
                 let _restore_status = Command::new("setsid")
                     .args(&[
@@ -723,8 +709,6 @@ impl FITMSnapshot {
             .expect("[!] Namespace wait failed")
             .code()
             .unwrap();
-
-        sleep(Duration::new(0, 50000000));
 
         // We want to quit if cmin breaks (0) but not if it found a crash in the target (2)
         if exit_status != 0 && exit_status != 2 {

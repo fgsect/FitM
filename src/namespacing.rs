@@ -73,7 +73,6 @@ impl NamespaceContext {
 
                 unsafe { libc::setsid() };
 
-                println!("[*] Entering namespace");
                 let _ = io::stdout().flush();
                 // std::process::Command::new("stat").arg("/proc/self/ns/pid").status().unwrap();
                 // std::process::Command::new("ps").arg("-aux").status().unwrap();
@@ -109,19 +108,14 @@ impl NamespaceContext {
             None => {
                 (self.init_fn)();
                 let res = f();
-                println!("[*] Force FS-SYNC");
                 std::thread::sleep(std::time::Duration::from_millis(5));
                 std::process::Command::new("sync")
                     .arg("-f")
                     .status()
                     .unwrap();
-                println!("[*] Exiting namespace");
                 let _ = io::stdout().flush();
                 match res {
-                    Ok(val) => {
-                        println!("child exitcode: {}", val);
-                        std::process::exit(val)
-                    }
+                    Ok(val) => std::process::exit(val),
                     Err(e) => panic!("Namespace call failed with error {:?}", e),
                 }
             }

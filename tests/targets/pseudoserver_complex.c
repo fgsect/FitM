@@ -73,7 +73,7 @@ int main() {
         if (!strcmp(buf, "Need more state!\n")) {
 
             // send 2
-            new_msg = "make client go b000000000000m.\n";
+            new_msg = "make client go b0000000000m.\n";
             send(new_socket , new_msg , strlen(new_msg) , 0 );
             printf("server send #2: %s\n", new_msg);
 

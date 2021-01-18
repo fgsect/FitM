@@ -59,8 +59,6 @@ pub fn copy(from: &str, to: &str) {
 }
 
 pub fn cp_recursive(from: &str, to: &str) {
-    // std::fs::rename can not rename filled dirs -.-
-
     // preserve is needed because otherwise file permissions change through copying
     Command::new("cp")
         .args(&["--preserve", "-r", from, to])
