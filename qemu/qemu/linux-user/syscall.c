@@ -2295,7 +2295,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
     if(!create_outputs) {
         return (ssize_t)len;
     } else {
-        FILE *fp;
+//        FILE *fp;
 //        char *uuid = get_new_uuid();
 //        char path[49] = "/tmp/fitm-";
 //        strncat(path, uuid, 37);

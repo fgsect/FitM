@@ -17,60 +17,27 @@
 
 
 
+#define SNAP_SUCCESS_EXIT 42
 #define MAX_MSG_SIZE 1024
 
 char* get_new_uuid(void);
 int do_criu(void);
 char* concat3(char *first, char *second, char *third);
+void save_exitcode(int exitcode);
 
 
-// static int send_req(int socket_fd, CriuReq *req)
-// {
-//     unsigned char buf[MAX_MSG_SIZE];
-//     int len;
-
-//     len = criu_req__get_packed_size(req);
-
-//     if (criu_req__pack(req, buf) != len) {
-//         perror("Failed packing request");
-//         return -1;
-//     }
-
-//     if (write(socket_fd, buf, len)  == -1) {
-//         perror("Can't send request");
-//         return -1;
-//     }
-
-//     return 0;
-// }
-
-// static CriuResp *recv_resp(int socket_fd)
-// {
-// 	unsigned char buf[MAX_MSG_SIZE];
-// 	int len;
-// 	CriuResp *msg = 0;
-
-// 	len = read(socket_fd, buf, MAX_MSG_SIZE);
-// 	if (len == -1) {
-// 		perror("Can't read response");
-// 		return NULL;
-// 	}
-
-// 	msg = criu_resp__unpack(NULL, len, buf);
-// 	if (!msg) {
-// 		perror("Failed unpacking response");
-// 		return NULL;
-// 	}
-
-// 	return msg;
-// }
+void save_exitcode(int exitcode){
+    FILE *fd = fopen("target-exitcode", "w");
+    // https://stackoverflow.com/a/32819876
+    char buffer[snprintf(NULL, 0, "%d", exitcode)+1];
+    sprintf(buffer, "%d", exitcode);
+    fwrite(buffer, 1, sizeof(buffer), fd);
+    fclose(fd);
+}
 
 int do_criu(void){
-    int ret = 1;
-    int fd, dir_fd;
+    int dir_fd;
     struct criu_opts *criu_request_options = NULL;
-    struct sockaddr_un addr;
-    socklen_t addr_len;
 
     char *uuid = get_new_uuid();
     char path[44] = "/tmp/";
@@ -81,17 +48,17 @@ int do_criu(void){
 
     dir_fd = open(snapshot_dir, O_DIRECTORY);
     if (dir_fd == -1) {
-        perror("Can't open snapshot dir");
+        perror("Can't open snapshot dir\n");
         goto exit;
     }
 
     if (criu_local_init_opts(&criu_request_options)) {
-        perror("Can't allocate memory for dump request");
+        perror("Can't allocate memory for dump request\n");
         goto exit;
     }
 
     if (criu_local_set_service_address(criu_request_options, "/tmp/criu_service.socket")) {
-        perror("Couldn't set service address");
+        perror("Couldn't set service address\n");
         goto exit;
     }
 
@@ -100,7 +67,7 @@ int do_criu(void){
     criu_local_set_leave_running(criu_request_options, true);
     
     int criu_result = criu_local_dump(criu_request_options);
-    printf("Criu-result: %d", criu_result);
+    printf("Criu-result: %d\n", criu_result);
     
     if (criu_result < 0) {
         printf("An error in criu has occured %d\n", criu_result);
@@ -112,11 +79,14 @@ int do_criu(void){
         printf("EXITING\n");
 
         // SIGNAL INIT
+        // Internet says we should rely on files or others in this case: https://stackoverflow.com/a/7697135
+        // write exit code to file to read out in fitm
+        save_exitcode(SNAP_SUCCESS_EXIT);
 
         /* We exit with 42 upon a successful snapshot-exit
         The returncode is checked in snapshot_run to determine 
         whether a new checkpoint was reached */
-        exit(42);
+        exit(SNAP_SUCCESS_EXIT);
     }
 
     if (criu_result == 1) {
@@ -126,7 +96,7 @@ int do_criu(void){
         return 0;
     }
 
-    printf("Unexpected criu-result %d", criu_result);
+    printf("Unexpected criu-result %d\n", criu_result);
 
 exit:
     _exit(-1);
