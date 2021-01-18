@@ -7,6 +7,7 @@ use std::{fs, process::ExitStatus};
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use std::io::{self, ErrorKind, Write};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
@@ -243,6 +244,12 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
         .stdout(Stdio::from(criu_stdout))
         .stderr(Stdio::from(criu_stderr))
         .spawn()
+}
+
+pub fn get_filesize(path: &PathBuf) -> u64 {
+    let metadata = fs::metadata(path)
+        .expect("[!] Could not grab metadata for cur_file in utils::get_filesize");
+    metadata.len()
 }
 
 #[cfg(test)]

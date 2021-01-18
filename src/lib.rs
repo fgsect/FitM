@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use std::{env, fmt};
 
 use crate::namespacing::NamespaceContext;
-use crate::utils::{advance_pid, cp_recursive, spawn_criu};
+use crate::utils::{advance_pid, cp_recursive, get_filesize, spawn_criu};
 use regex::Regex;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
@@ -519,9 +519,16 @@ impl FITMSnapshot {
         // Move created outputs to a given folder
         // Probably saved states, as current active-state folder will be deleted with next to_active()
         for entry in fs::read_dir("./fd").expect("[!] Could not read populated fd folder") {
-            let cur_file = entry.unwrap().file_name();
-            let from = format!("./fd/{}", &cur_file.to_str().unwrap());
-            let destination_path = Path::new(output_path).join(cur_file);
+            let dir_entry = entry.unwrap();
+            let file_name = &dir_entry.file_name();
+
+            // skip empty outputs --> easier debugging
+            if get_filesize(&dir_entry.path()) == 0 {
+                continue;
+            }
+
+            let from = format!("./fd/{}", &file_name.to_str().unwrap());
+            let destination_path = Path::new(output_path).join(file_name);
             let to = destination_path
                 .to_str()
                 .expect("[!] Couldn't convert destination_path to str");
