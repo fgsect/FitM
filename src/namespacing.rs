@@ -362,6 +362,7 @@ mod tests {
             "".to_string(),
             true,
             false,
+            None,
         );
 
         afl_server_snap.init_run(false, true).unwrap();

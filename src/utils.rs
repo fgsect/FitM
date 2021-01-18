@@ -6,7 +6,7 @@ use std::{fs, process::ExitStatus};
 
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Write};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 

@@ -20,6 +20,7 @@ fn repeated_cmin_test_() {
         "".to_string(),
         true,
         false,
+        None,
     );
 
     server0
