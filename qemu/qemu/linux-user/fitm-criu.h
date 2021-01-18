@@ -77,8 +77,7 @@ int do_criu(void){
     criu_local_set_leave_running(criu_request_options, true);
     
     int criu_result = criu_local_dump(criu_request_options);
-    printf("Criu-result: %d\n", criu_result);
-    
+
     if (criu_result < 0) {
         printf("An error in criu has occured %d\n", criu_result);
         exitcode = -1;
@@ -86,9 +85,6 @@ int do_criu(void){
     }
     
     if (criu_result == 0) {
-        printf("Snapshot successful\n");
-        printf("EXITING\n");
-
         // SIGNAL INIT
         // Internet says we should rely on files or others in this case: https://stackoverflow.com/a/7697135
         // write exit code to file to read out in fitm
