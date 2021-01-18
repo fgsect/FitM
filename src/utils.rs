@@ -1,6 +1,6 @@
 use fs_extra;
 use fs_extra::dir::CopyOptions;
-use std::fs;
+use std::{fs, process::ExitStatus};
 use std::process::{Child, Command, Stdio};
 
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
@@ -191,6 +191,23 @@ pub fn advance_pid(target: u64) {
 
     file.write((target - 1).to_string().as_bytes())
         .expect("Writing failed");
+}
+
+pub fn waitpid(snapshot_pid: libc::pid_t) -> io::Result<ExitStatus> {
+    let mut status = 0 as libc::c_int;
+    loop {
+        let result = unsafe { libc::waitpid(snapshot_pid, &mut status, 0) };
+        if result == -1 {
+            let e = io::Error::last_os_error();
+            if e.kind() != io::ErrorKind::Interrupted {
+                return Err(e);
+            }
+        } else {
+            break;
+        }
+    }
+    // Casting the waitpid return value to automatically interpret ExitStatus flags
+    Ok(unsafe { std::mem::transmute(status) })
 }
 
 pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
