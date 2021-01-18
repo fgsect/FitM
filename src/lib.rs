@@ -204,7 +204,7 @@ impl FITMSnapshot {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
-        NamespaceContext::new()
+        let closure_ret = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
@@ -251,14 +251,13 @@ impl FITMSnapshot {
                     command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
                 }
 
-                let res = command
+                let exit_status = command
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
                     .expect("[!] Snapshot run failed");
 
-                println!("Exitcode: {}", res);
-                Ok(0)
+                Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
             .wait()
@@ -274,6 +273,7 @@ impl FITMSnapshot {
             let exit_code =
                 utils::read_exitcode().expect("[!] Error while calling read_exitcode in init_run");
             println!("Exitcode: {}", exit_code);
+            println!("closure ret: {}", closure_ret);
             if exit_code == 42 {
                 // With snapshot_run we move the state folder instead of copying it,
                 // but in this initial case we need to use
@@ -302,7 +302,7 @@ impl FITMSnapshot {
         println!("[*] Running snapshot run for input: \"{}\"", stdin_path);
         let _ = io::stdout().flush();
 
-        NamespaceContext::new()
+        let exit_code = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
@@ -335,15 +335,12 @@ impl FITMSnapshot {
                     .wait()
                     .expect("[!] Snapshot run failed");
 
-                println!("Snapshot Exit: {:?}", exit_status.code());
-                Ok(0)
+                Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
             .wait()
             .expect("[!] Namespace wait failed");
 
-        let exit_code =
-            utils::read_exitcode().expect("[!] Error while calling read_exitcode in snapshot_run");
         if exit_code != 42 {
             panic!("Error in namespaced process occured");
         }

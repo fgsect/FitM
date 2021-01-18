@@ -35,7 +35,8 @@ void save_exitcode(int exitcode){
     // https://stackoverflow.com/a/32819876
     char buffer[snprintf(NULL, 0, "%d", exitcode)+1];
     sprintf(buffer, "%d", exitcode);
-    fwrite(buffer, 1, sizeof(buffer), fd);
+    // don't write null byte into file
+    fwrite(buffer, 1, sizeof(buffer)-1, fd);
     if(ferror(fd)) {
         perror("Error occured while writing to target-exitcode in fitm-criu.h\n");
     }
