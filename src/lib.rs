@@ -261,7 +261,9 @@ impl FITMSnapshot {
             })
             .expect("[!] Namespace creation failed")
             .wait()
-            .expect("[!] Namespace wait failed");
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
 
         //
         // WAIT FOR INPUT
@@ -270,11 +272,7 @@ impl FITMSnapshot {
         // io::stdin().read_line(&mut buf);
 
         if create_snapshot {
-            let exit_code =
-                utils::read_exitcode().expect("[!] Error while calling read_exitcode in init_run");
-            println!("Exitcode: {}", exit_code);
-            println!("closure ret: {}", closure_ret);
-            if exit_code == 42 {
+            if closure_exit == 42 {
                 // With snapshot_run we move the state folder instead of copying it,
                 // but in this initial case we need to use
                 // the state folder shortly after running this function
@@ -339,13 +337,15 @@ impl FITMSnapshot {
             })
             .expect("[!] Namespace creation failed")
             .wait()
-            .expect("[!] Namespace wait failed");
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
 
         if exit_code != 42 {
             panic!("Error in namespaced process occured");
         }
 
-        let next_snapshot_path = format!(
+        let _next_snapshot_path = format!(
             "{}/{}/next_snapshot",
             env::current_dir().unwrap().display(),
             ACTIVE_STATE
@@ -431,7 +431,9 @@ impl FITMSnapshot {
             })
             .expect("[!] Namespace creation failed")
             .wait()
-            .expect("[!] Namespace wait failed");
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
 
         // wait for 50 millis
         sleep(Duration::from_millis(50));
@@ -495,7 +497,9 @@ impl FITMSnapshot {
             })
             .expect("[!] Namespace creation failed")
             .wait()
-            .expect("[!] Namespace wait failed");
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
 
         if exit_status != 0 {
             let info =
@@ -707,7 +711,9 @@ impl FITMSnapshot {
             })
             .expect("[!] Namespace creation failed")
             .wait()
-            .expect("[!] Namespace wait failed");
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
 
         sleep(Duration::new(0, 50000000));
 

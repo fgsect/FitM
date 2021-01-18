@@ -1,4 +1,5 @@
 use libc::{self, pid_t};
+use std::process::ExitStatus;
 use std::{
     ffi::CString,
     fmt::Debug,
@@ -117,7 +118,10 @@ impl NamespaceContext {
                 println!("[*] Exiting namespace");
                 let _ = io::stdout().flush();
                 match res {
-                    Ok(val) => std::process::exit(val),
+                    Ok(val) => {
+                        println!("child exitcode: {}", val);
+                        std::process::exit(val)
+                    }
                     Err(e) => panic!("Namespace call failed with error {:?}", e),
                 }
             }
@@ -127,11 +131,11 @@ impl NamespaceContext {
 
 pub struct Namespace {
     pub init_pid: pid_t,
-    pub status: Option<libc::c_int>,
+    pub status: Option<ExitStatus>,
 }
 
 impl Namespace {
-    pub fn wait(&mut self) -> io::Result<libc::c_int> {
+    pub fn wait(&mut self) -> io::Result<ExitStatus> {
         if let Some(status) = self.status {
             return Ok(status);
         }
@@ -148,8 +152,10 @@ impl Namespace {
                 break;
             }
         }
-        self.status = Some(status);
-        Ok(status)
+        // Casting the waitpid return value to automatically interpret ExistStatus flags
+        let exit_status: ExitStatus = unsafe { std::mem::transmute(status) };
+        self.status = Some(exit_status);
+        Ok(exit_status)
     }
 }
 
