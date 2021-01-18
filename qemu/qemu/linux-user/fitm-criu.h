@@ -28,15 +28,22 @@ void save_exitcode(int exitcode);
 
 void save_exitcode(int exitcode){
     FILE *fd = fopen("target-exitcode", "w");
+    if(!fd) {
+        perror("Could not open target-exitcode in fitm-criu.h\n");
+    }
+
     // https://stackoverflow.com/a/32819876
     char buffer[snprintf(NULL, 0, "%d", exitcode)+1];
     sprintf(buffer, "%d", exitcode);
     fwrite(buffer, 1, sizeof(buffer), fd);
+    if(ferror(fd)) {
+        perror("Error occured while writing to target-exitcode in fitm-criu.h\n");
+    }
     fclose(fd);
 }
 
 int do_criu(void){
-    int dir_fd;
+    int dir_fd, exitcode;
     struct criu_opts *criu_request_options = NULL;
 
     char *uuid = get_new_uuid();
@@ -49,16 +56,19 @@ int do_criu(void){
     dir_fd = open(snapshot_dir, O_DIRECTORY);
     if (dir_fd == -1) {
         perror("Can't open snapshot dir\n");
+        exitcode = -1;
         goto exit;
     }
 
     if (criu_local_init_opts(&criu_request_options)) {
         perror("Can't allocate memory for dump request\n");
+        exitcode = -1;
         goto exit;
     }
 
     if (criu_local_set_service_address(criu_request_options, "/tmp/criu_service.socket")) {
         perror("Couldn't set service address\n");
+        exitcode = -1;
         goto exit;
     }
 
@@ -71,6 +81,7 @@ int do_criu(void){
     
     if (criu_result < 0) {
         printf("An error in criu has occured %d\n", criu_result);
+        exitcode = -1;
         goto exit;
     }
     
@@ -93,13 +104,16 @@ int do_criu(void){
         printf("RESTORED\n");
         close(dir_fd);
         criu_local_free_opts(criu_request_options);
-        return 0;
+        exitcode = 0;
+        save_exitcode(exitcode);
+        return exitcode;
     }
 
     printf("Unexpected criu-result %d\n", criu_result);
 
 exit:
-    _exit(-1);
+    save_exitcode(exitcode);
+    _exit(exitcode);
 }
 
 char* get_new_uuid(void){

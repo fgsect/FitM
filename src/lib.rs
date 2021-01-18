@@ -271,10 +271,19 @@ impl FITMSnapshot {
         // io::stdin().read_line(&mut buf);
 
         if create_snapshot {
-            // With snapshot_run we move the state folder instead of copying it,
-            // but in this initial case we need to use
-            // the state folder shortly after running this function
-            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+            let exit_code =
+                utils::read_exitcode().expect("[!] Error while calling read_exitcode in init_run");
+            println!("Exitcode: {}", exit_code);
+            if exit_code == 42 {
+                // With snapshot_run we move the state folder instead of copying it,
+                // but in this initial case we need to use
+                // the state folder shortly after running this function
+                utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
+            } else {
+                panic!(
+                    "[!] Snapshot in init_run failed. Check latest active-state folder for clues."
+                );
+            }
         }
 
         if create_outputs {
@@ -293,7 +302,7 @@ impl FITMSnapshot {
         println!("[*] Running snapshot run for input: \"{}\"", stdin_path);
         let _ = io::stdout().flush();
 
-        let exit_code = NamespaceContext::new()
+        NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
@@ -333,7 +342,9 @@ impl FITMSnapshot {
             .wait()
             .expect("[!] Namespace wait failed");
 
-        if exit_code != 0 {
+        let exit_code =
+            utils::read_exitcode().expect("[!] Error while calling read_exitcode in snapshot_run");
+        if exit_code != 42 {
             panic!("Error in namespaced process occured");
         }
 
@@ -342,13 +353,9 @@ impl FITMSnapshot {
             env::current_dir().unwrap().display(),
             ACTIVE_STATE
         );
-        let next = fs::read_dir(next_snapshot_path).expect("Couldn't open next-snapshot-dir");
 
-        let contents: Vec<_> = next.collect();
-        println!("dir: {:?}", contents);
-
-        let success = contents.len() > 0;
-        if contents.len() == 1 {
+        let success = exit_code == 42;
+        if success {
             // WAIT FOR INPUT
             println!("[DBG] Wait for input");
             let mut buf = String::new();
