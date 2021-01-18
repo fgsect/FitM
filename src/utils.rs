@@ -1,13 +1,32 @@
 use fs_extra;
 use fs_extra::dir::CopyOptions;
-use std::{fs, process::ExitStatus};
+use json;
 use std::process::{Child, Command, Stdio};
+use std::{fs, process::ExitStatus};
 
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use std::io::{self, ErrorKind, Read, Write};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
+
+pub fn parse_pid() -> io::Result<i32> {
+    let pstree = Command::new("./criu/crit/crit-python3")
+        .args(&[
+            "decode".to_string(),
+            "-i".to_string(),
+            format!("{}/snapshot/pstree.img", ACTIVE_STATE),
+        ])
+        .output()
+        .expect("[!] crit decode failed during utils::parse_pid");
+    let pstree_string = String::from_utf8(pstree.stdout)
+        .expect("[!] Failed to grab output from crit in utils::parse_pid");
+    let pstree_json = json::parse(pstree_string.as_str()).unwrap();
+    let pid = pstree_json["entries"][0]["pid"]
+        .as_i32()
+        .expect("[!] Could not transform json value into i32 in utils::parse_pid");
+    Ok(pid.into())
+}
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
@@ -229,7 +248,7 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
 #[cfg(test)]
 mod tests {
     use crate::utils;
-    use crate::utils::latest_snapshot_time;
+    use crate::utils::{latest_snapshot_time, parse_pid};
     use std::fs;
     use std::path::Path;
 
@@ -259,6 +278,11 @@ mod tests {
         // Returns true if the given path points to a directory
         let metadata = fs::metadata(to_path).expect("Could not find copy 'to' folder");
         metadata.file_type().is_dir()
+    }
+
+    #[test]
+    fn test_parse_pid() {
+        println!("{:?}", parse_pid().unwrap());
     }
 
     #[test]
