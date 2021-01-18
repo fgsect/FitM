@@ -50,6 +50,8 @@ pub struct FITMSnapshot {
     pub initial: bool,
     /// Name of the corresponding acitve dir
     pub origin_state: &'static str,
+    /// Pid of the snapshotted process
+    pub pid: Option<i32>,
 }
 
 impl fmt::Debug for FITMSnapshot {
@@ -91,6 +93,7 @@ impl FITMSnapshot {
         base_state: String,
         server: bool,
         from_snapshot: bool,
+        pid: Option<i32>,
     ) -> FITMSnapshot {
         let origin_state = origin_state(server);
 
@@ -137,6 +140,7 @@ impl FITMSnapshot {
             base_state,
             initial: false,
             origin_state: origin_state,
+            pid,
         };
 
         // We can write a tool in the future to parse this info
@@ -197,7 +201,11 @@ impl FITMSnapshot {
 
     /// Needed for the two initial snapshots created based on the target
     /// binaries
-    pub fn init_run(&self, create_outputs: bool, create_snapshot: bool) -> Result<(), io::Error> {
+    pub fn init_run(
+        &self,
+        create_outputs: bool,
+        create_snapshot: bool,
+    ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
         // Start the initial snapshot run. We use our patched qemu to emulate
@@ -265,11 +273,13 @@ impl FITMSnapshot {
             .code()
             .unwrap();
 
+        let mut pid = None;
         if create_snapshot {
             if closure_exit == 42 {
                 // With snapshot_run we move the state folder instead of copying it,
                 // but in this initial case we need to use
                 // the state folder shortly after running this function
+                pid = Some(utils::parse_pid().unwrap());
                 utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
             } else {
                 panic!(
@@ -285,7 +295,7 @@ impl FITMSnapshot {
                 .expect("[!] Could not remove active_state during init_run");
         }
 
-        Ok(())
+        Ok(pid)
     }
 
     /// Create a new snapshot based on a given snapshot
@@ -307,7 +317,7 @@ impl FITMSnapshot {
                     format!("{}/next_snapshot", env::current_dir().unwrap().display());
                 fs::create_dir(&next_snapshot_dir).expect("[-] Could not create snapshot dir!");
 
-                let exit_status = Command::new("setsid")
+                let _restore = Command::new("setsid")
                     .args(&[
                         format!("stdbuf"),
                         format!("-oL"),
@@ -325,8 +335,10 @@ impl FITMSnapshot {
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
-                    .expect("[!] Snapshot run failed");
+                    .expect("[!] Snapshot restore failed");
 
+                let exit_status =
+                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
@@ -422,6 +434,7 @@ impl FITMSnapshot {
                     .env("FITM_CREATE_OUTPUTS", "1")
                     .spawn()?
                     .wait()?;
+
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
@@ -467,7 +480,7 @@ impl FITMSnapshot {
                     sleep(Duration::from_millis(0));
                 }
 
-                let exit_status = Command::new("setsid")
+                let _restore_status = Command::new("setsid")
                     .args(&[
                         format!("stdbuf"),
                         format!("-oL"),
@@ -483,11 +496,10 @@ impl FITMSnapshot {
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
-                    .expect("[!] Snapshot run failed");
+                    .expect("[!] Snapshot restore failed");
 
-                // No new states are discovered if this sleep is not there
-                // Didn't investigate further.
-                sleep(Duration::from_secs(5));
+                let exit_status =
+                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
@@ -612,6 +624,7 @@ impl FITMSnapshot {
             self.state_path.clone(),
             self.server,
             true,
+            self.pid,
         );
 
         if afl.snapshot_run(input_path)? {
@@ -921,7 +934,7 @@ pub fn run(
     ensure_dir_exists(&generation_input_dir(1));
 
     // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
-    let afl_client_snap: FITMSnapshot = FITMSnapshot::new(
+    let mut afl_client_snap: FITMSnapshot = FITMSnapshot::new(
         2,
         0,
         client_bin.to_string(),
@@ -929,27 +942,19 @@ pub fn run(
         "".to_string(),
         false,
         false,
+        None,
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.init_run(false, true)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // This is the (theoretical) state before the initial server run.
     // afl_client_snap.create_outputs("". "./saved-states/fitm-gen0-state0");
     // we just need tmp to create outputs
-    let tmp = FITMSnapshot::new(
-        2,
-        0,
-        client_bin.to_string(),
-        run_timeout,
-        "".to_string(),
-        false,
-        false,
-    );
-    tmp.init_run(true, false)?;
+    afl_client_snap.init_run(true, false)?;
 
-    let afl_server: FITMSnapshot = FITMSnapshot::new(
+    let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
         0,
         server_bin.to_string(),
@@ -957,8 +962,9 @@ pub fn run(
         "".to_string(),
         true,
         false,
+        None,
     );
-    afl_server.init_run(false, true)?;
+    afl_server.pid = afl_server.init_run(false, true)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
