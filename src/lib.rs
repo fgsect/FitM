@@ -204,7 +204,7 @@ impl FITMSnapshot {
         // until the first recv of the target is hit. We have to use setsid to
         // circumvent the --shell-job problem of criu and stdbuf to have the
         // correct stdin, stdout and stderr file descriptors.
-        let closure_ret = NamespaceContext::new()
+        let closure_exit = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
                     .expect("[!] Could not spawn criuserver");
@@ -425,6 +425,7 @@ impl FITMSnapshot {
                     .env("AFL_NO_UI", "1")
                     // Give criu forkserver up to a minute to spawn
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
+                    .env("FITM_CREATE_OUTPUTS", "1")
                     .spawn()?
                     .wait()?;
                 Ok(exit_status.code().unwrap())

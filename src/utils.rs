@@ -3,7 +3,7 @@ use fs_extra::dir::CopyOptions;
 use std::fs;
 use std::process::{Child, Command, Stdio};
 
-use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT, TARGET_EXITCODE};
+use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use std::io::{self, ErrorKind, Read, Write};
 use std::str::FromStr;
@@ -207,20 +207,6 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
         .stdout(Stdio::from(criu_stdout))
         .stderr(Stdio::from(criu_stderr))
         .spawn()
-}
-
-pub fn read_exitcode() -> Result<i32, io::Error> {
-    let mut exitcode_file = fs::File::open(format!("{}/{}", ACTIVE_STATE, TARGET_EXITCODE))
-        .expect("[!] Could not open target-exitcode in utils::read_exitcode");
-    let mut buffer = String::new();
-    exitcode_file
-        .read_to_string(&mut buffer)
-        .expect("[!] Could not read target-exitcode in utils::read_exitcode");
-    // Added this since rust seemed to read the null byte as a character(?) and broke on parsing
-    buffer.retain(|c| c.is_digit(10));
-    Ok(buffer
-        .parse::<i32>()
-        .expect("[!] Could not parse exitcode in utils::read_exitcode"))
 }
 
 #[cfg(test)]
