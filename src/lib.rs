@@ -19,6 +19,7 @@ pub mod utils;
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
+pub const SAVED_STATES: &str = "saved-states";
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
@@ -903,6 +904,35 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
         // read all files, return the strings
         .filter(|x| x.path().is_file())
         .map(|x| x.path())
+        .collect())
+}
+
+pub fn get_traces() -> io::Result<Vec<String>> {
+    // should match naming scheme explained at `input_file_list_for_gen`
+    let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
+    // Collect all snapshot folders in saved-states
+    let states_iter = fs::read_dir(SAVED_STATES)
+        .expect(format!("[!] Could not read_dir {} in get_traces.", SAVED_STATES).as_str())
+        .into_iter()
+        .filter_map(|dir| dir.ok())
+        .filter(|dir_entry| {
+            dir_entry.path().is_dir()
+                && snapshot_regex
+                    .find(dir_entry.path().to_str().unwrap())
+                    .is_some()
+        });
+
+    // Collect iterator of paths to all trace files
+    let traces_iter = states_iter
+        .map(|dir_entry| dir_entry.path().join("snapshot_map"))
+        .filter(|snapshot_path| snapshot_path.is_file());
+
+    // Return content of each file as vec
+    Ok(traces_iter
+        .map(|path| {
+            fs::read_to_string(path)
+                .expect("[!] Error while reading snapshot_map files in get_traces")
+        })
         .collect())
 }
 
