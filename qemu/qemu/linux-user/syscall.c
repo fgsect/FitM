@@ -2364,6 +2364,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
 
+        char* input = getenv_from_file("INPUT_FILENAME");
+
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -2378,28 +2380,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
             }
         }
 
-        // We want to get input from files so we pipe the file we get from AFL through an environment var into here.
-        // The file is used as stdin
-        char* input = getenv_from_file("INPUT_FILENAME");
-        FILE* input_file = fopen(input, "r");
+        open_input_file(0, input);
 
-        if(!input_file){
-            printf("INPUT_FILENAME: %s\n", input);
-            perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
-            exit(1);
-        }
-
-        int input_fd = fileno(input_file);
-        if(input_fd == -1){
-            printf("fatal: could not: %s\n", input);
-            perror("fatal: could not fileno INPUT_FILENAME");
-            exit(1);
-        }
-        // An open may result in INPUT_FILENAME at fd 0 if 0 is not used before calling fopen
-        if(input_fd){
-            dup2(input_fd, 0);
-            close(input_fd);
-        }
     }
     // read did not read anything without setting FD to the beginning of the file.
 //    lseek(0, 0, SEEK_SET);
@@ -6168,7 +6150,7 @@ static int do_openat(void *cpu_env, int dirfd, const char *pathname, int flags, 
         int fd, r;
 
         /* create temporary file to map stat to */
-        tmpdir = getenv_from_file("TMPDIR");
+        tmpdir = getenv("TMPDIR");
         if (!tmpdir)
             tmpdir = "/tmp";
         snprintf(filename, sizeof(filename), "%s/qemu-open.XXXXXX", tmpdir);
@@ -6391,9 +6373,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 // untested, may need debugging
                 close(0);
                 do_criu();
-                // Weird bug making criu restore crash - this solves it
-                sleep(0.2);
-                system("touch /tmp/after_docriu");
+
+                char *input = getenv_from_file("INPUT_FILENAME");
+
                 create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
                 timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -6411,23 +6393,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     }
                 }
 
-                // We want to get input from files so we pipe the file we get from AFL through an environment var into here.
-                // The file is used as stdin
-                char* input = getenv_from_file("INPUT_FILENAME");
-                FILE* input_file = fopen(input, "r");
-                if(!input_file){
-                    printf("INPUT_FILENAME: %s\n", input);
-                    perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
-                    exit(1);
-                }
-                int input_fd = fileno(input_file);
-                if(!input_fd){
-                    printf("fatal: could not: %s\n", input);
-                    perror("fatal: could not fileno INPUT_FILENAME");
-                    exit(1);
-                }
-                dup2(input_fd, arg1);
-                close(input_fd);
+                open_input_file(arg1, input);
+
             }
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 return -TARGET_EFAULT;
