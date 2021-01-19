@@ -194,9 +194,21 @@ impl FITMSnapshot {
     }
 
     fn save_fuzz_results(&self) -> Result<(), io::Error> {
-        let from = format!("{}/out", ACTIVE_STATE);
-        let to = format!("./saved-states/{}/out_postrun", self.state_path);
-        cp_recursive(from.as_str(), to.as_str());
+        let postrun = "out_postrun";
+        let out = format!("{}/out", ACTIVE_STATE);
+        let out_postrun = format!("{}/{}", ACTIVE_STATE, postrun);
+
+        // cp will copy out into out_postrun on the second and third copy because the destination already exists
+        // thus we need src and dst to be the same name
+        if PathBuf::from(out_postrun.as_str()).is_dir() {
+            remove_dir_all(out_postrun.as_str())
+                .expect("[!] Error while removing out_postrun in save_fuzz_results");
+        }
+        cp_recursive(out.as_str(), out_postrun.as_str());
+
+        // Don't copy INTO out_postrun, if you do the folders won't get merged by cp
+        let to = format!("./saved-states/{}", self.state_path);
+        cp_recursive(out_postrun.as_str(), to.as_str());
         Ok(())
     }
 
