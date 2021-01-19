@@ -3,4 +3,4 @@
 	url = https://github.com/checkpoint-restore/criu.git
 [submodule "AFLplusplus"]
 	path = AFLplusplus
-	url = https://github.com/AFLplusplus/AFLplusplus.git
+	url = git@github.com:derpsteb/AFLplusplus.git
