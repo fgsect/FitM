@@ -2295,15 +2295,6 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
     if(!create_outputs) {
         return (ssize_t)len;
     } else {
-//        FILE *fp;
-//        char *uuid = get_new_uuid();
-//        char path[49] = "/tmp/fitm-";
-//        strncat(path, uuid, 37);
-//        fp = fopen(path, "w+");
-//        fprintf(fp, "fd: %d\nmsg: %s\nlen: %ld", fd, (char *)msg, len);
-//        fclose(fp);
-
-//        _ = system("ls -la /proc/self/fd > /tmp/fitm-sendto");
         return write(fd, (char *) msg, len);
     }
 }
@@ -2383,8 +2374,6 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         open_input_file(0, input);
 
     }
-    // read did not read anything without setting FD to the beginning of the file.
-//    lseek(0, 0, SEEK_SET);
     return read(0, (char *)msg, len);
 }
 
@@ -6438,18 +6427,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             g_free(copy);
         } else {
             if(!create_outputs) {
-                _ = system("ls -la /proc/self/fd > /tmp/fitm-arg3");
                 ret = arg3;
             } else {
-                _ = system("ls -la /proc/self/fd > /tmp/fitm-safewrite2");
-//                FILE *fp;
-//                char *uuid = get_new_uuid();
-//                char path[49] = "/tmp/fitm-";
-//                strncat(path, uuid, 37);
-//                fp = fopen(path, "w+");
-//                fprintf(fp, "arg1: %ld\np: %s\narg3: %ld", arg1, (char *)p, arg3);
-//                fclose(fp);
-
                 ret = get_errno(safe_write(arg1, p, arg3));
             }
         }
