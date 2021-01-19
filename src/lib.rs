@@ -727,9 +727,8 @@ impl FITMSnapshot {
     }
 }
 
-fn cpy_trace(queue: &str, input: &str, state_path: &str) -> Result<(), io::Error> {
+fn cpy_trace(trace_file: &str, state_path: &str) -> Result<(), io::Error> {
     // Copy the .trace to the new snapshot dir
-    let trace_file = format!("{}/.traces/{}", queue, input);
     let to = format!("./saved-states/{}/snapshot_map", state_path);
     println!("saving trace_file: {} to: {}", &trace_file, &to);
     fs::copy(&trace_file, &to).expect(
@@ -806,16 +805,30 @@ pub fn process_stage(
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
                 let state_id = next_gen_id_start + next_own_snaps.len();
-                // TODO: Check if a snapshot for this cmin .trace already exists
+
+                let trace_file = format!(
+                    "{}/.traces/{}",
+                    &absolut_cmin_post_exec,
+                    entry.file_name().into_string().unwrap()
+                );
+
+                match get_traces().unwrap() {
+                    // If we have seen the current trace before we don't want to create a new snapshot for this input
+                    Some(traces) => {
+                        let cur_trace = fs::read_to_string(&trace_file)
+                            .expect("[!] Could not read current trace_file in process_stage");
+                        if traces.iter().any(|trace| trace == cur_trace.as_str()) {
+                            println!("==== [*] Skipping snapshot run for input (duplicate trace): {:?} ====", entry.path());
+                            continue;
+                        }
+                    }
+                    _ => (),
+                }
                 let snap_option = snap
                     .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
                 match snap_option {
                     Some(new_snap) => {
-                        cpy_trace(
-                            &absolut_cmin_post_exec.as_str(),
-                            entry.file_name().into_string().unwrap().as_str(),
-                            &new_snap.state_path,
-                        )?;
+                        cpy_trace(trace_file.as_str(), &new_snap.state_path)?;
 
                         // Commit this fresly-baked snapshot to our vec.
                         next_own_snaps.push(new_snap);
@@ -907,7 +920,7 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
         .collect())
 }
 
-pub fn get_traces() -> io::Result<Vec<String>> {
+pub fn get_traces() -> io::Result<Option<Vec<String>>> {
     // should match naming scheme explained at `input_file_list_for_gen`
     let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
     // Collect all snapshot folders in saved-states
@@ -928,12 +941,17 @@ pub fn get_traces() -> io::Result<Vec<String>> {
         .filter(|snapshot_path| snapshot_path.is_file());
 
     // Return content of each file as vec
-    Ok(traces_iter
+    let traces_vec: Vec<String> = traces_iter
         .map(|path| {
             fs::read_to_string(path)
                 .expect("[!] Error while reading snapshot_map files in get_traces")
         })
-        .collect())
+        .collect();
+    if traces_vec.len() > 0 {
+        Ok(Some(traces_vec))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Run fitm
