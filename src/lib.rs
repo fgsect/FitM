@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::{self, DirEntry, File};
 use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -385,6 +385,18 @@ impl FITMSnapshot {
         Ok(success)
     }
 
+    fn found_crashes(&self) -> bool {
+        let iter: Vec<DirEntry> = fs::read_dir(format!("{}/out/main/crashes", ACTIVE_STATE))
+            .expect("[!]")
+            .map(|entry| entry.unwrap())
+            .collect();
+        if iter.len() > 0 {
+            true
+        } else {
+            false
+        }
+    }
+
     /// Start a single fuzz run in afl which gets restored from an earlier
     /// snapshot. Because we use sh and the restore script we have to skip the
     /// bin check
@@ -454,14 +466,20 @@ impl FITMSnapshot {
             println!("{}", info);
             std::process::exit(1);
         }
+        println!("==== [*] Finished fuzzing {} ====", self.state_path);
+
+        if self.found_crashes() {
+            println!(
+                "==== [*] Crashes present after fuzzing {} ====",
+                self.state_path
+            );
+        }
 
         // Doesn't work since File has no copy trait and Stdio:from doesn't take ref :(
         // let mut stdout_content = String::new();
         // stdout.read_to_string(&mut stdout_content).unwrap();
         // println!("==== [*] AFL++ stdout: \n{}", stdout_content);
         self.save_fuzz_results()?;
-
-        println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
         Ok(())
     }
