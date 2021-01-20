@@ -139,6 +139,11 @@ bool create_outputs = true; //TODO: works? getenv_from_file("FITM_CREATE_OUTPUTS
 // If true, please do snapshot.
 // we are restored or snapshottet or something.
 bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+// live555 server tries to find it's own IP adr by sending & recveiving a multicast packet
+// this results in a recv before the recv that waits for client input
+// this variable should help identify the correct recv call to snapshot by indicating if the recv call
+// happened after accept has been called at least once
+bool accepted_once = false;
 // every position in this bitstring is interpreted as a fd. pos x == fd x
 // If a position holds a 1 it is a socket
 long long int is_socket = 0;
@@ -2014,6 +2019,7 @@ static abi_long do_bind(int sockfd, abi_ulong target_addr,
 static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
+    accepted_once = true;
     // Connecting to a remote adr. always works as we are only running locally
     // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275
     return 0;
@@ -2193,14 +2199,18 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
-    char *uuid = get_new_uuid();
-    char path[44] = "./fd/";
-    strncat(path, uuid, 37);
+    int new_fd = -1;
+    if (!accepted_once) {
+        char *uuid = get_new_uuid();
+        char path[44] = "./fd/";
+        strncat(path, uuid, 37);
 
-    int new_fd = open(path, O_RDWR | O_CREAT, 0666);
-    chmod(path, 0666);
-    is_socket |= 1 << new_fd;
-
+        int new_fd = open(path, O_RDWR | O_CREAT, 0666);
+        chmod(path, 0666);
+        is_socket |= 1 << new_fd;
+    }
+    
+    accepted_once = true;
     return new_fd;
 }
 
@@ -2311,7 +2321,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         env_init = true;
     }
 
-    if(sent){
+    if(sent && accepted_once){
         if (!timewarp_mode) {
             exit(0);
         }
@@ -6328,7 +6338,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             if (arg3 == 0) {
                 return 0;
             } else {
-            if(sent && (is_socket >> arg1) & 1){
+            if(sent && (is_socket >> arg1) & 1 && accepted_once){
                 if (!timewarp_mode) {
                     exit(0);
                 }
@@ -8356,6 +8366,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
          * Microblaze is further special in that it uses a sixth
          * implicit argument to clone for the TLS pointer.
          */
+        // Run clone normally before we have hit at least one accept() call and start fuzzing
+        if (accepted_once) {
+            return 0;
+        }
 #if defined(TARGET_MICROBLAZE)
         ret = get_errno(do_fork(cpu_env, arg1, arg2, arg4, arg6, arg5));
 #elif defined(TARGET_CLONE_BACKWARDS)

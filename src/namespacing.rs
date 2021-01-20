@@ -359,7 +359,7 @@ mod tests {
             None,
         );
 
-        afl_server_snap.init_run(false, true).unwrap();
+        afl_server_snap.init_run(false, true, "").unwrap();
 
         std::fs::write("./saved-states/fitm-gen1-state0/in/testinp", "ulullulul")
             .expect("failed to create test-input");

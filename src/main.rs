@@ -37,9 +37,11 @@ fn main() {
     // TODO: use argv to fill these
     match fitm::run(
         ".",
-        "./tests/targets/pseudoclient_simple",
-        "./tests/targets/pseudoserver_simple",
-        &Duration::from_secs(10),
+        "../../../../../../../usr/bin/ftp",
+        "127.0.0.1 2200",
+        "./LightFTP/Source/Release/fftp",
+        "../LightFTP/fftp.conf",
+        &Duration::from_secs(3),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}

@@ -218,6 +218,7 @@ impl FITMSnapshot {
         &self,
         create_outputs: bool,
         create_snapshot: bool,
+        cli_args: &str,
     ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
@@ -255,7 +256,7 @@ impl FITMSnapshot {
                         format!("-oL"),
                         format!("../fitm-qemu-trace"),
                         format!("../{}", self.target_bin),
-                        format!("{}", dev_null),
+                        format!("{}", cli_args),
                     ])
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
@@ -989,7 +990,9 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 pub fn run(
     base_path: &str,
     client_bin: &str,
+    client_args: &str,
     server_bin: &str,
+    server_args: &str,
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
@@ -1015,7 +1018,7 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1030,7 +1033,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false)?;
+    tmp.init_run(true, false, client_args)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1042,7 +1045,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true)?;
+    afl_server.pid = afl_server.init_run(true, true, server_args)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
