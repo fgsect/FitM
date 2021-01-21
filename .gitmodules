@@ -10,3 +10,6 @@
 [submodule "tests/targets/LightFTP"]
 	path = tests/targets/LightFTP
 	url = git@github.com:derpsteb/LightFTP.git
+[submodule "tests/targets/dcmtk"]
+	path = tests/targets/dcmtk
+	url = git@github.com:derpsteb/dcmtk.git
