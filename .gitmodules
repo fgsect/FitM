@@ -7,3 +7,6 @@
 [submodule "tests/targets/live555"]
 	path = tests/targets/live555
 	url = git@github.com:derpsteb/live555.git
+[submodule "tests/targets/LightFTP"]
+	path = tests/targets/LightFTP
+	url = git@github.com:derpsteb/LightFTP.git
