@@ -125,10 +125,6 @@
 #include<sys/select.h>
 #include "fitm-criu.h"
 
-// Filedescriptors used by AFL to communicate between forkserver & child
-#define FRKSRV_READ_FD             (198)
-#define FRKSRV_WRITE_FD            (199)
-
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
 bool sent = true;
@@ -2341,39 +2337,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
 
-        if (fcntl(FRKSRV_READ_FD, F_GETFD) != -1) {
-            close(FRKSRV_READ_FD);
-        }
-        if (fcntl(FRKSRV_WRITE_FD, F_GETFD) != -1) {
-            close(FRKSRV_WRITE_FD);
-        }
+        create_pipes_file();
 
-        int read_pipe[2];
-        int write_pipe[2];
-        if (pipe(read_pipe) == -1) {
-            printf("QEMU: Could not open AFL Forkserver read pipe!");
-        }
-        if (pipe(write_pipe) == -1) {
-            printf("QEMU: Could not open AFL Forkserver read pipe!");
-        }
-        dup2(read_pipe[0], FRKSRV_READ_FD);
-        dup2(write_pipe[1], FRKSRV_WRITE_FD);
-        close(read_pipe[0]);
-        close(read_pipe[1]);
-        close(write_pipe[0]);
-        close(write_pipe[1]);
-
-        FILE *f = fopen("./pipes", "w");
-        char *buff = calloc(200, 1);
-        _ = readlink("/proc/self/fd/198", buff, 100);
-        char *tmp = (&buff[strlen(buff)])+1;
-        buff[strlen(buff)] = '\n';
-        _ = readlink("/proc/self/fd/199", tmp, 100);
-        fprintf(f, "%s\n", buff);
-        free(buff);
-        fclose(f);
-
-        // untested, may need debugging
         close(0);
         do_criu();
         // Weird bug making criu restore crash - this solves it
@@ -2384,16 +2349,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
-        if (!timewarp_mode) {
-            char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
-            char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
-            if(shm_env_var){
-                afl_setup(shm_env_var, afl_inst_ratio);
-                afl_forkserver(cpu);
-            } else {
-                puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
-            }
-        }
+        spawn_forksrv(cpu, timewarp_mode);
 
         open_input_file(0, input);
 
@@ -6356,36 +6312,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 if (!timewarp_mode) {
                     exit(0);
                 }
-                sent = false; // After restore, we'll await the next sent before criuin' again
-                if (fcntl(FRKSRV_READ_FD, F_GETFD) == -1) {
-                    int read_pipe[2];
-                    int write_pipe[2];
-                    if (pipe(read_pipe) == -1) {
-                        printf("QEMU: Could not open AFL Forkserver read pipe!");
-                    }
-                    if (pipe(write_pipe) == -1) {
-                        printf("QEMU: Could not open AFL Forkserver read pipe!");
-                    }
-                    dup2(read_pipe[0], FRKSRV_READ_FD);
-                    dup2(write_pipe[1], FRKSRV_WRITE_FD);
-                    close(read_pipe[0]);
-                    close(read_pipe[1]);
-                    close(write_pipe[0]);
-                    close(write_pipe[1]);
-                }
-                FILE *f = fopen("./pipes", "w");
-                char *buff = calloc(200, 1);
-                _ = readlink("/proc/self/fd/198", buff, 100);
-                char *tmp = (&buff[strlen(buff)])+1;
-                buff[strlen(buff)] = '\n';
-                _ = readlink("/proc/self/fd/199", tmp, 100);
-                fprintf(f, "%s\n", buff);
-                free(buff);
-                fclose(f);
 
-                // untested, may need debugging
+                create_pipes_file();
+
                 close(0);
                 do_criu();
+
+                // Weird bug making criu restore crash - this solves it
+                sleep(0.2);
 
                 char *input = getenv_from_file("INPUT_FILENAME");
 
@@ -6395,16 +6329,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 if (timewarp_mode) {
                     exit(0);
                 }
-                if (!timewarp_mode) {
-                    char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
-                    char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
-                    if(shm_env_var){
-                        afl_setup(shm_env_var, afl_inst_ratio);
-                        afl_forkserver(cpu);
-                    } else {
-                        puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
-                    }
-                }
+                spawn_forksrv(cpu, timewarp_mode);
 
                 open_input_file(arg1, input);
 
