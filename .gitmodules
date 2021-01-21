@@ -13,3 +13,9 @@
 [submodule "tests/targets/dcmtk"]
 	path = tests/targets/dcmtk
 	url = git@github.com:derpsteb/dcmtk.git
+[submodule "tests/targets/kamailio"]
+	path = tests/targets/kamailio
+	url = git@github.com:derpsteb/kamailio.git
+[submodule "tests/targets/pjproject"]
+	path = tests/targets/pjproject
+	url = git@github.com:derpsteb/pjproject.git
