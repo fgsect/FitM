@@ -2209,13 +2209,19 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 static abi_long do_accept4(int fd, abi_ulong target_addr,
                            abi_ulong target_addrlen_addr, int flags)
 {
+    // Exit once we accepted once because we can only provide one input per fuzz child
+    if (accepted_once) {
+        printf("[QEMU] do_accept4 exiting.");
+        _exit(0);
+    }
+
     int new_fd = -1;
     if (!accepted_once) {
         char *uuid = get_new_uuid();
         char path[44] = "./fd/";
         strncat(path, uuid, 37);
 
-        int new_fd = open(path, O_RDWR | O_CREAT, 0666);
+        new_fd = open(path, O_RDWR | O_CREAT, 0666);
         chmod(path, 0666);
         is_socket |= 1 << new_fd;
     }
