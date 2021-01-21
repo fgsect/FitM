@@ -156,20 +156,29 @@ impl FITMSnapshot {
 
     /// Copies everything in ./fd to ./outputs/ of a specified state path.
     /// this is used on the initial client state to generate intitial inputs for the first server run
-    fn copy_fds_to_output_for(&self, gen: u32, state: usize) -> Result<(), io::Error> {
+    fn copy_fds_to_output_for(&self, gen: u32, state: usize) {
         let state_path = state_path_for(gen, state);
         // Make sure state dir outputs exists
         let _ = fs::create_dir_all(&format!("./saved-states/{}/outputs", state_path));
-        for (i, entry) in fs::read_dir(&format!("./{}/fd", ACTIVE_STATE))?.enumerate() {
-            let path = entry?.path();
+        for (i, entry) in fs::read_dir(&format!("./{}/fd", ACTIVE_STATE))
+            .expect("[!] Could not find fd folder in copy_fds_to_output_for")
+            .enumerate()
+        {
+            let path = entry
+                .expect("[!] Could not find entry in fd folder in copy_fds_to_output_for")
+                .path();
             if path.is_file() {
-                std::fs::copy(
-                    path,
-                    &format!("./saved-states/{}/outputs/initial{}", &state_path, i),
-                )?;
+                let to = &format!("./saved-states/{}/outputs/initial{}", &state_path, i);
+                std::fs::copy(&path, &to).expect(
+                    format!(
+                        "[!] Could not copy {:?} to {} in copy_fds_to_output_for",
+                        path,
+                        to.as_str()
+                    )
+                    .as_str(),
+                );
             }
         }
-        Ok(())
     }
 
     /// Copies everything in ./fd to ./outputs/
@@ -303,7 +312,7 @@ impl FITMSnapshot {
         }
 
         if create_outputs {
-            self.copy_fds_to_output_for(0, 0)?;
+            self.copy_fds_to_output_for(0, 0);
 
             remove_dir_all(ACTIVE_STATE)
                 .expect("[!] Could not remove active_state during init_run");
@@ -450,6 +459,7 @@ impl FITMSnapshot {
                     // Give criu forkserver up to a minute to spawn
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
                     .env("FITM_CREATE_OUTPUTS", "1")
+                    .env("AFL_COMPCOV_LEVEL", "2")
                     .spawn()?
                     .wait()?;
 
@@ -460,6 +470,10 @@ impl FITMSnapshot {
             .expect("[!] Namespace wait failed")
             .code()
             .unwrap();
+
+        if self.state_path == "fitm-gen4-state0" {
+            sleep(Duration::from_millis(0));
+        }
 
         if exit_status != 0 {
             let info =
@@ -723,6 +737,7 @@ impl FITMSnapshot {
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
                     .env("AFL_DEBUG_CHILD_OUTPUT", "1")
                     .env("AFL_DEBUG", "1")
+                    .env("FITM_CREATE_OUTPUTS", "1")
                     // afl-cmin will keep the showmap traces in `.traces` after each run
                     .env("AFL_KEEP_TRACES", "1");
 
