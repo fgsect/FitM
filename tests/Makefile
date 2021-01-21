@@ -11,7 +11,7 @@ syscall:
 clean:
 	rm -rf self-dump self-dump.o rpc.pb-c.o rpc.pb-c.c rpc.pb-c.h \
 	forkserver_test rpc.proto syscall getenv_from_file_test pipe_test \
-	targets/pseudoclient targets/pseudoserver targets/snapshot_creation
+	targets/custom/pseudoclient targets/custom/pseudoserver targets/custom/snapshot_creation
 
 test_getenv: clean
 	gcc -o getenv_from_file_test getenv_from_file_test.c
@@ -22,26 +22,26 @@ test_pipe: clean
 	setsid stdbuf -oL ../AFLplusplus/afl-qemu-trace ./pipe_test < /dev/null &> pipe_test.out
 
 snapshot_creation:
-	gcc -o targets/snapshot_creation targets/snapshot_creation.c
+	gcc -o targets/custom/snapshot_creation targets/custom/snapshot_creation.c
 
 echo_server:
-	gcc -o targets/echo_server targets/echo_server.c
+	gcc -o targets/custom/echo_server targets/custom/echo_server.c
 
 pseudotest_simple: pseudoserver_simple pseudoclient_simple
 
 pseudoserver_simple: clean
-	gcc -o targets/pseudoserver_simple targets/pseudoserver_simple.c
+	gcc -o targets/custom/pseudoserver_simple targets/custom/pseudoserver_simple.c
 
 pseudoclient_simple: clean
-	gcc -o targets/pseudoclient_simple targets/pseudoclient_simple.c
+	gcc -o targets/custom/pseudoclient_simple targets/custom/pseudoclient_simple.c
 
 pseudotest_complex: pseudoserver_complex pseudoclient_complex
 
 pseudoserver_complex: clean
-	gcc -o targets/pseudoserver_complex targets/pseudoserver_complex.c
+	gcc -o targets/custom/pseudoserver_complex targets/custom/pseudoserver_complex.c
 
 pseudoclient_complex: clean
-	gcc -o targets/pseudoclient_complex targets/pseudoclient_complex.c
+	gcc -o targets/custom/pseudoclient_complex targets/custom/pseudoclient_complex.c
 
 test_criupipe: clean
 	gcc -o pipe pipe.c
