@@ -4867,8 +4867,14 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
             return -TARGET_ERESTARTSYS;
         }
 
+
         fork_start();
-        ret = fork();
+        if (accepted_once) {
+            ret = 0;
+            fork_end(0);
+        } else {
+            ret = fork();
+        }
         if (ret == 0) {
             /* Child Process.  */
             cpu_clone_regs(env, newsp);
@@ -8320,10 +8326,6 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
          * Microblaze is further special in that it uses a sixth
          * implicit argument to clone for the TLS pointer.
          */
-        // Run clone normally before we have hit at least one accept() call and start fuzzing
-        if (accepted_once) {
-            return 0;
-        }
 #if defined(TARGET_MICROBLAZE)
         ret = get_errno(do_fork(cpu_env, arg1, arg2, arg4, arg6, arg5));
 #elif defined(TARGET_CLONE_BACKWARDS)
