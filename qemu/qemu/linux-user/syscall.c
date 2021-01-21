@@ -2211,7 +2211,6 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 {
     // Exit once we accepted once because we can only provide one input per fuzz child
     if (accepted_once) {
-        printf("[QEMU] do_accept4 exiting.");
         _exit(0);
     }
 
@@ -2279,7 +2278,24 @@ static abi_long do_getsockname(int fd, abi_ulong target_addr,
 
     addr = alloca(addrlen);
 
-    ret = get_errno(getsockname(fd, addr, &addrlen));
+    /*
+     * struct sockaddr{
+            sa_family_t   sa_family       address family
+            char          sa_data[]       socket address (variable-length data)
+        };
+     */
+    if (accepted_once) {
+        puts("[QEMU] getsockname() accepted_once branch\n");
+         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
+         addr_pointer->sa_family = AF_INET;
+         addr_pointer->sa_data[0] = 42;
+         addr_pointer->sa_data[3] = 42;
+
+         ret = 0;
+    } else {
+        ret = get_errno(getsockname(fd, addr, &addrlen));
+    }
+
     if (!is_error(ret)) {
         host_to_target_sockaddr(target_addr, addr, addrlen);
         if (put_user_u32(addrlen, target_addrlen_addr))
@@ -4836,6 +4852,18 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
             tb_flush(cpu);
         }
 
+        if (accepted_once) {
+            pthread_mutex_unlock(&info.mutex);
+//            pthread_cond_destroy(&info.cond);
+            pthread_mutex_destroy(&info.mutex);
+            pthread_mutex_unlock(&clone_lock);
+
+            // should never return from this call
+            clone_func(&info);
+
+            perror("This should be dead code\n");
+            _exit(-1);
+        }
         ret = pthread_create(&info.thread, &attr, clone_func, &info);
         /* TODO: Free new CPU state if thread creation failed.  */
 
@@ -8326,6 +8354,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
          * Microblaze is further special in that it uses a sixth
          * implicit argument to clone for the TLS pointer.
          */
+        puts("[QEMU] clone goes brr\n");
 #if defined(TARGET_MICROBLAZE)
         ret = get_errno(do_fork(cpu_env, arg1, arg2, arg4, arg6, arg5));
 #elif defined(TARGET_CLONE_BACKWARDS)
