@@ -122,6 +122,7 @@
 
 #include "../../patches/afl-qemu-common.h"
 
+#include<sys/select.h>
 #include "fitm-criu.h"
 
 // Filedescriptors used by AFL to communicate between forkserver & child
@@ -1270,6 +1271,9 @@ static abi_long do_select(int n,
                           abi_ulong rfd_addr, abi_ulong wfd_addr,
                           abi_ulong efd_addr, abi_ulong target_tv_addr)
 {
+
+
+
     fd_set rfds, wfds, efds;
     fd_set *rfds_ptr, *wfds_ptr, *efds_ptr;
     struct timeval tv;
@@ -1297,6 +1301,16 @@ static abi_long do_select(int n,
         ts_ptr = &ts;
     } else {
         ts_ptr = NULL;
+    }
+
+    // we are fuzzing we want select to return immediately.
+    if (accepted_once) {
+        //TODO: select may have to update the timesepc, do we care?
+        //TODO2: We may only want to return data available for our FDs?
+        //We would need to handle extra data, don't.
+        FD_ZERO(efds_ptr);
+        // by simply returning the count, FD_ISSET will be true for all FDs.
+        return ret;
     }
 
     ret = get_errno(safe_pselect6(n, rfds_ptr, wfds_ptr, efds_ptr,
@@ -7677,6 +7691,15 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 ts_ptr = NULL;
             }
 
+            // we are fuzzing we want select to return immediately.
+            if (accepted_once) {
+                //TODO: We may only want to return data available for our FDs?
+                //We would need to handle extra data, don't.
+                FD_ZERO(efds_ptr);
+                // by simply returning the count, FD_ISSET will be true for all FDs.
+                return ret;
+            }
+
             /* Extract the two packed args for the sigset */
             if (arg6) {
                 sig_ptr = &sig;
@@ -8668,10 +8691,30 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     return -TARGET_EINVAL;
                 }
 
+
+
                 target_pfd = lock_user(VERIFY_WRITE, arg1,
                                        sizeof(struct target_pollfd) * nfds, 1);
                 if (!target_pfd) {
                     return -TARGET_EFAULT;
+                }
+
+                if (accepted_once) {
+                    // If we're fuzzing, immediately return on poll. all were successful.
+                    int set = 0;
+                    for (i  = 0; i < nfds; i++) {
+                        // All may read and/or write (POLLIN or POLLOUT) if they want to.
+                        // TODO: Only if the .fd is one of ours during fuzzing?
+                        uint16_t response = tswap16(target_pfd[i].events) & (POLLIN | POLLOUT);
+                        if (response) { set++; }
+                        target_pfd[i].revents = tswap16(response);
+                    }
+                    unlock_user(target_pfd, arg1, sizeof(struct target_pollfd) * nfds);
+                    if (!set){
+                        printf("[FITM] OH NOES! No fds wanted to read or write during poll!");
+                    }
+                    return set;
+
                 }
 
                 pfd = alloca(sizeof(struct pollfd) * nfds);
@@ -8679,7 +8722,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     pfd[i].fd = tswap32(target_pfd[i].fd);
                     pfd[i].events = tswap16(target_pfd[i].events);
                 }
+
             }
+
 
             switch (num) {
 # ifdef TARGET_NR_ppoll
