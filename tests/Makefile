@@ -1,3 +1,13 @@
+live555:
+	$(MAKE) -C ./targets/live555
+	$(MAKE) -C ./targets/live555/testProgs
+
+live555-client:
+	./targets/live555/testProgs/testRTSPClient rtsp://192.168.178.27:8554/wavAudioTest
+
+live555-server:
+	cd ./targets/live555/testProgs && ./testOnDemandRTSPServer 8854 && cd ../../
+
 selfdump: symlink
 	mkdir -p /tmp/criu_snapshot
 	protoc-c --proto_path=. --c_out=. rpc.proto
@@ -42,10 +52,6 @@ pseudoserver_complex: clean
 
 pseudoclient_complex: clean
 	gcc -o targets/custom/pseudoclient_complex targets/custom/pseudoclient_complex.c
-
-test_criupipe: clean
-	gcc -o pipe pipe.c
-	./pipe
 
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
 symlink:
