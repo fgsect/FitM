@@ -1,3 +1,6 @@
+lightftp:
+	$(MAKE) -C ./targets/LightFTP/Source/Release clean all
+
 live555:
 	$(MAKE) -C ./targets/live555
 	$(MAKE) -C ./targets/live555/testProgs
