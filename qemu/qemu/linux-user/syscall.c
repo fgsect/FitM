@@ -125,6 +125,7 @@
 #include<sys/select.h>
 #include "fitm-criu.h"
 
+#define DEBUG_QEMU 1
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
 bool sent = true;
@@ -2250,7 +2251,9 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
     addr = alloca(addrlen);
 
     if (accepted_once) {
+# ifdef DEBUG_QEMU
         puts("[QEMU] getpeername() accepted_once branch\n");
+# endif
         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
         addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
@@ -2263,7 +2266,9 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
 
         ret = 0;
     } else {
+# ifdef DEBUG_QEMU
         puts("[QEMU] getpeername() not accepted branch\n");
+# endif
         ret = get_errno(getpeername(fd, addr, &addrlen));
     }
 
@@ -2302,7 +2307,9 @@ static abi_long do_getsockname(int fd, abi_ulong target_addr,
         };
      */
     if (accepted_once) {
+# ifdef DEBUG_QEMU
         puts("[QEMU] getsockname() accepted_once branch\n");
+# endif
          struct sockaddr *addr_pointer = (struct sockaddr*) addr;
          addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
@@ -2349,6 +2356,9 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
     if(!env_init){
+# ifdef DEBUG_QEMU
+        puts("[QEMU] do_sendto()->env_init\n");
+# endif
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -2369,6 +2379,9 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addrlen)
 {
     if(!env_init){
+# ifdef DEBUG_QEMU
+        puts("[QEMU] do_recvfrom()->env_init\n");
+# endif
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -4875,6 +4888,9 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         }
 
         if (accepted_once) {
+# ifdef DEBUG_QEMU
+            puts("[QEMU] do_fork() accepted_once\n");
+# endif
             pthread_mutex_unlock(&info.mutex);
 //            pthread_cond_destroy(&info.cond);
             pthread_mutex_destroy(&info.mutex);
@@ -4886,6 +4902,9 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
             perror("This should be dead code\n");
             _exit(-1);
         }
+# ifdef DEBUG_QEMU
+        puts("[QEMU] do_fork()->pthread_create()\n");
+# endif
         ret = pthread_create(&info.thread, &attr, clone_func, &info);
         /* TODO: Free new CPU state if thread creation failed.  */
 
@@ -6362,6 +6381,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return 0; /* avoid warning */
     case TARGET_NR_read:
             if(!env_init){
+# ifdef DEBUG_QEMU
+                puts("[QEMU] read()->env_init\n");
+# endif
                 create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
                 timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -6408,19 +6430,31 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return ret;
     case TARGET_NR_write:
         if(!env_init){
+# ifdef DEBUG_QEMU
+            puts("[QEMU] write()->env_init\n");
+# endif
             create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
             timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
             env_init = true;
         }
+# ifdef DEBUG_QEMU
+        printf("[QEMU] Env should be initialized. Outputs: %d, timewarp: %d\n", create_outputs, timewarp_mode);
+# endif
         if ((is_socket >> arg1) & 1){
             // TODO: Julian, can you checkout how to patch this properly?
             sent = true;
         }
         if (arg2 == 0 && arg3 == 0) {
             if(!create_outputs) {
+# ifdef DEBUG_QEMU
+                puts("[QEMU] write()->no create_outputs\n");
+# endif
                 return 0;
             } else {
+# ifdef DEBUG_QEMU
+                puts("[QEMU] write()->create_outputs\n");
+# endif
                 return get_errno(safe_write(arg1, 0, 0));
             }
         }
@@ -8376,7 +8410,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
          * Microblaze is further special in that it uses a sixth
          * implicit argument to clone for the TLS pointer.
          */
+# ifdef DEBUG_QEMU
         puts("[QEMU] clone goes brr\n");
+# endif
 #if defined(TARGET_MICROBLAZE)
         ret = get_errno(do_fork(cpu_env, arg1, arg2, arg4, arg6, arg5));
 #elif defined(TARGET_CLONE_BACKWARDS)
