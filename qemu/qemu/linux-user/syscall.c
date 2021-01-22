@@ -2011,6 +2011,10 @@ static abi_long do_socket(int domain, int type, int protocol)
     strncat(path, uuid, 37);
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0666);
+    if (new_fd == -1) {
+        perror("[QEMU] Error while opening path in do_socket(), exiting: \n");
+        _exit(-1);
+    }
     chmod(path, 0666);
     is_socket |= 1 << new_fd;
 
