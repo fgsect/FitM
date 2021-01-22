@@ -125,6 +125,9 @@
 #include<sys/select.h>
 #include "fitm-criu.h"
 
+// We originally used FD 0 to send input from afl into the target
+// However targets may use FD 0 to wait for an interrupt from the user or sth similar
+#define FITM_INPUT_FD 13371337
 // Use this define to toggle debug prints in various places
 // Might be spammy
 #define DEBUG_QEMU 1
@@ -2387,6 +2390,10 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
                             abi_ulong target_addr,
                             abi_ulong target_addrlen)
 {
+    if (fd == 0) {
+        puts("[QEMU] do_recvfrom(): encountered fd 0 in recvfrom. Exiting..\n");
+        _exit(0);
+    }
     if(!env_init){
 # ifdef DEBUG_QEMU
         puts("[QEMU] do_recvfrom(): env_init\n");
@@ -2406,6 +2413,7 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         create_pipes_file();
 
         close(0);
+        close(FITM_INPUT_FD);
 #ifdef INCLUDE_DOCRIU
         do_criu();
 #endif
@@ -2419,10 +2427,12 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 
         spawn_forksrv(cpu, timewarp_mode);
 
-        open_input_file(0, input);
+        open_input_file(FITM_INPUT_FD, input);
 
+        return read(FITM_INPUT_FD, (char *)msg, len);
     }
-    return read(0, (char *)msg, len);
+    return read(fd, (char *)msg, len);
+
 }
 
 #ifdef TARGET_NR_socketcall
@@ -6391,6 +6401,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
+            if (num == 0) {
+                puts("[QEMU] read(): encountered fd 0 in read. Exiting..\n");
+                _exit(0);
+            }
             if(!env_init){
 # ifdef DEBUG_QEMU
                 puts("[QEMU] read(): env_init\n");
@@ -6411,6 +6425,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                 create_pipes_file();
 
                 close(0);
+                close(FITM_INPUT_FD);
 #ifdef INCLUDE_DOCRIU
                 do_criu();
 #endif
