@@ -264,7 +264,7 @@ impl FITMSnapshot {
                         format!("stdbuf"),
                         format!("-oL"),
                         format!("../fitm-qemu-trace"),
-                        format!("../{}", self.target_bin),
+                        format!("{}", self.target_bin),
                         format!("{}", cli_args),
                     ])
                     .stdin(Stdio::from(stdin))
