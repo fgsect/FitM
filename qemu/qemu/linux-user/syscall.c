@@ -2249,7 +2249,24 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
 
     addr = alloca(addrlen);
 
-    ret = get_errno(getpeername(fd, addr, &addrlen));
+    if (accepted_once) {
+        puts("[QEMU] getpeername() accepted_once branch\n");
+        struct sockaddr *addr_pointer = (struct sockaddr*) addr;
+        addr_pointer->sa_family = AF_INET;
+        // sa_data is 14 bytes long
+        // could not find an exact description, figured out by trail and error
+        // for details: https://www.freebsd.org/doc/en/books/developers-handbook/sockets-essential-functions.html
+        addr_pointer->sa_data[2] = 43;
+        addr_pointer->sa_data[3] = 0;
+        addr_pointer->sa_data[4] = 0;
+        addr_pointer->sa_data[5] = 43;
+
+        ret = 0;
+    } else {
+        puts("[QEMU] getpeername() not accepted branch\n");
+        ret = get_errno(getpeername(fd, addr, &addrlen));
+    }
+
     if (!is_error(ret)) {
         host_to_target_sockaddr(target_addr, addr, addrlen);
         if (put_user_u32(addrlen, target_addrlen_addr))
@@ -2288,8 +2305,13 @@ static abi_long do_getsockname(int fd, abi_ulong target_addr,
         puts("[QEMU] getsockname() accepted_once branch\n");
          struct sockaddr *addr_pointer = (struct sockaddr*) addr;
          addr_pointer->sa_family = AF_INET;
-         addr_pointer->sa_data[0] = 42;
-         addr_pointer->sa_data[3] = 42;
+        // sa_data is 14 bytes long
+        // could not find an exact description, figured out by trail and error
+        // for details: https://www.freebsd.org/doc/en/books/developers-handbook/sockets-essential-functions.html
+        addr_pointer->sa_data[2] = 42;
+        addr_pointer->sa_data[3] = 0;
+        addr_pointer->sa_data[4] = 0;
+        addr_pointer->sa_data[5] = 42;
 
          ret = 0;
     } else {
