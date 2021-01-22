@@ -1060,7 +1060,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(true, true, server_args)?;
+    afl_server.pid = afl_server.init_run(false, true, server_args)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
