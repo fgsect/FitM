@@ -1,4 +1,4 @@
-use libc::{self, clone, pid_t};
+use libc::{self, pid_t};
 use std::process::ExitStatus;
 use std::{
     ffi::CString,
