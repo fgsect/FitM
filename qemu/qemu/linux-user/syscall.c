@@ -2058,7 +2058,7 @@ static abi_long do_socket(int domain, int type, int protocol)
     if (domain == AF_INET || domain == AF_INET6) {
         return FITM_FD;
     }
-    FDBG("Socket() called for non-inet protocol");
+    FDBG("Socket() called for non-inet protocol\n");
 int target_type = type;
     int ret;
 
