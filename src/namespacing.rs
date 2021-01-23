@@ -177,6 +177,7 @@ impl Namespace {
     }
 }
 
+/*
 #[repr(align(8))]
 #[repr(C)]
 struct clone_args {
@@ -189,6 +190,7 @@ struct clone_args {
     stack_size: u64,  /* Size of stack */
     tls: u64,         /* Location of new TLS */
 }
+*/
 
 // Das ist V2 aber mein kernel is zu alt ...
 #[repr(align(8))]
@@ -207,6 +209,7 @@ struct clone_argsV2 {
     set_tid_size: u64, /* Number of elements in set_tid */
 }
 
+/*
 unsafe fn clone3(args: &clone_args) -> io::Result<Option<i32>> {
     let ret: pid_t = libc::syscall(
         libc::SYS_clone3,
@@ -233,6 +236,7 @@ unsafe fn clone3(args: &clone_args) -> io::Result<Option<i32>> {
         }
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {
