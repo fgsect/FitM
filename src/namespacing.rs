@@ -1,4 +1,4 @@
-use libc::{self, pid_t};
+use libc::{self, clone, pid_t};
 use std::process::ExitStatus;
 use std::{
     ffi::CString,
@@ -51,6 +51,26 @@ fn mount(
     }
 }
 
+unsafe fn sys_clone(flags: libc::c_int) -> io::Result<Option<libc::pid_t>> {
+    let ret: pid_t = libc::syscall(
+        libc::SYS_clone,
+        flags as libc::c_int,
+        0,
+        0,
+        0,
+        0,
+    ) as _;
+
+    match ret {
+        0 => Ok(None),
+        x if x > 0 => Ok(Some(x)),
+        x => {
+            *libc::__errno_location() = -x;
+            Err(io::Error::last_os_error())
+        }
+    }
+}
+
 pub struct NamespaceContext {
     pub init_fn: Box<dyn FnOnce()>,
 }
@@ -86,18 +106,22 @@ impl NamespaceContext {
         E: Debug,
     {
         // Clone-process with namespaceing flags
+        // let clone_result = unsafe {
+        //     let args = clone_args {
+        //         flags: (libc::CLONE_NEWPID | libc::CLONE_NEWNS) as _,
+        //         pidfd: 0,
+        //         parent_tid: 0,
+        //         child_tid: 0,
+        //         exit_signal: libc::SIGCHLD as _,
+        //         stack: 0,
+        //         stack_size: 0,
+        //         tls: 0,
+        //     };
+        //     clone3(&args)?
+        // };
+
         let clone_result = unsafe {
-            let args = clone_args {
-                flags: (libc::CLONE_NEWPID | libc::CLONE_NEWNS) as _,
-                pidfd: 0,
-                parent_tid: 0,
-                child_tid: 0,
-                exit_signal: libc::SIGCHLD as _,
-                stack: 0,
-                stack_size: 0,
-                tls: 0,
-            };
-            clone3(&args)?
+            sys_clone(libc::CLONE_NEWPID | libc::CLONE_NEWNS | libc::SIGCHLD )?
         };
 
         Ok(match clone_result {
