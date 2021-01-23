@@ -130,7 +130,7 @@
 #define FITM_INPUT_FD 13371337
 // Use this define to toggle debug prints in various places
 // Might be spammy
-#define DEBUG_QEMU 1
+#define FITM_DEBUG 1
 // Remove this define temporarily to ignore do_criu() calls
 // This might be useful when debugging targets where a specific behaviour is solicited after a snapshot
 #define INCLUDE_DOCRIU 1
@@ -154,6 +154,12 @@ bool accepted_once = false;
 // If a position holds a 1 it is a socket
 long long int is_socket = 0;
 
+// FITM specific: for debug prints, use FDBG.
+#ifdef FITM_DEBUG
+#define FDBG(...) printf("[QEMU] " __VA_ARGS__)
+#else
+#define FDBG(...)
+#endif
 
 extern unsigned int afl_forksrv_pid;
 
@@ -2020,7 +2026,7 @@ static abi_long do_socket(int domain, int type, int protocol)
 
     int new_fd = open(path, O_RDWR | O_CREAT, 0666);
     if (new_fd == -1) {
-        perror("[QEMU] do_socket(): Error while opening path in do_socket(), exiting: \n");
+        perror("do_socket(): Error while opening path ./fd/ in do_socket()");
         _exit(-1);
     }
     chmod(path, 0666);
@@ -2105,6 +2111,13 @@ static abi_long do_sendrecvmsg_locked(int fd, struct target_msghdr *msgp,
     msg.msg_iov = vec;
 
     if (send) {
+        if (accepted_once)  {
+            // TODO
+            printf("[FITM] TODO: implement send(m)msg");
+            exit(1);
+            ret = 0;
+            goto out;
+        }
         if (fd_trans_target_to_host_data(fd)) {
             void *host_msg;
 
@@ -2124,6 +2137,12 @@ static abi_long do_sendrecvmsg_locked(int fd, struct target_msghdr *msgp,
             }
         }
     } else {
+        if (accepted_once)  {
+            // TODO
+            printf("[FITM] TODO: implement recv(m)msg");
+            //ret = 0;
+            //goto out;
+        }
         ret = get_errno(safe_recvmsg(fd, &msg, flags));
         if (!is_error(ret)) {
             len = ret;
@@ -2224,6 +2243,8 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 {
     // Exit once we accepted once because we can only provide one input per fuzz child
     if (accepted_once) {
+        FDBG("Second accept. This may be a bug.");
+        return FITM_INPUT_FD;
         _exit(0);
     }
 
@@ -2234,11 +2255,16 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
         strncat(path, uuid, 37);
 
         new_fd = open(path, O_RDWR | O_CREAT, 0666);
+        if (new_fd < 0) {
+            perror("Could not open fd-file, make sure ./fd exists.");
+            _exit(-1);
+        }
         chmod(path, 0666);
         is_socket |= 1 << new_fd;
     }
     
     accepted_once = true;
+    sent = true; // << Adding this as fix for the server - it won't send anything.
     return new_fd;
 }
 
@@ -2263,9 +2289,7 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
     addr = alloca(addrlen);
 
     if (accepted_once) {
-# ifdef DEBUG_QEMU
-        puts("[QEMU] getpeername(): accepted_once branch\n");
-# endif
+        FDBG("getpeername(): accepted_once branch\n");
         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
         addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
@@ -2278,9 +2302,7 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
 
         ret = 0;
     } else {
-# ifdef DEBUG_QEMU
-        puts("[QEMU] getpeername(): not accepted branch\n");
-# endif
+        FDBG("getpeername(): not accepted branch\n");
         ret = get_errno(getpeername(fd, addr, &addrlen));
     }
 
@@ -2319,11 +2341,9 @@ static abi_long do_getsockname(int fd, abi_ulong target_addr,
         };
      */
     if (accepted_once) {
-# ifdef DEBUG_QEMU
-        puts("[QEMU] getsockname(): accepted_once branch\n");
-# endif
-         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
-         addr_pointer->sa_family = AF_INET;
+        FDBG("getsockname(): accepted_once branch\n");
+        struct sockaddr *addr_pointer = (struct sockaddr*) addr;
+        addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
         // could not find an exact description, figured out by trail and error
         // for details: https://www.freebsd.org/doc/en/books/developers-handbook/sockets-essential-functions.html
@@ -2368,9 +2388,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
     if(!env_init){
-# ifdef DEBUG_QEMU
-        puts("[QEMU] do_sendto(): env_init\n");
-# endif
+        FDBG("do_sendto(): env_init\n");
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -2385,34 +2403,33 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
     }
 }
 
-/* do_recvfrom() Must return target values and target errnos. */
-static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, int flags,
-                            abi_ulong target_addr,
-                            abi_ulong target_addrlen)
-{
-    if (fd == 0) {
-        puts("[QEMU] do_recvfrom(): encountered fd 0 in recvfrom. Exiting..\n");
-        _exit(0);
-    }
+// Returns true, if we should handle this fd in a special way.
+static bool is_fitm_fd(int fd) {
+    return (is_socket >> fd) & 1 && accepted_once;
+}
+
+static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
+
+    //if (fd == FITM_INPUT_FD) { ??
+    FDBG("fitm_read called from fitm fd %d.", fd);
     if(!env_init){
-# ifdef DEBUG_QEMU
-        puts("[QEMU] do_recvfrom(): env_init\n");
-# endif
+        FDBG("do_recvfrom(): env_init\n");
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
         env_init = true;
     }
 
-    if(sent && accepted_once){
+    // TODO: The initial server should also go into timewarp here, it will not send?
+    if(sent && accepted_once) {
         if (!timewarp_mode) {
-            exit(0);
+            FDBG("we are done here. Have a nice day.");
+            _exit(0);
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
 
         create_pipes_file();
 
-        close(0);
         close(FITM_INPUT_FD);
 #ifdef INCLUDE_DOCRIU
         do_criu();
@@ -2428,11 +2445,78 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
         spawn_forksrv(cpu, timewarp_mode);
 
         open_input_file(FITM_INPUT_FD, input);
-
-        return read(FITM_INPUT_FD, (char *)msg, len);
+        fd = FITM_INPUT_FD;
     }
-    return read(fd, (char *)msg, len);
 
+    // TODO: do we ever want to read from the original fd? Probably not.
+    return read(fd, msg, len);
+}
+
+
+/* do_recvfrom() Must return target values and target errnos. */
+static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, int flags,
+                            abi_ulong target_addr,
+                            abi_ulong target_addrlen)
+{
+    FDBG("recvfrom called");
+    
+
+    socklen_t addrlen;
+    void *addr;
+    void *host_msg;
+    abi_long ret;
+
+    host_msg = lock_user(VERIFY_WRITE, msg, len, 0);
+    if (!host_msg)
+        return -TARGET_EFAULT;
+
+    if (is_fitm_fd(fd)) {
+
+        ret = fitm_read(cpu, fd, (char *)host_msg, arg3);
+        unlock_user(host_msg, msg, len);
+        return ret;
+    
+    }
+
+
+    if (target_addr) {
+        if (get_user_u32(addrlen, target_addrlen)) {
+            ret = -TARGET_EFAULT;
+            goto fail;
+        }
+        if ((int)addrlen < 0) {
+            ret = -TARGET_EINVAL;
+            goto fail;
+        }
+        addr = alloca(addrlen);
+        ret = get_errno(safe_recvfrom(fd, host_msg, len, flags,
+                                      addr, &addrlen));
+    } else {
+        addr = NULL; /* To keep compiler quiet.  */
+        ret = get_errno(safe_recvfrom(fd, host_msg, len, flags, NULL, 0));
+    }
+    if (!is_error(ret)) {
+        if (fd_trans_host_to_target_data(fd)) {
+            abi_long trans;
+            trans = fd_trans_host_to_target_data(fd)(host_msg, MIN(ret, len));
+            if (is_error(trans)) {
+                ret = trans;
+                goto fail;
+            }
+        }
+        if (target_addr) {
+            host_to_target_sockaddr(target_addr, addr, addrlen);
+            if (put_user_u32(addrlen, target_addrlen)) {
+                ret = -TARGET_EFAULT;
+                goto fail;
+            }
+        }
+        unlock_user(host_msg, msg, len);
+    } else {
+fail:
+        unlock_user(host_msg, msg, 0);
+    }
+    return ret;
 }
 
 #ifdef TARGET_NR_socketcall
@@ -4909,9 +4993,7 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         }
 
         if (accepted_once) {
-# ifdef DEBUG_QEMU
-            puts("[QEMU] do_fork(): accepted_once\n");
-# endif
+            FDBG("do_fork(): accepted_once\n");
             pthread_mutex_unlock(&info.mutex);
 //            pthread_cond_destroy(&info.cond);
             pthread_mutex_destroy(&info.mutex);
@@ -4923,9 +5005,7 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
             perror("This should be dead code\n");
             _exit(-1);
         }
-# ifdef DEBUG_QEMU
-        puts("[QEMU] do_fork(): pthread_create()\n");
-# endif
+        FDBG("do_fork(): pthread_create()\n");
         ret = pthread_create(&info.thread, &attr, clone_func, &info);
         /* TODO: Free new CPU state if thread creation failed.  */
 
@@ -6401,52 +6481,16 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
-            if (num == 0) {
-                puts("[QEMU] read(): encountered fd 0 in read. Exiting..\n");
-                _exit(0);
-            }
-            if(!env_init){
-# ifdef DEBUG_QEMU
-                puts("[QEMU] read(): env_init\n");
-# endif
-                create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
-                timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
-
-                env_init = true;
-            }
-            if (arg3 == 0) {
-                return 0;
-            } else {
-            if(sent && (is_socket >> arg1) & 1 && accepted_once){
-                if (!timewarp_mode) {
-                    exit(0);
-                }
-
-                create_pipes_file();
-
-                close(0);
-                close(FITM_INPUT_FD);
-#ifdef INCLUDE_DOCRIU
-                do_criu();
-#endif
-                // Weird bug making criu restore crash - this solves it
-                sleep(0.2);
-
-                char *input = getenv_from_file("INPUT_FILENAME");
-
-                create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
-                timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
-
-                if (timewarp_mode) {
-                    exit(0);
-                }
-                spawn_forksrv(cpu, timewarp_mode);
-
-                open_input_file(arg1, input);
-
-            }
+        if (arg3 == 0) {
+            return 0;
+        } else {
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 return -TARGET_EFAULT;
+            if (is_fitm_fd(arg1)) {
+                ret = fitm_read(cpu, arg1, p, arg3);
+                unlock_user(p, arg2, ret);
+                return ret;
+            }
             ret = get_errno(safe_read(arg1, p, arg3));
             if (ret >= 0 &&
                 fd_trans_host_to_target_data(arg1)) {
@@ -6457,33 +6501,53 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return ret;
     case TARGET_NR_write:
         if(!env_init){
-# ifdef DEBUG_QEMU
-            puts("[QEMU] write(): env_init\n");
-# endif
+            FDBG("write(): env_init\n");
             create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
             timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
-
+            FDBG("write(): Env: Outputs: %d, timewarp: %d\n", create_outputs, timewarp_mode);
             env_init = true;
         }
-# ifdef DEBUG_QEMU
-        printf("[QEMU] write(): Env should be initialized. Outputs: %d, timewarp: %d\n", create_outputs, timewarp_mode);
-# endif
         if ((is_socket >> arg1) & 1){
+            FDBG("setting sent = true");
             // TODO: Julian, can you checkout how to patch this properly?
             sent = true;
         }
+
         if (arg2 == 0 && arg3 == 0) {
-            if(!create_outputs) {
-# ifdef DEBUG_QEMU
-                puts("[QEMU] write(): no create_outputs\n");
-# endif
-                return 0;
-            } else {
-# ifdef DEBUG_QEMU
-                puts("[QEMU] write(): create_outputs\n");
-# endif
-                return get_errno(safe_write(arg1, 0, 0));
+            return get_errno(safe_write(arg1, 0, 0));
+        }
+        if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
+            return -TARGET_EFAULT;
+
+#if FITM_DEBUG        
+        FDBG("Write with fd %ld: ", arg1);
+        for (int i = 0; i < arg3 && i < 80; i++) {
+            putc(((char *)p)[i], stdout);
+        }
+        putc('\n', stdout);
+#endif
+
+        if(!create_outputs) {
+            FDBG("write(): ignoring all outputs\n");
+            unlock_user(p, arg2, 0);
+            return arg3;
+        }
+
+        if (fd_trans_target_to_host_data(arg1)) {
+            void *copy = g_malloc(arg3);
+            memcpy(copy, p, arg3);
+            ret = fd_trans_target_to_host_data(arg1)(copy, arg3);
+            if (ret >= 0) {
+                ret = get_errno(safe_write(arg1, copy, ret));
             }
+            g_free(copy);
+        } else {
+            ret = get_errno(safe_write(arg1, p, arg3));
+        }
+        unlock_user(p, arg2, 0);
+
+        if (arg2 == 0 && arg3 == 0) {
+
         }
         if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
             return -TARGET_EFAULT;
@@ -8437,9 +8501,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
          * Microblaze is further special in that it uses a sixth
          * implicit argument to clone for the TLS pointer.
          */
-# ifdef DEBUG_QEMU
-        puts("[QEMU] clone(): goes brr\n");
-# endif
+        FDBG("clone(): goes brr\n");
 #if defined(TARGET_MICROBLAZE)
         ret = get_errno(do_fork(cpu_env, arg1, arg2, arg4, arg6, arg5));
 #elif defined(TARGET_CLONE_BACKWARDS)

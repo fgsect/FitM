@@ -179,9 +179,10 @@ char* get_new_uuid(void){
 }
 
 char* concat3(char *first, char *second, char *third){
-    char *ret = (char *)calloc(strlen(first)+strlen(second)+strlen(third)+4, 1);
-    strncpy(ret, first, strlen(first)+1);
-    strncat(ret, second, strlen(second)+1);
-    strncat(ret, third, strlen(third)+1);
+    size_t new_max_len = strlen(first) + strlen(second) + strlen(third) + 4;
+    char *ret = (char *)calloc(new_max_len, sizeof(char));
+    strncpy(ret, first, new_max_len);
+    strncat(ret, second, new_max_len - strlen(ret));
+    strncat(ret, third, new_max_len - strlen(ret));
     return ret;
 }
