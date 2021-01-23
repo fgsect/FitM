@@ -207,8 +207,10 @@ pub fn advance_pid(target: u64) {
         .open("/proc/sys/kernel/ns_last_pid")
         .expect("Failed to open ns_last_pid");
 
+    println!("Trying to set ns_last_pid to {:?}", (target - 1).to_string().as_bytes());
+
     file.write((target - 1).to_string().as_bytes())
-        .expect("Writing failed");
+        .expect("Writing failed (higher than /proc/sys/kernel/pid_max?)");
 }
 
 pub fn waitpid(snapshot_pid: libc::pid_t) -> io::Result<ExitStatus> {

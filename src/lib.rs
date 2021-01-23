@@ -247,8 +247,8 @@ impl FITMSnapshot {
                 let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
                 fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
 
-                // Force the target PID to be in the Order of ~100k (random choice)
-                advance_pid(1 << 17);
+                // Force the target PID to be in the Order of ~16k (high, but not hither than a normal pid_max)
+                advance_pid(1 << 14);
 
                 // Open a file for stdout and stderr to log to
                 let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
