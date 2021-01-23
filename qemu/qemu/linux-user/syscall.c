@@ -120,9 +120,12 @@
 
 #include "tcg/tcg-op.h"
 
+// afl specific headers
 #include "../../patches/afl-qemu-common.h"
 
-#include<sys/select.h>
+// fitm specific hearders
+#include <sys/select.h>
+#include <sys/stat.h>
 #include "fitm-criu.h"
 
 // We originally used FD 0 to send input from afl into the target
@@ -155,7 +158,7 @@ int fitm_out_fd = -1;
 
 // FITM specific: for debug prints, use FDBG.
 #ifdef FITM_DEBUG
-#define FDBG(...) printf("[QEMU] " __VA_ARGS__)
+#define FDBG(...) printf("[QEMU] " __VA_ARGS__); fflush(stdout)
 #else
 #define FDBG(...)
 #endif
@@ -2583,13 +2586,13 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         printf("[FITM] BUG: fitm_read may only be called with FITM_FD\n");
         _exit(-1);
     }
-    FDBG("fitm_read called from fitm fd %d for len %ld.", fd, len);
+    FDBG("fitm_read called from fitm fd %d for len %ld.\n", fd, len);
     fitm_ensure_initialized();
 
     // If we sent something, and hit the next recv, either snapshot, or exit.
     if(sent) {
         if (!timewarp_mode) {
-            FDBG("we are done here. Have a nice day.");
+            FDBG("we are done here. Have a nice day.\n");
             _exit(0);
         }
         sent = false; // After restore, we'll await the next sent before criuin' again
@@ -2597,7 +2600,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         create_pipes_file();
 
         if (fitm_out_fd != -1) {
-            FDBG("Create Outputs in Snapshot run (?)");
+            FDBG("Create Outputs in Snapshot run (?)\n");
             close(fitm_out_fd);
         }
 
@@ -2619,7 +2622,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
     int ret = read(FITM_FD, msg, len);
     if (ret == -1 && errno == EBADF) {
-        printf("[QEMU] bug: read on closed FITM_FD?");
+        printf("[QEMU] bug: read on closed FITM_FD?\n");
+        fflush(stdout);
         _exit(-1);
     }
     // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
@@ -5557,6 +5561,12 @@ static abi_long do_fcntl(int fd, int cmd, abi_ulong arg)
         break;
 
     case TARGET_F_GETFL:
+
+        if (fd == FITM_FD) {
+            FDBG("fcntl(GETFL) handled for FITM_FD\n");
+            return O_SYNC | O_RDWR;
+        }
+
         ret = get_errno(safe_fcntl(fd, host_cmd, arg));
         if (ret >= 0) {
             ret = host_to_target_bitmask(ret, fcntl_flags_tbl);
@@ -7244,6 +7254,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return ret;
 #endif
     case TARGET_NR_dup:
+        if (arg1 == FITM_FD) {
+            FDBG("dup returning FITM_FD\n");
+            // just return the same fd again. May work.
+            return FITM_FD;
+        }
         ret = get_errno(dup(arg1));
         if (ret >= 0) {
             fd_trans_dup(arg1, ret);
@@ -8507,6 +8522,19 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 #ifdef TARGET_NR_fstat
     case TARGET_NR_fstat:
         {
+            if (arg1 == FITM_FD) {
+                struct target_stat *target_st;
+                if (!lock_user_struct(VERIFY_WRITE, target_st, arg2, 0)) {
+                    return -TARGET_EFAULT;
+                }
+                memset(target_st, 0, sizeof(*target_st));
+                __put_user(16, &target_st->st_size);
+                __put_user(S_IFSOCK, &target_st->st_mode);
+                unlock_user_struct(target_st, arg2, 1);
+                FDBG("Handled fstat\n");
+                return 0;
+            }
+
             ret = get_errno(fstat(arg1, &st));
 #if defined(TARGET_NR_stat) || defined(TARGET_NR_lstat)
         do_stat:
