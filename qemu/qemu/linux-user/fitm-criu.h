@@ -74,7 +74,7 @@ void spawn_forksrv(CPUState *cpu, bool timewarp_mode) {
             afl_setup(shm_env_var, afl_inst_ratio);
             afl_forkserver(cpu);
         } else {
-            puts("Forkserver not started, since SHM_ENV_VAR env variable is missing");
+            puts("AFL Forkserver not started, (SHM_ENV_VAR env var not set)");
         }
     }
 }
