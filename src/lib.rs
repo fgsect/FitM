@@ -260,12 +260,8 @@ impl FITMSnapshot {
 
                 let mut command = Command::new("setsid");
                 command
-                    .args(&[
-                        "stdbuf",
-                        "-oL",
-                        "../fitm-qemu-trace",
-                        &self.target_bin,
-                    ]).args(cli_args)
+                    .args(&["stdbuf", "-oL", "../fitm-qemu-trace", &self.target_bin])
+                    .args(cli_args)
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
@@ -970,6 +966,9 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
         .collect())
 }
 
+// We are currently not sure if checking only current gen or all gens for duplicate traces is better
+// Problem: Server & Client may indefinitely bounce "passwd" and "wrong passwd" back and forth
+// without realizing that no new path has been found.
 pub fn get_traces() -> io::Result<Option<Vec<String>>> {
     // should match naming scheme explained at `input_file_list_for_gen`
     let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
