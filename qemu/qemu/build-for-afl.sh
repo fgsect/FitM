@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export LIBS='-lprotobuf-c -luuid -L ../../../criu/lib/c/ -L ../../../criu/images/ -lcriu'
+export LIBS='-lprotobuf-c -luuid -L ../../../criu/lib/c/ -L ../../../criu/images/ -l:libcriu.so'
 export LDFLAGS="$LIBS"
 export QEMU_LDFLAGS="$LIBS"
 ./configure --disable-system --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
@@ -18,5 +18,5 @@ export QEMU_LDFLAGS="$LIBS"
             --disable-system --disable-blobs --disable-tools --python=`which python3` \
 	    --extra-ldflags="$LIBS"
 
-make -j$(nproc) CLFAGS="$LIBS"
+make -j$(nproc) LDFAGS="$LIBS"
 cp ./x86_64-linux-user/qemu-x86_64 ../../fitm-qemu-trace
