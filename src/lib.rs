@@ -716,22 +716,22 @@ impl FITMSnapshot {
                 let mut command = Command::new("../AFLplusplus/afl-cmin");
                 command
                     .args(&[
-                        format!("-i"),
-                        format!("{}", &input_dir),
-                        format!("-o"),
-                        format!("{}", &output_dir),
+                        "-i",
+                        &input_dir,
+                        "-o",
+                        &output_dir,
                         // No mem limit
-                        format!("-t"),
-                        format!("{}", self.timeout.as_millis()),
-                        format!("-m"),
-                        format!("none"),
-                        format!("-U"),
-                        format!("--"),
-                        format!("bash"),
+                        "-t",
+                        &format!("{}", self.timeout.as_millis()),
+                        "-m",
+                        "none",
+                        "-U",
+                        "--",
+                        "bash",
                         // Our restore script
-                        format!("./restore.sh"),
+                        "./restore.sh",
                         // The fuzzer input file
-                        format!("@@"),
+                        "@@",
                     ])
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
@@ -777,7 +777,6 @@ impl FITMSnapshot {
             println!("Cmin minimized to 0 testcases. Bug in cmin? Check active-dir.");
             std::process::exit(-1);
         }
-
 
         println!(
             "==== [*] Wrote cmin contents from {} to {} ====",
