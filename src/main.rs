@@ -35,12 +35,13 @@ fn main() {
     println!("cwd: {:?}", foo);
 
     // TODO: use argv to fill these
+    // Paths are relative to ACTIVE_DIR
     match fitm::run(
-        ".",
-        "../../../../../../../usr/bin/ftp",
-        "127.0.0.1 2200",
-        "./LightFTP/Source/Release/fftp",
-        "../LightFTP/fftp.conf",
+
+        "../tests/targets/LightFTP/Source/Release/fftp",
+        &["../tests/targets/LightFTP/fftp.conf"],
+        "/usr/bin/ftp",
+        &["127.0.0.1", "2200"],
         &Duration::from_secs(3),
     ) {
         Err(e) => println!("Error {:?}", e),

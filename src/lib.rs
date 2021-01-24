@@ -227,7 +227,7 @@ impl FITMSnapshot {
         &self,
         create_outputs: bool,
         create_snapshot: bool,
-        cli_args: &str,
+        cli_args: &[&str],
     ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
@@ -261,17 +261,17 @@ impl FITMSnapshot {
                 let mut command = Command::new("setsid");
                 command
                     .args(&[
-                        format!("stdbuf"),
-                        format!("-oL"),
-                        format!("../fitm-qemu-trace"),
-                        format!("{}", self.target_bin),
-                        format!("{}", cli_args),
-                    ])
+                        "stdbuf",
+                        "-oL",
+                        "../fitm-qemu-trace",
+                        &self.target_bin,
+                    ]).args(cli_args)
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
                     // .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
+                    //.env("QEMU_STRACE", "1")
                     .env("AFL_NO_UI", "1");
 
                 if create_outputs {
@@ -1003,18 +1003,14 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 /// Run fitm
 /// runtime indicates the time, after which the fuzzer switches to the next entry
 pub fn run(
-    base_path: &str,
     client_bin: &str,
-    client_args: &str,
+    client_args: &[&str],
     server_bin: &str,
-    server_args: &str,
+    server_args: &[&str],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
     let run_timeout = Duration::from_secs(3);
-
-    // set the directory to base_path for all of this criu madness to work.
-    env::set_current_dir(base_path)?;
 
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));

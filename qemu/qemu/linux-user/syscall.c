@@ -2118,12 +2118,12 @@ static abi_long do_bind(int sockfd, abi_ulong target_addr,
                         socklen_t addrlen)
 {
     if (sockfd == FITM_FD) {
-        FDBG("do_bind ignored for %d", sockfd);
+        FDBG("do_bind ignored for FITM_FD\n");
         // Adress binding always works as we are only writing to a file
         // check: https://github.com/zardus/preeny/blob/master/src/desock.c#L259
         return 0;
     }
-    FDBG("do_bind called on non-fitm sockfd %d", sockfd);
+    FDBG("do_bind called on non-fitm sockfd %d\n", sockfd);
     
     void *addr;
     abi_long ret;
@@ -2146,13 +2146,13 @@ static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
     if (sockfd == FITM_FD) {
-        FDBG("do_connect ignored for %d", sockfd);
+        FDBG("do_connect ignored for %d\n", sockfd);
         // Connecting to a remote adr. always works as we are only running locally
         // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275
         accepted_once = true;
         return 0;
     }
-    FDBG("do_connect called on non-fitm sockfd %d", sockfd);
+    FDBG("do_connect called on non-fitm sockfd %d\n", sockfd);
     void *addr;
     abi_long ret;
 
@@ -2501,7 +2501,7 @@ static abi_long do_socketpair(int domain, int type, int protocol,
 // Initialize, or do not. There is no try.
 static void fitm_ensure_initialized(void) {
     if(!env_init){
-        FDBG("do_recvfrom(): env_init\n");
+        FDBG("env_init\n");
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
@@ -2532,8 +2532,14 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
         sent = true;
         // Only write sth to the fd if we are in consolidation
         if(!create_outputs) {
+            FDBG("Sendto called on FITM_FD -> no outputs\n");
             return (abi_long)len;
         } else {
+            if (fitm_out_fd == -1) {
+                printf("[FITM] BUG: fitm_out_fd not set in create_outputs!\n");
+                exit(-1);
+            }
+            FDBG("Sendto called on FITM_FD -> writing to %d\n", fitm_out_fd);
             // TODO: proper guest2host conversation?
             return write(fitm_out_fd, (char *) msg, len);
         }
@@ -2605,6 +2611,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
 #ifdef INCLUDE_DOCRIU
+        // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
+        // This would break the fitm snapshot restore
         do_criu();
 #endif
         // Weird bug making criu restore crash - this solves it
@@ -6682,8 +6690,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         return ret;
     case TARGET_NR_write:
         
-        fitm_ensure_initialized();
         if (arg1 == FITM_FD) {
+            fitm_ensure_initialized();
             FDBG("setting sent = true");
             // TODO: Julian, can you checkout how to patch this properly?
             sent = true;

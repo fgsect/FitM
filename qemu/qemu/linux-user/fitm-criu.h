@@ -104,13 +104,9 @@ void open_input_file(abi_long arg1, char *input) {
 }
 
 int do_criu(void){
+
     int dir_fd, exitcode;
     struct criu_opts *criu_request_options = NULL;
-
-    char *uuid = get_new_uuid();
-    char path[44] = "/tmp/";
-    strncat(path, uuid, 37);
-    close(open(path, O_RDWR | O_CREAT, 0644));
 
     char *snapshot_dir = getenv_from_file("CRIU_SNAPSHOT_OUT_DIR");
     printf("fitm-criu.h: snapshot_dir %s\n", snapshot_dir);
@@ -136,7 +132,11 @@ int do_criu(void){
     criu_local_set_images_dir_fd(criu_request_options, dir_fd);
     criu_local_set_log_level(criu_request_options, 4);
     criu_local_set_leave_running(criu_request_options, true);
-    
+
+    // We need to flush everything, else we have a slight chance that files change after dump.
+    fflush(stdout);
+    fflush(stderr);
+
     int criu_result = criu_local_dump(criu_request_options);
 
     if (criu_result < 0) {
