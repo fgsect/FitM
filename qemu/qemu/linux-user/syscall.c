@@ -2613,11 +2613,27 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 #ifdef INCLUDE_DOCRIU
         // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
         // This would break the fitm snapshot restore
+        close(2);
+        if(block_signals()) {
+            printf("[QEMU] Could not block signals for do_criu call\n");
+            fflush(stdout);
+            _exit(-1);
+        }
         do_criu();
-#endif
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
-
+        int stderr_fd = open("./stderr", O_WRONLY | O_APPEND);
+        if (stderr_fd == -1) {
+            printf("[QEMU] Could not reopen stderr\n");
+            fflush(stdout);
+            _exit(-1);
+        }
+        if (stderr_fd != 2) {
+            dup2(stderr_fd, 2);
+            close(stderr_fd);
+        }
+        fprintf(stderr, "\n=== CRIU RESTORED ===\n");
+#endif
         // If we don't unset here fitm_output_fd is never set since env_init is set to true before the snapshot and never unset
         env_init = false;
 
