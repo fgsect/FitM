@@ -417,7 +417,11 @@ impl FITMSnapshot {
         let exit_status = NamespaceContext::new()
             .execute(|| -> io::Result<i32> {
                 let (stdout, stderr) = self.to_active()?;
-                println!("==== [*] Start fuzzing {} ====", self.state_path);
+                println!(
+                    "==== [*] Start fuzzing {} ({:?}) ====",
+                    self.state_path,
+                    PathBuf::from(&self.target_bin).file_name().unwrap()
+                );
                 // Spawn the afl run in a command. This run is relative to the state dir
                 // meaning we already are inside the directory. This prevents us from
                 // accidentally using different resources than we expect.
@@ -971,7 +975,10 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
     let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
     // Collect all snapshot folders in saved-states
     let states_iter = fs::read_dir(SAVED_STATES)
-        .expect(format!("[!] Could not read_dir {} in get_traces.", SAVED_STATES).as_str())
+        .expect(&format!(
+            "[!] Could not read_dir {} in get_traces.",
+            SAVED_STATES
+        ))
         .into_iter()
         .filter_map(|dir| dir.ok())
         .filter(|dir_entry| {
@@ -1082,15 +1089,7 @@ pub fn run(
             current_gen = 1;
         }
 
-        println!(
-            "Fuzzing {} (gen {})",
-            if is_client(current_gen) {
-                "client"
-            } else {
-                "server"
-            },
-            current_gen
-        );
+        println!("Fuzzing Gen {}", current_gen);
 
         // outputs of current gen (i.e. client) --> inputs[current_gen+1] (i.e. server)
         let next_other_gen = current_gen + 1;
