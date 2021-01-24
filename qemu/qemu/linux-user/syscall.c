@@ -2518,9 +2518,9 @@ static void fitm_ensure_initialized(void) {
             chmod(path, 0666);
             fitm_out_fd = new_fd;
         }
-
         env_init = true;
     }
+    FDBG(": fitm_ensure_initialized() create_outputs %d, timewarp_mode %d, fitm_out_fd %d\n", create_outputs, timewarp_mode, fitm_out_fd);
 }
 
 /* do_sendto() Must return target values and target errnos. */
@@ -2618,10 +2618,12 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         // Weird bug making criu restore crash - this solves it
         sleep(0.2);
 
+        // If we don't unset here fitm_output_fd is never set since env_init is set to true before the snapshot and never unset
+        env_init = false;
+
         char* input = getenv_from_file("INPUT_FILENAME");
 
-        create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
-        timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+        fitm_ensure_initialized();
 
         spawn_forksrv(cpu, timewarp_mode);
 
@@ -6692,8 +6694,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         
         if (arg1 == FITM_FD) {
             fitm_ensure_initialized();
-            FDBG("setting sent = true");
-            // TODO: Julian, can you checkout how to patch this properly?
+            FDBG("setting sent = true\n");
             sent = true;
             if (!create_outputs) {
                 FDBG("write(): ignoring all outputs\n");
@@ -6709,7 +6710,12 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
             return -TARGET_EFAULT;
 #if FITM_DEBUG        
-        FDBG("Write with fd %ld: ", arg1);
+        FDBG("Write with arg1_fd %ld: and fitm_out_fd: %d\n", arg1, fitm_out_fd);
+        char fd_path[200];
+        char file_path[400];
+        sprintf(fd_path, "/proc/self/fd/%d", fitm_out_fd);
+        readlink(fd_path, file_path, 200);
+        FDBG("write: fitm_out_fd %ld links to path %s\n", arg1, file_path);
         for (int i = 0; i < arg3 && i < 80; i++) {
             putc(((char *)p)[i], stdout);
         }
