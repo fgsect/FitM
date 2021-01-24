@@ -698,6 +698,10 @@ impl FITMSnapshot {
             .expect("[!] Error while constructing absolute input_dir path");
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
+        
+        // Make sure we always have at least dummy input (even if the other side finished)
+        let mut dummy_file = File::create(&format!("{}/dummy", &input_dir))?;
+        dummy_file.write_all(b"dummy")?;
 
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -713,9 +717,9 @@ impl FITMSnapshot {
                 command
                     .args(&[
                         format!("-i"),
-                        format!("{}", input_dir),
+                        format!("{}", &input_dir),
                         format!("-o"),
-                        format!("{}", output_dir),
+                        format!("{}", &output_dir),
                         // No mem limit
                         format!("-t"),
                         format!("{}", self.timeout.as_millis()),
@@ -768,6 +772,12 @@ impl FITMSnapshot {
             println!("{}", info);
             std::process::exit(1);
         }
+
+        if fs::read_dir(&output_dir).unwrap().next().is_none() {
+            println!("Cmin minimized to 0 testcases. Bug in cmin? Check active-dir.");
+            std::process::exit(-1);
+        }
+
 
         println!(
             "==== [*] Wrote cmin contents from {} to {} ====",
@@ -899,12 +909,6 @@ pub fn process_stage(
 /// @return: False, if we didn't advance to the next generation (no more output)
 pub fn check_stage_advanced(next_inputs: &mut Vec<String>) -> bool {
     !next_inputs.is_empty()
-}
-
-// We begin running the client to the first send (gen == 0), then we fuzz the server (gen == 1), the fuzz the client (gen == 2), etc.
-// So every odd numbered is a server
-const fn is_client(gen_id: usize) -> bool {
-    gen_id % 2 == 0
 }
 
 // Get the (non-minimized) input dir to the generation with id gen_id
