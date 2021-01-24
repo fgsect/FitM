@@ -2610,6 +2610,9 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             close(fitm_out_fd);
         }
 
+        // dup2 does not overwrite dest with src if src == dst
+        close(FITM_FD);
+
 #ifdef INCLUDE_DOCRIU
         // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
         // This would break the fitm snapshot restore
@@ -2649,9 +2652,17 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
     int ret = read(FITM_FD, msg, len);
     if (ret == -1 && errno == EBADF) {
         printf("[QEMU] bug: read on closed FITM_FD?\n");
+        perror("FD 1337");
         fflush(stdout);
         _exit(-1);
-    }
+    } else if (ret == 0) {
+        // Some targets may sleep after the server disconnected.
+        // We lose bugs in teardown code but fuzzing works
+        printf("[QEMU] No more fuzzing input. Exiting now.\n");
+        fflush(stdout);
+        _exit(0);
+    };
+    FDBG("read: %d\n", ret);
     // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
     return ret;
 }
@@ -6725,18 +6736,6 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         }
         if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
             return -TARGET_EFAULT;
-#if FITM_DEBUG        
-        FDBG("Write with arg1_fd %ld: and fitm_out_fd: %d\n", arg1, fitm_out_fd);
-        char fd_path[200];
-        char file_path[400];
-        sprintf(fd_path, "/proc/self/fd/%d", fitm_out_fd);
-        readlink(fd_path, file_path, 200);
-        FDBG("write: fitm_out_fd %ld links to path %s\n", arg1, file_path);
-        for (int i = 0; i < arg3 && i < 80; i++) {
-            putc(((char *)p)[i], stdout);
-        }
-        putc('\n', stdout);
-#endif
         if (arg1 == FITM_FD) {
             ret = get_errno(safe_write(fitm_out_fd, p, arg3));
         } else if (fd_trans_target_to_host_data(arg1)) {
