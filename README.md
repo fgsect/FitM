@@ -60,7 +60,7 @@ Build with: `cd qemu/qemu/ && ./build-for-afl.sh`
 ### Arch
 
 To compile CRIU from source and run tests these packages need to be installed:
-`protobuf protobuf-c python-yaml python-protobuf`
+`sudo apt-get install python3-protobuf python3-yaml`
 
 ## Git Submodule
 
