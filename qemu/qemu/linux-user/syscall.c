@@ -6660,6 +6660,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
            and _exit_group is used for application termination.
            Do thread termination if we have more then one thread.  */
 
+        // More forecful exit
+        if ((arg1 & 0xFF) == 42) {
+            printf( "Target tried to exit with reseved exit code (42).\n"
+                    "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
+            _exit(43);
+        }
+        _exit(arg1);
+
         if (block_signals()) {
             return -TARGET_ERESTARTSYS;
         }
