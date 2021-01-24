@@ -1,4 +1,6 @@
 .vscode
+./qemu/qemu/roms/seabios/config.mak
+./qemu/qemu/roms/vgabios/config.mak
 /target
 Cargo.lock
 .idea
