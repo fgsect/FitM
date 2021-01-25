@@ -485,6 +485,11 @@ impl FITMSnapshot {
             println!("{}", info);
             std::process::exit(1);
         }
+
+        // Print a few stats. This is no longer in the actiavted folder.
+        println!("Whatsup:");
+        io::stdout().write_all(&Command::new("./AFLplusplus/afl-whatsup").args(&["-s", "./active-state/out"]).output().unwrap().stdout)?;
+
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
         if self.found_crashes() {
