@@ -131,7 +131,8 @@
 // We originally used FD 0 to send input from afl into the target
 // However targets may use FD 0 to wait for an interrupt from the user or sth similar
 // Since using fitm_in_file we need to set FITM_FD to the current FD value
-#define FITM_FD 1337
+// Checkout: man 2 select --> bugs: FD_SETSIZE is limited to 1024
+#define FITM_FD 999
 // Use this define to toggle debug prints in various places
 // Might be spammy
 #define FITM_DEBUG 1
@@ -1319,13 +1320,13 @@ static abi_long do_select(int n,
     }
 
     // we are fuzzing we want to return immediately if select is called for our FD.
-    if (FD_ISSET(FITM_FD, wfds_ptr) || FD_ISSET(FITM_FD, rfds_ptr)) {
+    if ((wfds_ptr && FD_ISSET(FITM_FD, &wfds)) || (rfds_ptr && FD_ISSET(FITM_FD, &rfds)) || (efds_ptr && FD_ISSET(FITM_FD, &efds))) {
         // Ignoring read/write distinction here, no target would care
-        FD_ZERO(efds_ptr);
-        FD_ZERO(wfds_ptr);
-        FD_ZERO(rfds_ptr);
-        FD_SET(FITM_FD, rfds_ptr);
-        FD_SET(FITM_FD, wfds_ptr);
+        FD_ZERO(&efds);
+        FD_ZERO(&wfds);
+        FD_ZERO(&rfds);
+        FD_SET(FITM_FD, &rfds);
+        FD_SET(FITM_FD, &wfds);
 
         if (rfd_addr && copy_to_user_fdset(rfd_addr, &rfds, n))
             return -TARGET_EFAULT;
@@ -1340,7 +1341,7 @@ static abi_long do_select(int n,
 
         return 1;
     }
- 
+
     if (target_tv_addr) {
         if (copy_from_user_timeval(&tv, target_tv_addr))
             return -TARGET_EFAULT;
@@ -5627,8 +5628,10 @@ static abi_long do_fcntl(int fd, int cmd, abi_ulong arg)
         break;
 
     case TARGET_F_SETFL:
-        FDBG("fcntl: SETFL\n");
-        system("ls -la /proc/self/fd");
+        if (fd == FITM_FD) {
+            FDBG("fcntl(SETFL) handled for FITM_FD\n");
+            return 0;
+        }
         ret = get_errno(safe_fcntl(fd, host_cmd,
                                    target_to_host_bitmask(arg,
                                                           fcntl_flags_tbl)));
@@ -8020,13 +8023,13 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             }
 
             // we are fuzzing we want to return immediately if select is called for our FD.
-            if (FD_ISSET(FITM_FD, wfds_ptr) || FD_ISSET(FITM_FD, rfds_ptr)) {
+            if ((wfds_ptr && FD_ISSET(FITM_FD, &wfds)) || (rfds_ptr && FD_ISSET(FITM_FD, &rfds)) || (efds_ptr && FD_ISSET(FITM_FD, &efds))) {
                 // Ignoring read/write distinction here, no target would care
-                FD_ZERO(efds_ptr);
-                FD_ZERO(wfds_ptr);
-                FD_ZERO(rfds_ptr);
-                FD_SET(FITM_FD, rfds_ptr);
-                FD_SET(FITM_FD, wfds_ptr);
+                FD_ZERO(&efds);
+                FD_ZERO(&wfds);
+                FD_ZERO(&rfds);
+                FD_SET(FITM_FD, &rfds);
+                FD_SET(FITM_FD, &wfds);
 
                 if (rfd_addr && copy_to_user_fdset(rfd_addr, &rfds, n))
                     return -TARGET_EFAULT;
