@@ -37,11 +37,11 @@ fn main() {
     // TODO: use argv to fill these
     // Paths are relative to ACTIVE_DIR
     match fitm::run(
-        "../tests/targets/LightFTP/Source/Release/fftp",
-        &["../tests/targets/LightFTP/fftp.conf"],
-        "/usr/bin/ftp",
-        &["127.0.0.1", "2200"],
-        &Duration::from_secs(60 * 15),
+        "../tests/targets/live555/testProgs/testRTSPClient",
+        &["rtsp://127.0.0.1:8554/wavAudioTest"],
+        "../tests/targets/live555/testProgs/testOnDemandRTSPServer",
+        &[""],
+        &Duration::from_secs(2),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}

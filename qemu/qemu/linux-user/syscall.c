@@ -130,6 +130,7 @@
 
 // We originally used FD 0 to send input from afl into the target
 // However targets may use FD 0 to wait for an interrupt from the user or sth similar
+// Since using fitm_in_file we need to set FITM_FD to the current FD value
 #define FITM_FD 1337
 // Use this define to toggle debug prints in various places
 // Might be spammy
@@ -157,6 +158,7 @@ bool accepted_once = false;
 int fitm_out_fd = -1;
 // Instead of dup()ing to 1337, we just keep a shadow fd for input.
 FILE *fitm_in_file = NULL;
+
 
 // FITM specific: for debug prints, use FDBG.
 #ifdef FITM_DEBUG
@@ -2061,10 +2063,11 @@ static int sock_flags_fixup(int fd, int target_type)
 static abi_long do_socket(int domain, int type, int protocol)
 {
     if (domain == AF_INET || domain == AF_INET6) {
+        FDBG("do_socket: returning FITM_FD\n");
         return FITM_FD;
     }
     FDBG("Socket() called for non-inet protocol\n");
-int target_type = type;
+    int target_type = type;
     int ret;
 
     ret = target_to_host_sock_type(&type);
@@ -2659,6 +2662,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
         fitm_in_file = fitm_open_input_file(input);
+        dup2(fileno(fitm_in_file), FITM_FD);
     }
 
     int ret = fread(msg, 1, len, fitm_in_file);
@@ -5623,6 +5627,8 @@ static abi_long do_fcntl(int fd, int cmd, abi_ulong arg)
         break;
 
     case TARGET_F_SETFL:
+        FDBG("fcntl: SETFL\n");
+        system("ls -la /proc/self/fd");
         ret = get_errno(safe_fcntl(fd, host_cmd,
                                    target_to_host_bitmask(arg,
                                                           fcntl_flags_tbl)));
