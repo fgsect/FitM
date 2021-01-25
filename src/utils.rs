@@ -6,11 +6,28 @@ use std::{fs, process::ExitStatus};
 
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
+use rand::Rng;
 use std::fs::create_dir_all;
 use std::io::{self, ErrorKind, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
+
+pub fn pick_random<T>(input_vec: Vec<T>, count: u32) -> Vec<T>
+where
+    T: Clone,
+{
+    let mut rng = rand::thread_rng();
+    let mut output_vec: Vec<T> = Vec::new();
+    for _i in 1..count + 1 {
+        // gen_range upper bound is exclusive
+        let new = input_vec
+            .get(rng.gen_range(0, input_vec.len()))
+            .expect("[!] rng produced out of bounds index for input_vec in pick_random");
+        output_vec.push(new.to_owned());
+    }
+    output_vec
+}
 
 pub fn clear_out() {
     std::fs::remove_dir_all("out")
@@ -260,7 +277,7 @@ pub fn get_filesize(path: &PathBuf) -> u64 {
 #[cfg(test)]
 mod tests {
     use crate::utils;
-    use crate::utils::{latest_snapshot_time, parse_pid};
+    use crate::utils::{latest_snapshot_time, parse_pid, pick_random};
     use std::fs;
     use std::path::Path;
 
@@ -290,6 +307,12 @@ mod tests {
         // Returns true if the given path points to a directory
         let metadata = fs::metadata(to_path).expect("Could not find copy 'to' folder");
         metadata.file_type().is_dir()
+    }
+
+    #[test]
+    fn test_pick_random() {
+        let random_from_ten = pick_random(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 3);
+        println!("Got {:?} from a range of 0..9", random_from_ten);
     }
 
     #[test]
