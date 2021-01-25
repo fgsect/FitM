@@ -2615,6 +2615,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         if (fitm_in_file) {
             // close the last in file, ready for the next round.
             fclose(fitm_in_file);
+            // if we don't set this manually, checking fitm_in_file for NULL goes tuttikaputti
+            fitm_in_file = NULL;
         }
 
 #ifdef INCLUDE_DOCRIU
