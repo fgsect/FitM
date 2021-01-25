@@ -1,7 +1,10 @@
+all: lightftp live555 pseudotest_simple
+
 lightftp:
 	$(MAKE) -C ./targets/LightFTP/Source/Release clean all
 
 live555:
+	cd ./targets/live555 && ./genMakefiles linux-64bit
 	$(MAKE) -C ./targets/live555
 	$(MAKE) -C ./targets/live555/testProgs
 

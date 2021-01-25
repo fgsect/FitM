@@ -1,4 +1,4 @@
-.PHONY: all afl qemu criu fitm debug
+.PHONY: all afl qemu criu fitm debug tests
 
 CRIUPATH?=./criu
 
@@ -18,6 +18,17 @@ fitm:
 
 debug:
 	cargo build
+
+run: tests debug
+	sudo rm -rf ./active_state
+	sudo rm -rf ./saved_states
+	sudo ./target/debug/fitm
+	sudo chown -R $(USER) ./active_state
+	sudo chown -R $(USER) ./saved_states
+
+
+tests:
+	$(MAKE) -C ./tests
 
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
 symlink:
