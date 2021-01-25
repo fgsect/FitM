@@ -155,6 +155,8 @@ bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP
 bool accepted_once = false;
 // This holds the (potential) output file descriptor
 int fitm_out_fd = -1;
+// Instead of dup()ing to 1337, we just keep a shadow fd for input.
+FILE *fitm_in_file = NULL;
 
 // FITM specific: for debug prints, use FDBG.
 #ifdef FITM_DEBUG
@@ -2610,8 +2612,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             close(fitm_out_fd);
         }
 
-        // dup2 does not overwrite dest with src if src == dst
-        close(FITM_FD);
+        // close the last in file, ready for the next round.
+        fclose(fitm_in_file);
 
 #ifdef INCLUDE_DOCRIU
         // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
@@ -2646,10 +2648,16 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
         spawn_forksrv(cpu, timewarp_mode);
 
-        open_input_file(FITM_FD, input);
+        if (unlikely(fitm_in_file != NULL)) {
+            printf("[FITM] BUG: fitm_open_input_file called twice in one run\n");
+            fflush(stdout);
+            _exit(-1);
+        }
+
+        fitm_in_file = fitm_open_input_file(input);
     }
 
-    int ret = read(FITM_FD, msg, len);
+    int ret = fread(msg, 1, len, fitm_in_file);
     if (ret == -1 && errno == EBADF) {
         printf("[QEMU] bug: read on closed FITM_FD?\n");
         perror("FD 1337");
