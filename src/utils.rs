@@ -6,10 +6,17 @@ use std::{fs, process::ExitStatus};
 
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
+use std::fs::create_dir_all;
 use std::io::{self, ErrorKind, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
+
+pub fn clear_out() {
+    std::fs::remove_dir_all("out")
+        .expect("[!] Could not remove old 'out' folder in utils::clear_out");
+    create_dir_all("out").expect("[!] Could not recreate out folder in utils::clear_out");
+}
 
 pub fn parse_pid() -> io::Result<i32> {
     let pstree = Command::new("./criu/crit/crit-python3")

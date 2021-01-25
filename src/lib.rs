@@ -422,6 +422,8 @@ impl FITMSnapshot {
                 // meaning we already are inside the directory. This prevents us from
                 // accidentally using different resources than we expect.
 
+                utils::clear_out();
+
                 let exit_status = Command::new("../AFLplusplus/afl-fuzz")
                     .args(&[
                         "-i",
