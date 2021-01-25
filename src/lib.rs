@@ -741,9 +741,7 @@ impl FITMSnapshot {
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
                     .env("AFL_DEBUG_CHILD_OUTPUT", "1")
                     .env("AFL_DEBUG", "1")
-                    .env("FITM_CREATE_OUTPUTS", "1")
-                    // afl-cmin will keep the showmap traces in `.traces` after each run
-                    .env("AFL_KEEP_TRACES", "1");
+                    .env("FITM_CREATE_OUTPUTS", "1");
 
                 // Don't keep traces BEFORE fuzzing, only afterwards.
                 if keep_traces {
