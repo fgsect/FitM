@@ -28,7 +28,7 @@
 char* get_new_uuid(void);
 int do_criu(void);
 char* concat3(char *first, char *second, char *third);
-void open_input_file(abi_long arg1, char *input);
+FILE *fitm_open_input_file(char *input);
 void spawn_forksrv(CPUState *cpu, bool timewarp_mode);
 void create_pipes_file(void);
 
@@ -79,9 +79,10 @@ void spawn_forksrv(CPUState *cpu, bool timewarp_mode) {
     }
 }
 
-void open_input_file(abi_long arg1, char *input) {
+FILE *fitm_open_input_file(char *input) {
     // We want to get input from files so we pipe the file we get from AFL through an environment var into here.
     // The file is used as stdin
+
     FILE* input_file = fopen(input, "r");
 
     if(!input_file){
@@ -89,18 +90,7 @@ void open_input_file(abi_long arg1, char *input) {
         perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
         exit(1);
     }
-
-    int input_fd = fileno(input_file);
-    if(input_fd == -1){
-        printf("fatal: could not: %s\n", input);
-        perror("fatal: could not fileno INPUT_FILENAME");
-        exit(1);
-    }
-    // An open may result in INPUT_FILENAME at fd 0 if 0 is not used before calling fopen
-    if(input_fd){
-        dup2(input_fd, arg1);
-        close(input_fd);
-    }
+    return input_file;
 }
 
 int do_criu(void){
