@@ -5,7 +5,8 @@ use std::process::{Command, Stdio};
 use std::{env, fmt};
 
 use crate::namespacing::NamespaceContext;
-use crate::utils::{advance_pid, cp_recursive, get_filesize, spawn_criu};
+use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
+use rand::{thread_rng, Rng};
 use regex::Regex;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
@@ -20,6 +21,7 @@ pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 pub const SAVED_STATES: &str = "saved-states";
+pub const ABORT_THRESHOLD: f64 = 0.9;
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
@@ -321,8 +323,8 @@ impl FITMSnapshot {
     /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
     pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
         println!(
-            "==== [*] Running snapshot run for input: \"{}\" ====",
-            stdin_path
+            "==== [*] Running snapshot run on {} for input: \"{}\" ====",
+            self.state_path, stdin_path
         );
         let _ = io::stdout().flush();
 
@@ -912,7 +914,7 @@ pub fn process_stage(
             .expect("[!] Could not remove .traces after saving program maps");
     }
 
-    Ok(next_own_snaps)
+    Ok(pick_random(next_own_snaps, 5))
 }
 
 /// Originally proposed return value of process_stage()
@@ -1106,6 +1108,12 @@ pub fn run(
             current_gen = 1;
         }
 
+        let mut rng = rand::thread_rng();
+        let y: f64 = rng.gen();
+        if current_gen != 1 && y > ABORT_THRESHOLD {
+            println!("Restarting fuzzing from gen 1 because of randomness");
+        }
+
         println!("Fuzzing Gen {}", current_gen);
 
         // outputs of current gen (i.e. client) --> inputs[current_gen+1] (i.e. server)
@@ -1130,5 +1138,12 @@ pub fn run(
         )?;
 
         generation_snaps[next_own_gen].append(&mut next_snaps);
+        println!(
+            "Queue after process_stage contains: {:?}",
+            generation_snaps[next_own_gen]
+                .iter()
+                .map(|x| x.state_path.as_str())
+                .collect::<Vec<_>>()
+        );
     }
 }

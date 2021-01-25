@@ -21,8 +21,12 @@ where
     let mut output_vec: Vec<T> = Vec::new();
     for _i in 1..count + 1 {
         // gen_range upper bound is exclusive
+        if input_vec.len() == 0 {
+            break;
+        }
+        let rand_index = rng.gen_range(0, input_vec.len());
         let new = input_vec
-            .get(rng.gen_range(0, input_vec.len()))
+            .get(rand_index)
             .expect("[!] rng produced out of bounds index for input_vec in pick_random");
         output_vec.push(new.to_owned());
     }
