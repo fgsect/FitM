@@ -20,8 +20,9 @@ debug:
 	cargo build
 
 run: tests debug
-	sudo rm -rf ./active_state
-	sudo rm -rf ./saved_states
+	sudo rm -rf ./active-state
+	sudo rm -rf ./saved-states
+	sudo rm -rf ./cmin-tmp
 	sudo ./target/debug/fitm
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states

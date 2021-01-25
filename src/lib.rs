@@ -5,8 +5,8 @@ use std::process::{Command, Stdio};
 use std::{env, fmt};
 
 use crate::namespacing::NamespaceContext;
+use crate::utils::RomuRand;
 use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
-use rand::{thread_rng, Rng};
 use regex::Regex;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
@@ -820,6 +820,7 @@ fn cpy_trace(trace_file: &str, state_path: &str) -> Result<(), io::Error> {
 /// @param current_inputs: path to inputs for this stage
 /// @return: upcoming snaps for the next generation based on current snaps (client->client, server->server)
 pub fn process_stage(
+    rand: &mut RomuRand,
     current_snaps: &Vec<FITMSnapshot>,
     current_inputs: &Vec<PathBuf>,
     next_gen_id_start: usize,
@@ -827,7 +828,7 @@ pub fn process_stage(
 ) -> Result<Vec<FITMSnapshot>, io::Error> {
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
-    for snap in current_snaps {
+    for snap in pick_random(rand, current_snaps, 5) {
         let cmin_tmp_dir = format!("cmin-tmp");
 
         // remove old tmp if it exists, then recreate
@@ -914,7 +915,7 @@ pub fn process_stage(
             .expect("[!] Could not remove .traces after saving program maps");
     }
 
-    Ok(pick_random(next_own_snaps, 5))
+    Ok(next_own_snaps)
 }
 
 /// Originally proposed return value of process_stage()
@@ -1038,6 +1039,8 @@ pub fn run(
     // A lot of timeout for now
     let run_timeout = Duration::from_secs(3);
 
+    let mut rand = RomuRand::preseeded();
+
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
@@ -1108,8 +1111,7 @@ pub fn run(
             current_gen = 1;
         }
 
-        let mut rng = rand::thread_rng();
-        let y: f64 = rng.gen();
+        let y = rand.below(1000) as f64 / 1000.0;
         if current_gen != 1 && y > ABORT_THRESHOLD {
             println!("Restarting fuzzing from gen 1 because of randomness");
         }
@@ -1131,6 +1133,7 @@ pub fn run(
         // In each generation, IDs are simply numbered
         let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
+            &mut rand,
             &generation_snaps[current_gen],
             &input_file_list_for_gen(current_gen)?,
             next_gen_id_start,

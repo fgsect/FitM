@@ -1,36 +1,42 @@
-use fs_extra;
-use fs_extra::dir::CopyOptions;
-use json;
-use std::process::{Child, Command, Stdio};
-use std::{fs, process::ExitStatus};
-
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
-use rand::Rng;
-use std::fs::create_dir_all;
-use std::io::{self, ErrorKind, Write};
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::time::{Duration, SystemTime};
+use fs_extra::{self, dir::CopyOptions};
+use json;
+use std::{
+    fs::{self, create_dir_all},
+    io::{self, ErrorKind, Write},
+    path::PathBuf,
+    process::{Child, Command, ExitStatus, Stdio},
+    str::FromStr,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-pub fn pick_random<T>(input_vec: Vec<T>, count: u32) -> Vec<T>
+pub fn pick_random<T>(rand: &mut RomuRand, input_vec: &[T], count: usize) -> Vec<T>
 where
     T: Clone,
 {
-    let mut rng = rand::thread_rng();
-    let mut output_vec: Vec<T> = Vec::new();
-    for _i in 1..count + 1 {
-        // gen_range upper bound is exclusive
-        if input_vec.len() == 0 {
+    let mut output_idx: Vec<usize> = Vec::new();
+    // let mut output_vec: Vec<T> = vec![];
+
+    if input_vec.len() <= count {
+        return Vec::from(input_vec);
+    }
+
+    'genrand: loop {
+        let rand_index = rand.below(input_vec.len() as _) as usize;
+        for elem in output_idx.iter() {
+            if rand_index == *elem {
+                continue 'genrand;
+            }
+        }
+
+        output_idx.push(rand_index as _);
+        if output_idx.len() == count {
             break;
         }
-        let rand_index = rng.gen_range(0, input_vec.len());
-        let new = input_vec
-            .get(rand_index)
-            .expect("[!] rng produced out of bounds index for input_vec in pick_random");
-        output_vec.push(new.to_owned());
     }
-    output_vec
+
+    output_idx.iter().map(|x| input_vec[*x].clone()).collect()
 }
 
 pub fn clear_out() {
@@ -278,10 +284,78 @@ pub fn get_filesize(path: &PathBuf) -> u64 {
     metadata.len()
 }
 
+/// Has a Rand field, that can be used to get random values
+// #[cfg(feature = "std")]
+#[inline]
+/// Gets current nanoseconds since UNIX_EPOCH
+pub fn current_nanos() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64
+}
+
+/// see https://arxiv.org/pdf/2002.11331.pdf
+#[derive(Copy, Clone, Debug, Default)]
+pub struct RomuRand {
+    x_state: u64,
+    y_state: u64,
+}
+
+impl RomuRand {
+    pub fn new(seed: u64) -> Self {
+        let mut rand = Self::default();
+        rand.set_seed(seed);
+        rand
+    }
+
+    /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
+    /// Needs stdlib timer
+    // #[cfg(feature = "std")]
+    pub fn preseeded() -> Self {
+        Self::new(current_nanos())
+    }
+
+    fn set_seed(&mut self, seed: u64) {
+        self.x_state = seed ^ 0x12345;
+        self.y_state = seed ^ 0x6789A;
+    }
+
+    #[inline]
+    fn next(&mut self) -> u64 {
+        let xp = self.x_state;
+        self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
+        self.y_state = self.y_state.wrapping_sub(xp).rotate_left(27);
+        xp
+    }
+
+    // Gets a value below the given 64 bit val (inclusive)
+    pub fn below(&mut self, upper_bound_excl: u64) -> u64 {
+        if upper_bound_excl <= 1 {
+            return 0;
+        }
+
+        /*
+        Modulo is biased - we don't want our fuzzing to be biased so let's do it
+        right. See
+        https://stackoverflow.com/questions/10984974/why-do-people-say-there-is-modulo-bias-when-using-a-random-number-generator
+        */
+        let mut unbiased_rnd: u64;
+        loop {
+            unbiased_rnd = self.next();
+            if unbiased_rnd < (u64::MAX - (u64::MAX % upper_bound_excl)) {
+                break;
+            }
+        }
+
+        unbiased_rnd % upper_bound_excl
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils;
-    use crate::utils::{latest_snapshot_time, parse_pid, pick_random};
+    use crate::utils::{latest_snapshot_time, parse_pid, pick_random, RomuRand};
     use std::fs;
     use std::path::Path;
 
@@ -315,7 +389,8 @@ mod tests {
 
     #[test]
     fn test_pick_random() {
-        let random_from_ten = pick_random(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 3);
+        let mut rand = RomuRand::preseeded();
+        let random_from_ten = pick_random(&mut rand, &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 3);
         println!("Got {:?} from a range of 0..9", random_from_ten);
     }
 
