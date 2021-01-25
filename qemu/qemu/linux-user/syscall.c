@@ -2612,8 +2612,10 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             close(fitm_out_fd);
         }
 
-        // close the last in file, ready for the next round.
-        fclose(fitm_in_file);
+        if (fitm_in_file) {
+            // close the last in file, ready for the next round.
+            fclose(fitm_in_file);
+        }
 
 #ifdef INCLUDE_DOCRIU
         // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
