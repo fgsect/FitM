@@ -41,7 +41,7 @@ fn main() {
         &["../tests/targets/LightFTP/fftp.conf"],
         "/usr/bin/ftp",
         &["127.0.0.1", "2200"],
-        &Duration::from_secs(3),
+        &Duration::from_secs(60 * 15),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
