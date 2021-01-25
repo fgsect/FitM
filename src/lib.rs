@@ -260,12 +260,8 @@ impl FITMSnapshot {
 
                 let mut command = Command::new("setsid");
                 command
-                    .args(&[
-                        "stdbuf",
-                        "-oL",
-                        "../fitm-qemu-trace",
-                        &self.target_bin,
-                    ]).args(cli_args)
+                    .args(&["stdbuf", "-oL", "../fitm-qemu-trace", &self.target_bin])
+                    .args(cli_args)
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
@@ -286,7 +282,7 @@ impl FITMSnapshot {
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
-                    .expect("[!] Snapshot run failed");
+                    .expect(&format!("[!] Snapshot run failed for {}", &self.target_bin));
 
                 Ok(exit_status.code().unwrap())
             })
@@ -428,29 +424,29 @@ impl FITMSnapshot {
 
                 let exit_status = Command::new("../AFLplusplus/afl-fuzz")
                     .args(&[
-                        format!("-i"),
-                        format!("./in"),
-                        format!("-o"),
-                        format!("./out"),
+                        "-i",
+                        "./in",
+                        "-o",
+                        "./out",
                         // No mem limit
-                        format!("-m"),
-                        format!("none"),
+                        "-m",
+                        "none",
                         // Fuzzing as main node
-                        format!("-M"),
-                        format!("main"),
-                        format!("-d"),
+                        "-M",
+                        "main",
+                        "-d",
                         // At what time to stop this afl run
-                        format!("-V"),
-                        format!("{}", run_duration.as_secs()),
+                        "-V",
+                        &format!("{}", run_duration.as_secs()),
                         // Timeout per individual execution
-                        format!("-t"),
-                        format!("{}", self.timeout.as_millis()),
-                        format!("--"),
-                        format!("bash"),
+                        "-t",
+                        &format!("{}", self.timeout.as_millis()),
+                        "--",
+                        "bash",
                         // Our restore script
-                        format!("./restore.sh"),
+                        "./restore.sh",
                         // The fuzzer input file
-                        format!("@@"),
+                        "@@",
                     ])
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
@@ -488,7 +484,13 @@ impl FITMSnapshot {
 
         // Print a few stats. This is no longer in the actiavted folder.
         println!("Whatsup:");
-        io::stdout().write_all(&Command::new("./AFLplusplus/afl-whatsup").args(&["-s", "./active-state/out"]).output().unwrap().stdout)?;
+        io::stdout().write_all(
+            &Command::new("./AFLplusplus/afl-whatsup")
+                .args(&["-s", "./active-state/out"])
+                .output()
+                .unwrap()
+                .stdout,
+        )?;
 
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
@@ -523,11 +525,11 @@ impl FITMSnapshot {
 
                 let _restore_status = Command::new("setsid")
                     .args(&[
-                        format!("stdbuf"),
-                        format!("-oL"),
-                        format!("bash"),
-                        format!("./restore.sh"),
-                        String::from(entry_path.clone().to_str().unwrap()),
+                        "stdbuf",
+                        "-oL",
+                        "bash",
+                        "./restore.sh",
+                        entry_path.clone().to_str().unwrap(),
                     ])
                     .stdin(Stdio::from(entry_file))
                     .stdout(Stdio::from(stdout.try_clone().unwrap()))
@@ -703,7 +705,7 @@ impl FITMSnapshot {
             .expect("[!] Error while constructing absolute input_dir path");
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
-        
+
         // Make sure we always have at least dummy input (even if the other side finished)
         let mut dummy_file = File::create(&format!("{}/dummy", &input_dir))?;
         dummy_file.write_all(b"dummy")?;

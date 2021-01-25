@@ -37,7 +37,6 @@ fn main() {
     // TODO: use argv to fill these
     // Paths are relative to ACTIVE_DIR
     match fitm::run(
-
         "../tests/targets/LightFTP/Source/Release/fftp",
         &["../tests/targets/LightFTP/fftp.conf"],
         "/usr/bin/ftp",

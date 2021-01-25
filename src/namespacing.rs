@@ -52,14 +52,7 @@ fn mount(
 }
 
 unsafe fn sys_clone(flags: libc::c_int) -> io::Result<Option<libc::pid_t>> {
-    let ret: pid_t = libc::syscall(
-        libc::SYS_clone,
-        flags as libc::c_int,
-        0,
-        0,
-        0,
-        0,
-    ) as _;
+    let ret: pid_t = libc::syscall(libc::SYS_clone, flags as libc::c_int, 0, 0, 0, 0) as _;
 
     match ret {
         0 => Ok(None),
@@ -120,9 +113,8 @@ impl NamespaceContext {
         //     clone3(&args)?
         // };
 
-        let clone_result = unsafe {
-            sys_clone(libc::CLONE_NEWPID | libc::CLONE_NEWNS | libc::SIGCHLD )?
-        };
+        let clone_result =
+            unsafe { sys_clone(libc::CLONE_NEWPID | libc::CLONE_NEWNS | libc::SIGCHLD)? };
 
         Ok(match clone_result {
             Some(child_pid) => Namespace {
