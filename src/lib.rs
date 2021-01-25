@@ -785,6 +785,10 @@ impl FITMSnapshot {
             std::process::exit(-1);
         }
 
+        // On a larger server, we had issues with cmin files getting lost in the subsequent copy...
+        Command::new("sync").status().unwrap();
+        sleep(Duration::from_millis(200));
+
         println!(
             "==== [*] Wrote cmin contents from {} to {} ====",
             input_dir, output_dir
