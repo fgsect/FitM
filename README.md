@@ -57,10 +57,10 @@ This allows us to no write patch files while developing qemu.
 Build with: `cd qemu/qemu/ && ./build-for-afl.sh`
 
 ## CRIU Build Dependencies
-### Arch
+### Ubuntu
 
-To compile CRIU from source and run tests these packages need to be installed:
-`sudo apt-get install python3-protobuf python3-yaml`
+To compile and run CRIU, these packages need to be installed:
+`sudo apt install protobuf-c-compiler libprotobuf-c-dev libnet-dev python3-protobuf python3-yaml`
 
 ## Git Submodule
 
