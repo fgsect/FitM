@@ -2663,7 +2663,6 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
         fitm_in_file = fitm_open_input_file(input);
-        dup2(fileno(fitm_in_file), FITM_FD);
     }
 
     int ret = fread(msg, 1, len, fitm_in_file);
