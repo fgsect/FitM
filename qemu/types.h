@@ -25,10 +25,15 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "config.h"
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+#ifdef WORD_SIZE_64
+typedef unsigned __int128 uint128_t;
+typedef uint128_t         u128;
+#endif
 
 /* Extended forkserver option values */
 
@@ -43,60 +48,48 @@ typedef uint32_t u32;
 #define FS_ERROR_MMAP 16
 
 /* Reporting options */
-#define FS_OPT_ENABLED 0x8f000001
+#define FS_OPT_ENABLED 0x80000001
 #define FS_OPT_MAPSIZE 0x40000000
 #define FS_OPT_SNAPSHOT 0x20000000
 #define FS_OPT_AUTODICT 0x10000000
+#define FS_OPT_SHDMEM_FUZZ 0x01000000
+#define FS_OPT_OLD_AFLPP_WORKAROUND 0x0f000000
 // FS_OPT_MAX_MAPSIZE is 8388608 = 0x800000 = 2^23 = 1 << 22
-#define FS_OPT_MAX_MAPSIZE ((0x00fffffe >> 1) + 1)
+#define FS_OPT_MAX_MAPSIZE ((0x00fffffeU >> 1) + 1)
 #define FS_OPT_GET_MAPSIZE(x) (((x & 0x00fffffe) >> 1) + 1)
 #define FS_OPT_SET_MAPSIZE(x) \
   (x <= 1 || x > FS_OPT_MAX_MAPSIZE ? 0 : ((x - 1) << 1))
 
-/*
-
-   Ugh. There is an unintended compiler / glibc #include glitch caused by
-   combining the u64 type an %llu in format strings, necessitating a workaround.
-
-   In essence, the compiler is always looking for 'unsigned long long' for %llu.
-   On 32-bit systems, the u64 type (aliased to uint64_t) is expanded to
-   'unsigned long long' in <bits/types.h>, so everything checks out.
-
-   But on 64-bit systems, it is #ifdef'ed in the same file as 'unsigned long'.
-   Now, it only happens in circumstances where the type happens to have the
-   expected bit width, *but* the compiler does not know that... and complains
-   about 'unsigned long' being unsafe to pass to %llu.
-
- */
-
-#if defined(__x86_64__) || defined(__aarch64__)
 typedef unsigned long long u64;
-#else
-typedef uint64_t u64;
-#endif                                                       /* ^__x86_64__ */
 
 typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
+#ifdef WORD_SIZE_64
+typedef __int128 int128_t;
+typedef int128_t s128;
+#endif
 
 #ifndef MIN
-#define MIN(a, b)           \
-  ({                        \
-                            \
-    __typeof__(a) _a = (a); \
-    __typeof__(b) _b = (b); \
-    _a < _b ? _a : _b;      \
-                            \
-  })
-#define MAX(a, b)           \
-  ({                        \
-                            \
-    __typeof__(a) _a = (a); \
-    __typeof__(b) _b = (b); \
-    _a > _b ? _a : _b;      \
-                            \
-  })
+  #define MIN(a, b)           \
+    ({                        \
+                              \
+      __typeof__(a) _a = (a); \
+      __typeof__(b) _b = (b); \
+      _a < _b ? _a : _b;      \
+                              \
+    })
+
+  #define MAX(a, b)           \
+    ({                        \
+                              \
+      __typeof__(a) _a = (a); \
+      __typeof__(b) _b = (b); \
+      _a > _b ? _a : _b;      \
+                              \
+    })
+
 #endif                                                              /* !MIN */
 
 #define SWAP16(_x)                    \
@@ -130,22 +123,49 @@ typedef int64_t s64;
                                                                                \
   })
 
+// It is impossible to define 128 bit constants, so ...
+#ifdef WORD_SIZE_64
+  #define SWAPN(_x, _l)                            \
+    ({                                             \
+                                                   \
+      u128  _res = (_x), _ret;                     \
+      char *d = (char *)&_ret, *s = (char *)&_res; \
+      int   i;                                     \
+      for (i = 0; i < 16; i++)                     \
+        d[15 - i] = s[i];                          \
+      u32 sr = 128U - ((_l) << 3U);                \
+      (_ret >>= sr);                               \
+      (u128) _ret;                                 \
+                                                   \
+    })
+#endif
+
+#define SWAPNN(_x, _y, _l)                     \
+  ({                                           \
+                                               \
+    char *d = (char *)(_x), *s = (char *)(_y); \
+    u32   i, l = (_l)-1;                       \
+    for (i = 0; i <= l; i++)                   \
+      d[l - i] = s[i];                         \
+                                               \
+  })
+
 #ifdef AFL_LLVM_PASS
-#if defined(__linux__) || !defined(__ANDROID__)
-#define AFL_SR(s) (srandom(s))
-#define AFL_R(x) (random() % (x))
+  #if defined(__linux__) || !defined(__ANDROID__)
+    #define AFL_SR(s) (srandom(s))
+    #define AFL_R(x) (random() % (x))
+  #else
+    #define AFL_SR(s) ((void)s)
+    #define AFL_R(x) (arc4random_uniform(x))
+  #endif
 #else
-#define AFL_SR(s) ((void)s)
-#define AFL_R(x) (arc4random_uniform(x))
-#endif
-#else
-#if defined(__linux__) || !defined(__ANDROID__)
-#define SR(s) (srandom(s))
-#define R(x) (random() % (x))
-#else
-#define SR(s) ((void)s)
-#define R(x) (arc4random_uniform(x))
-#endif
+  #if defined(__linux__) || !defined(__ANDROID__)
+    #define SR(s) (srandom(s))
+    #define R(x) (random() % (x))
+  #else
+    #define SR(s) ((void)s)
+    #define R(x) (arc4random_uniform(x))
+  #endif
 #endif                                                    /* ^AFL_LLVM_PASS */
 
 #define STRINGIFY_INTERNAL(x) #x
@@ -154,15 +174,19 @@ typedef int64_t s64;
 #define MEM_BARRIER() __asm__ volatile("" ::: "memory")
 
 #if __GNUC__ < 6
-#define likely(_x) (_x)
-#define unlikely(_x) (_x)
+  #ifndef likely
+    #define likely(_x) (_x)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) (_x)
+  #endif
 #else
-#ifndef likely
-#define likely(_x) __builtin_expect(!!(_x), 1)
-#endif
-#ifndef unlikely
-#define unlikely(_x) __builtin_expect(!!(_x), 0)
-#endif
+  #ifndef likely
+    #define likely(_x) __builtin_expect(!!(_x), 1)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) __builtin_expect(!!(_x), 0)
+  #endif
 #endif
 
 #endif                                                   /* ! _HAVE_TYPES_H */

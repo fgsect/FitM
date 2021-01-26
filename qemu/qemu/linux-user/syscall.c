@@ -135,7 +135,7 @@
 #define FITM_FD 999
 // Use this define to toggle debug prints in various places
 // Might be spammy
-#define FITM_DEBUG 1
+#define FITM_DEBUG 0
 // Remove this define temporarily to ignore do_criu() calls
 // This might be useful when debugging targets where a specific behaviour is solicited after a snapshot
 #define INCLUDE_DOCRIU 1

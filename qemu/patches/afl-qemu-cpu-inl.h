@@ -47,6 +47,10 @@
 
 #define TSL_FD (FORKSRV_FD - 1)
 
+// Shmem fuzzing id
+#define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
+#define FS_OPT_SHDMEM_FUZZ 0x01000000
+
 /* This is equivalent to afl-as.h: */
 
 static unsigned char
@@ -73,6 +77,11 @@ __thread u32    __afl_cmp_counter;
 
 static int forkserver_installed = 0;
 static int disable_caching = 0;
+
+
+int sharedmem_fuzzing = 0;
+u32 *shared_buf_len = NULL;
+char *shared_buf = NULL;
 
 unsigned char afl_fork_child;
 unsigned int  afl_forksrv_pid;
@@ -289,9 +298,44 @@ static void print_mappings(void) {
 
 }
 
+static void afl_map_shm_fuzz(char *shm_fuzz_env) {
+
+  if (shm_fuzz_env && *shm_fuzz_env) {
+    //printf("SHM Fuzz Env: %s\n", shm_fuzz_env);
+
+    u32 shm_id = atoi(shm_fuzz_env);
+    u8 *map = (u8 *)shmat(shm_id, NULL, 0);
+    /* Whooooops. */
+
+    if (!map || map == (void *)-1) {
+
+      printf("[QEMU] ERROR: could not access fuzzing shared memory: %s", strerror(errno));
+      exit(1);
+
+    }
+
+    shared_buf_len = (u32 *)map;
+    shared_buf = (char *) map + sizeof(u32);
+
+    if (getenv("AFL_DEBUG")) {
+
+      printf("Successfully got fuzzing shared memory\n");
+
+    }
+
+  } else {
+
+    printf("ERROR: variable for fuzzing shared memory is not set\n");
+    exit(1);
+
+  }
+
+}
+
+
 /* Fork server logic, invoked once we hit _start. */
 
-void afl_forkserver(CPUState *cpu) {
+void afl_forkserver(CPUState *cpu, char *shm_fuzz_env) {
 
   u32           map_size = 0;
   unsigned char tmp[4] = {0};
@@ -300,6 +344,11 @@ void afl_forkserver(CPUState *cpu) {
   forkserver_installed = 1;
 
   if (getenv("AFL_QEMU_DEBUG_MAPS")) print_mappings();
+
+  if (shm_fuzz_env && *shm_fuzz_env) {
+    printf("[QEMU] a shm fuzz env exists -> requesting shm fuzzing.\n");
+    sharedmem_fuzzing = 1;
+  }
 
   // if (!afl_area_ptr) return; // not necessary because of fixed dummy buffer
 
@@ -312,14 +361,40 @@ void afl_forkserver(CPUState *cpu) {
   if (MAP_SIZE <= 0x800000) {
 
     map_size = (FS_OPT_ENABLED | FS_OPT_MAPSIZE | FS_OPT_SET_MAPSIZE(MAP_SIZE));
+    if (sharedmem_fuzzing != 0) { map_size |= FS_OPT_SHDMEM_FUZZ; }
     memcpy(tmp, &map_size, 4);
 
   }
 
+
   /* Tell the parent that we're alive. If the parent doesn't want
      to talk, assume that we're not running in forkserver mode. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
+    sharedmem_fuzzing = 0;
+    return;
+  }
+
+  u32 was_killed = 0;
+  if (sharedmem_fuzzing) {
+
+    if (read(FORKSRV_FD, &was_killed, 4) != 4) exit(2);
+
+    printf("Got %d opts from AFL (OPT_ENABLED %d, OPT_SHMEM: %d\n", was_killed, was_killed & FS_OPT_ENABLED, was_killed & FS_OPT_SHDMEM_FUZZ);
+
+
+    if ((was_killed & (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) ==
+        (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ))
+      afl_map_shm_fuzz(shm_fuzz_env);
+    else {
+
+      fprintf(stderr, "ERROR: afl-fuzz is old and does not support"
+              " shmem input");
+      exit(1);
+
+    }
+
+  }
 
   afl_forksrv_pid = getpid();
 
@@ -330,7 +405,6 @@ void afl_forkserver(CPUState *cpu) {
   while (1) {
 
     int status;
-    u32 was_killed;
 
     /* Whoops, parent dead? */
 

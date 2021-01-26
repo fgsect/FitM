@@ -36,7 +36,10 @@
 
 void HELPER(afl_entry_routine)(CPUArchState *env) {
 
-  afl_forkserver(ENV_GET_CPU(env));
+  // afl_forkserver(ENV_GET_CPU(env));
+  printf("NO LONGER CALLED\n");
+  fflush(stdout);
+  exit(-1);
 
 }
 

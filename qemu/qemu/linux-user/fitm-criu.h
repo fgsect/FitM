@@ -66,31 +66,64 @@ void create_pipes_file(void) {
     fclose(f);
 }
 
+#define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
 void spawn_forksrv(CPUState *cpu, bool timewarp_mode) {
     if (!timewarp_mode) {
         char* shm_env_var = getenv_from_file(SHM_ENV_VAR);
         char* afl_inst_ratio = getenv_from_file("AFL_INST_RATIO");
-        if(shm_env_var){
+
+        if (shm_env_var) {
             afl_setup(shm_env_var, afl_inst_ratio);
-            afl_forkserver(cpu);
+            afl_forkserver(cpu, getenv_from_file(SHM_FUZZ_ENV_VAR));
         } else {
             puts("AFL Forkserver not started, (SHM_ENV_VAR env var not set)");
         }
     }
 }
 
+/* AFL++ Sharedmap Fuzzing */
+extern int sharedmem_fuzzing;
+extern u32 *shared_buf_len;
+extern char *shared_buf;
+
 FILE *fitm_open_input_file(char *input) {
     // We want to get input from files so we pipe the file we get from AFL through an environment var into here.
     // The file is used as stdin
 
-    FILE* input_file = fopen(input, "r");
+    if (sharedmem_fuzzing) {
+        if (!shared_buf) {
+            printf("[QEMU] BUG: sharedmem fuzzing has NULL buffer!");
+            exit(-1);
+        }
 
-    if(!input_file){
-        printf("INPUT_FILENAME: %s\n", input);
-        perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
-        exit(1);
+        if (*shared_buf_len == 0) {
+            printf("[QEMU] Empty input in sharedmem?");
+        }
+
+        FILE* input_file_shmem = fmemopen(shared_buf, *shared_buf_len, "r");
+
+        if (!input_file_shmem) {
+            perror("Could not fmemopen");
+            exit(-1);
+        }
+
+        // printf("[QEMU] testcases starts with %s, len=%d\n", shared_buf, *shared_buf_len);
+
+        return input_file_shmem;
+
+    } else {
+
+        FILE* input_file = fopen(input, "r");
+
+        if(!input_file){
+            printf("INPUT_FILENAME: %s\n", input);
+            perror("fatal: could not fopen INPUT_FILENAME, check stdout for INPUT_FILENAME");
+            exit(1);
+        }
+
+        return input_file;
+
     }
-    return input_file;
 }
 
 int do_criu(void){
