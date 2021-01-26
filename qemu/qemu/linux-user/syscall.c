@@ -6700,7 +6700,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             _exit(43);
         }
-        FDBG("exit: Target tried to exit with exitcode %d\n", arg1);
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
         arg1 = 0;
         _exit(arg1);
 
@@ -6740,7 +6740,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             _exit(43);
         }
-        FDBG("exit: Target tried to exit with exitcode %d\n", arg1);
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
         arg1 = 0;
         _exit(arg1);
         return 0; /* avoid warning */
@@ -8784,7 +8784,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             return get_errno(exit_group(43));
         }
-        FDBG("exit: Target tried to exit with exitcode %d\n", arg1);
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
         arg1 = 0;
         return get_errno(exit_group(arg1));
 #endif
