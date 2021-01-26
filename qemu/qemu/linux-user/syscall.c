@@ -141,6 +141,13 @@
 #define INCLUDE_DOCRIU 1
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
+
+// Randomly chosen offsets in the AFL Bitmp, to emphasize sent operations for afl.
+// >> Make sure we don't minimize it.
+#define AFL_MAP_SENDTO (1<<3)
+#define AFL_MAP_WRITE (1<<4)
+#define AFL_MAP_READ (1<<5)
+
 bool sent = true;
 bool env_init = false;
 // If true, we are supposed to write the outputs to a file.
@@ -2546,8 +2553,14 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
                           abi_ulong target_addr, socklen_t addrlen)
 {
     if (fd == FITM_FD) {
+
         fitm_ensure_initialized();
         sent = true;
+
+        // If we reached send, we're happy. Increase SENT_ID
+        size_t loc = AFL_MAP_SENDTO;
+        INC_AFL_AREA(loc);
+       
         // Only write sth to the fd if we are in consolidation
         if(!create_outputs) {
             FDBG("Sendto called on FITM_FD -> no outputs\n");
@@ -2718,6 +2731,8 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 
     if (fd == FITM_FD) {
         FDBG("recvfrom for %ld bytes", len);
+        size_t loc = AFL_MAP_READ;
+        INC_AFL_AREA(loc);
         ret = fitm_read(cpu, fd, (char *)host_msg, len);
         unlock_user(host_msg, msg, len);
         return ret;
@@ -6772,6 +6787,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         if (arg1 == FITM_FD) {
             fitm_ensure_initialized();
             FDBG("setting sent = true\n");
+            size_t loc = AFL_MAP_WRITE;
+            INC_AFL_AREA(loc);
             sent = true;
             if (!create_outputs) {
                 FDBG("write(): ignoring all outputs\n");
