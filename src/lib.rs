@@ -269,7 +269,7 @@ impl FITMSnapshot {
                     .stderr(Stdio::from(stderr))
                     // .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
-                    //.env("QEMU_STRACE", "1")
+                    .env("QEMU_STRACE", "1")
                     .env("AFL_NO_UI", "1");
 
                 if create_outputs {
@@ -575,6 +575,10 @@ impl FITMSnapshot {
             .expect("[!] Namespace wait failed")
             .code()
             .unwrap();
+
+        if self.state_path.contains("fitm-gen1") {
+            panic!("We are here.");
+        }
 
         if exit_status != 0 {
             let info =
@@ -1023,13 +1027,13 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     // Look for the last and last -2 state's output to get the input.
     let gen_path = if gen_id > 3 {
         Regex::new(&format!(
-            "fitm\\-gen[{}|{}]\\-state\\d+",
+            "fitm-gen[{}{}]-state\\d+",
             gen_id - 1,
             gen_id - 3
         ))
         .unwrap()
     } else {
-        Regex::new(&format!("fitm\\-gen{}\\-state\\d+", gen_id - 1)).unwrap()
+        Regex::new(&format!("fitm-gen{}-state\\d+", gen_id - 1)).unwrap()
     };
 
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
