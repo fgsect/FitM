@@ -21,7 +21,7 @@ pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 pub const SAVED_STATES: &str = "saved-states";
-pub const ABORT_THRESHOLD: f64 = 0.9;
+pub const ABORT_THRESHOLD: f64 = 0.98;
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
