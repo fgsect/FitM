@@ -1102,8 +1102,10 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 pub fn run(
     client_bin: &str,
     client_args: &[&str],
+    client_envs: &[(&str, &str)],
     server_bin: &str,
     server_args: &[&str],
+    server_envs: &[(&str, &str)],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
@@ -1128,7 +1130,7 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1143,7 +1145,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false, client_args)?;
+    tmp.init_run(true, false, client_args, client_envs)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1155,7 +1157,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true, server_args)?;
+    afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
@@ -1201,7 +1203,7 @@ pub fn run(
         }
 
         println!(
-            "     [*] Queue before process_stage contains: {:?}",
+            "==== [*] Queue before process_stage contains: {:?} ====",
             generation_snaps
                 .iter()
                 .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
