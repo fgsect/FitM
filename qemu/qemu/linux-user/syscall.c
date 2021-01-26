@@ -141,7 +141,7 @@
 #define INCLUDE_DOCRIU 1
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
-bool sent = true;
+bool sent = false;
 bool env_init = false;
 // If true, we are supposed to write the outputs to a file.
 // This is set after each restore. Before the first restore we are doing the init run. Within the init run we don't want
