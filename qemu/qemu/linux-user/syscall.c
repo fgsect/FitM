@@ -141,7 +141,7 @@
 #define INCLUDE_DOCRIU 1
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
-bool sent = false;
+bool sent = true;
 bool env_init = false;
 // If true, we are supposed to write the outputs to a file.
 // This is set after each restore. Before the first restore we are doing the init run. Within the init run we don't want
@@ -2383,7 +2383,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
     }
     
     accepted_once = true;
-    sent = true; // << Adding this as fix for the server - it won't send anything, but immediately 
+    sent = true; // << Adding this as fix for the server - it won't send anything, but immediately
 
     return FITM_FD;
 
@@ -2678,7 +2678,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         fflush(stdout);
         _exit(0);
     };
-    FDBG("read: %d\n", ret);
+    FDBG("read: %d bytes with msg: %s\n", ret, msg);
     // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
     return ret;
 }
