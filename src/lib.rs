@@ -598,16 +598,11 @@ impl FITMSnapshot {
             }
 
             let from = format!("./fd/{}", &file_name.to_str().unwrap());
-            let destination_path = Path::new(output_path).join(file_name);
+            let destination_path =
+                Path::new(output_path).join(entry_path.file_name().unwrap().to_str().unwrap());
             let to = destination_path
                 .to_str()
                 .expect("[!] Couldn't convert destination_path to str");
-            // append index to not overwrite fd-files
-            let to = format!(
-                "{}-{}",
-                to,
-                entry_path.file_name().unwrap().to_str().unwrap()
-            );
             fs::copy(from, to).expect("[!] Could not copy output file to outputs folder");
         }
 
@@ -897,13 +892,11 @@ pub fn process_stage(
 
         // TODO: Make sure the same bitmap never creates a new snapshop for this state (may exist from last round already)
 
-        /*
-        TODO: (Otto?) ignore inputs by output, according to jaro distance
-
         let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
-
+        // TODO: (Otto?) ignore inputs by output, according to jaro distance
+        /*
         let mut other_outputs: Vec<String> = &[
             // input_file_list_for_gen(snap.generation + 1);
             input_file_list_for_gen(snap.generation - 1);
