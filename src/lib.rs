@@ -12,6 +12,7 @@ use std::ffi::OsString;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
 use std::time::Duration;
+use termion::{color, style};
 
 pub mod namespacing;
 pub mod utils;
@@ -23,9 +24,9 @@ pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 pub const SAVED_STATES: &str = "saved-states";
 pub const ABORT_THRESHOLD: f64 = 0.98;
-// 0 means exact match, 1 means no similarity
-// as we want to exclude "almost"-exact matches we need to exclude anything below this threshold
-pub const JARO_DISTANCE_THRESHOLD: f64 = 0.01;
+// 1.0 means exact match, 0.0 means no similarity
+// as we want to exclude "almost"-exact matches we need to exclude anything above this threshold
+pub const JARO_DISTANCE_THRESHOLD: f64 = 0.98;
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
@@ -504,6 +505,7 @@ impl FITMSnapshot {
             std::process::exit(1);
         }
 
+        println!("         Fuzzer Stats:");
         match fs::read_to_string("./active-state/out/main/fuzzer_stats") {
             Ok(stats) => {
                 for line in stats.split("\n") {
@@ -516,19 +518,31 @@ impl FITMSnapshot {
                         || line.starts_with("unique_hangs")
                         || line.starts_with("cycles_done")
                     {
-                        println!("         -> {}", line);
+                        println!(
+                            "         {}- {}{}",
+                            color::Fg(color::Green),
+                            line,
+                            style::Reset
+                        );
                     }
                 }
             }
-            Err(_) => println!("Failed to read fuzzer-stats. Skipping."),
+            Err(_) => println!(
+                "{}Failed to read fuzzer-stats. Skipping.{}",
+                color::Fg(color::Red),
+                style::Reset
+            ),
         }
 
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
         if self.found_crashes() {
             println!(
-                "==== [*] Crashes present after fuzzing {} ====",
-                self.state_path
+                "{}{}==== [*] Crashes present after fuzzing {} ===={}",
+                color::Fg(color::Green),
+                style::Bold,
+                self.state_path,
+                style::Reset,
             );
         }
 
@@ -707,14 +721,20 @@ impl FITMSnapshot {
 
         if afl.snapshot_run(input_path)? {
             println!(
-                "==== [*] New snapshot: {} with input {} ====",
-                afl.state_path, input_path
+                "{}==== [*] New snapshot: {} with input {} ===={}",
+                color::Fg(color::Blue),
+                afl.state_path,
+                input_path,
+                style::Reset,
             );
             Ok(Some(afl))
         } else {
             println!(
-                "==== [*] No snapshot: {} with input {} ====",
-                afl.state_path, input_path
+                "{}==== [x] Snapshot not created (traget exited): {} with input {} ===={}",
+                color::Fg(color::Yellow),
+                afl.state_path,
+                input_path,
+                style::Reset,
             );
             Ok(None)
         }
@@ -856,8 +876,8 @@ pub fn process_stage(
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
     println!(
-        "     -> Processing stage with inputs: {:?}",
-        &current_inputs
+        "     -> Processing stage with {} inputs.", //: {:?}",
+        current_inputs.len(),
     );
 
     for snap in pick_random(rand, current_snaps, 5) {
@@ -905,10 +925,10 @@ pub fn process_stage(
 
         // TODO: (Otto?) ignore inputs by output, according to jaro distance
 
-        let mut other_outputs: Vec<String> =
-            input_file_list_for_gen((snap.generation - 3) as usize)?
+        let mut other_outputs: Vec<Vec<u8>> =
+            input_file_list_for_gen((snap.generation - 1) as usize)?
                 .iter()
-                .map(|x| fs::read_to_string(x).expect("[!] Failed to map input_list"))
+                .map(|x| fs::read(x).expect("[!] Failed to map input_list"))
                 .collect();
         let mut ignored_outputs: Vec<OsString> = vec![];
 
@@ -917,7 +937,7 @@ pub fn process_stage(
             let entry_path = entry.path();
             let entry_file_name = entry.file_name();
             let own_output = {
-                fs::read_to_string(entry_path)
+                fs::read(entry_path)
                     .expect("[!] Could not read own_output while calculating jaro distance")
             };
 
@@ -926,7 +946,7 @@ pub fn process_stage(
             // So we read at +1, -1, -3
             if other_outputs
                 .iter()
-                .any(|x| strsim::jaro(x, &own_output) < JARO_DISTANCE_THRESHOLD)
+                .any(|x| utils::jaro(x, &own_output) > JARO_DISTANCE_THRESHOLD)
             {
                 ignored_outputs.push(entry_file_name);
             } else {
@@ -941,8 +961,8 @@ pub fn process_stage(
             let entry = entry?;
             if ignored_outputs.contains(&entry.file_name()) {
                 println!(
-                    "==== [*] Skipping output {:?} on snapshot creation ====",
-                    &entry.file_name()
+                    "==== [*] Skipping output {:?} on snapshot creation (Output too similar, JARO says no.) ====",
+                    &entry.file_name(),
                 );
                 continue;
             }
@@ -1039,8 +1059,8 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     let gen_path = Regex::new(&format!(
         "fitm-gen({}|{}|{})-state\\d+",
         gen_id + 1,
-        gen_id - 1,
-        if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 }
+        if gen_id >= 1 { gen_id - 1 } else { gen_id + 1 },
+        if gen_id >= 3 { gen_id - 3 } else { gen_id + 1 },
     ))
     .unwrap();
 
@@ -1116,6 +1136,18 @@ pub fn run(
     server_envs: &[(&str, &str)],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
+    println!(
+        "{}
+    __________________  ___
+   / ____/  _/_  __/  |/  /
+  / /_   / /  / / / /|_/ / 
+ / __/ _/ /  / / / /  / /  
+/_/   /___/ /_/ /_/  /_/   
+{}",
+        color::Fg(color::Cyan),
+        style::Reset
+    );
+
     // A lot of timeout for now
     let run_timeout = Duration::from_secs(3);
 
@@ -1196,7 +1228,12 @@ pub fn run(
             println!("Restarting fuzzing from gen 1 because of randomness");
         }
 
-        println!("---> Fuzzing Gen {}", current_gen);
+        println!(
+            "{}---> Fuzzing Gen {}{}",
+            color::Fg(color::Green),
+            current_gen,
+            style::Reset
+        );
 
         // outputs of current gen (i.e. client) --> inputs[current_gen+1] (i.e. server)
         let next_other_gen = current_gen + 1;

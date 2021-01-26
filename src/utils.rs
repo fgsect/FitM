@@ -3,6 +3,7 @@ use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 use fs_extra::{self, dir::CopyOptions};
 use json;
 use std::{
+    cmp::{max, min},
     fs::{self, create_dir_all},
     io::{self, ErrorKind, Write},
     path::PathBuf,
@@ -360,6 +361,111 @@ impl RomuRand {
 
         unbiased_rnd % upper_bound_excl
     }
+}
+
+/// Calculates the Jaro similarity between two strings. The returned value
+/// is between 0.0 and 1.0 (higher value means more similar).
+///
+/// ```
+/// use strsim::jaro;
+///
+/// assert!((0.392 - jaro("Friedrich Nietzsche", "Jean-Paul Sartre")).abs() <
+///         0.001);
+/// ```
+///
+pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
+    /*
+    This is largely copied from https://crates.io/crates/strsim
+    LICENSE:
+
+    The MIT License (MIT)
+
+    Copyright (c) 2015 Danny Guo
+    Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>
+    Copyright (c) 2018 Akash Kurdekar
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+    */
+    if a == b {
+        return 1.0;
+    }
+
+    let a_len = a.len();
+    let b_len = b.len();
+    if a_len == 0 && b_len == 0 {
+        return 0.0;
+    } else if a_len == 0 || b_len == 0 {
+        return 0.0;
+    } else if a_len == 1 && b_len == 1 && a[0] == b[0] {
+        return 1.0;
+    }
+
+    let search_range = max(0, (max(a_len, b_len) / 2) - 1);
+
+    let mut b_consumed = vec![false; b_len];
+
+    let mut matches = 0.0;
+
+    let mut transpositions = 0.0;
+    let mut b_match_index = 0;
+
+    for (i, a_char) in a.iter().enumerate() {
+        let min_bound =
+            // prevent integer wrapping
+            if i > search_range {
+                max(0, i - search_range)
+            } else {
+                0
+            };
+
+        let max_bound = min(b_len - 1, i + search_range);
+
+        if min_bound > max_bound {
+            continue;
+        }
+
+        for (j, b_char) in b.iter().enumerate() {
+            if min_bound <= j && j <= max_bound && a_char == b_char && !b_consumed[j] {
+                b_consumed[j] = true;
+                matches += 1.0;
+
+                if j < b_match_index {
+                    transpositions += 1.0;
+                }
+                b_match_index = j;
+
+                break;
+            }
+        }
+    }
+
+    let ret = if matches == 0.0 {
+        0.0
+    } else {
+        (1.0 / 3.0)
+            * ((matches / a_len as f64)
+                + (matches / b_len as f64)
+                + ((matches - transpositions) / matches))
+    };
+
+    //println!("JARO was {} for ({:?} <-> {:?})", ret, &a, &b);
+    ret
 }
 
 #[cfg(test)]
