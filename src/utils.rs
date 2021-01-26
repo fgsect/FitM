@@ -35,8 +35,8 @@ where
             break;
         }
     }
-
-    output_idx.iter().map(|x| input_vec[*x].clone()).collect()
+    output_idx.sort();
+    output_idx.into_iter().map(|x| input_vec[x].clone()).collect()
 }
 
 pub fn clear_out() {

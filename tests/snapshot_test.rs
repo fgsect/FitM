@@ -3,6 +3,7 @@ mod common;
 
 use crate::common::teardown;
 use std::time::Duration;
+use fitm::utils;
 
 static SERVER_BIN: &str = "./tests/targets/pseudoserver_simple";
 #[allow(dead_code)]
@@ -24,7 +25,7 @@ fn repeated_cmin_test_() {
     );
 
     server0
-        .init_run(false, true)
+        .init_run(false, true, &[])
         .expect("[!] Init run on server0 failed");
 
     // =========== snapshot on gen1 =============
