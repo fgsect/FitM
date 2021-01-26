@@ -230,6 +230,7 @@ impl FITMSnapshot {
         create_outputs: bool,
         create_snapshot: bool,
         cli_args: &[&str],
+        extra_envs: &[(&str, &str)],
     ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
@@ -267,11 +268,12 @@ impl FITMSnapshot {
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
-                    // .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
-                    //.env("QEMU_STRACE", "1")
                     .env("AFL_NO_UI", "1");
 
+                for (k, v) in extra_envs {
+                    command.env(*k, *v);
+                }
                 if create_outputs {
                     command.env("FITM_CREATE_OUTPUTS", "1");
                 }
@@ -489,14 +491,21 @@ impl FITMSnapshot {
         match fs::read_to_string("./active-state/out/main/fuzzer_stats") {
             Ok(stats) => {
                 for line in stats.split("\n") {
-                    if line.starts_with("execs_done") || line.starts_with("execs_per_sec") || line.starts_with("paths_total") || line.starts_with("max_depth") || line.starts_with("stability") || line.starts_with("unique_crashes") || line.starts_with("unique_hangs") || line.starts_with("cycles_done") {
+                    if line.starts_with("execs_done")
+                        || line.starts_with("execs_per_sec")
+                        || line.starts_with("paths_total")
+                        || line.starts_with("max_depth")
+                        || line.starts_with("stability")
+                        || line.starts_with("unique_crashes")
+                        || line.starts_with("unique_hangs")
+                        || line.starts_with("cycles_done")
+                    {
                         println!("{}", line);
                     }
                 }
-            },
+            }
             Err(_) => println!("Failed to read fuzzer-stats. Skipping."),
         }
-
 
         println!("==== [*] Finished fuzzing {} ====", self.state_path);
 
@@ -1066,8 +1075,10 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 pub fn run(
     client_bin: &str,
     client_args: &[&str],
+    client_envs: &[(&str, &str)],
     server_bin: &str,
     server_args: &[&str],
+    server_envs: &[(&str, &str)],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
@@ -1092,7 +1103,7 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1107,7 +1118,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false, client_args)?;
+    tmp.init_run(true, false, client_args, client_envs)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1119,7 +1130,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true, server_args)?;
+    afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);

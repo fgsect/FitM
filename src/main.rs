@@ -39,9 +39,11 @@ fn main() {
     match fitm::run(
         "../tests/targets/live555/testProgs/testRTSPClient",
         &["rtsp://127.0.0.1:8554/wavAudioTest"],
+        &[("QEMU_STRACE", "1")],
         "../tests/targets/live555/testProgs/testOnDemandRTSPServer",
         &[""],
-        &Duration::from_secs(2),
+        &[("QEMU_STRACE", "1"), ("INIT_RECV_SKIP", "1")],
+        &Duration::from_secs(1),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
