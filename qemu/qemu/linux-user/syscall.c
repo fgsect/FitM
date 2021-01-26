@@ -166,6 +166,10 @@ bool accepted_once = false;
 int fitm_out_fd = -1;
 // Instead of dup()ing to 1337, we just keep a shadow fd for input.
 FILE *fitm_in_file = NULL;
+// For some targets (e.g. live555) we want to discard the first n recv calls
+// This variable configures how many recvs are skipped
+int recv_ctr = 0;
+int init_recv_skip = 0;
 
 
 // FITM specific: for debug prints, use FDBG.
@@ -2390,7 +2394,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
     }
     
     accepted_once = true;
-    sent = true; // << Adding this as fix for the server - it won't send anything, but immediately 
+    sent = true; // << Adding this as fix for the server - it won't send anything, but immediately
 
     return FITM_FD;
 
@@ -2518,6 +2522,12 @@ static void fitm_ensure_initialized(void) {
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
+        // Ignore any possible error
+        char* init_recv_skip_tmp = getenv_from_file("INIT_RECV_SKIP");
+        if(init_recv_skip_tmp){
+            init_recv_skip = atoi(init_recv_skip_tmp);
+        }
+
         if (create_outputs) {
             // Open FD for writing. :)
             char *uuid = get_new_uuid();
@@ -2533,7 +2543,7 @@ static void fitm_ensure_initialized(void) {
         }
         env_init = true;
     }
-    FDBG(": fitm_ensure_initialized() create_outputs %d, timewarp_mode %d, fitm_out_fd %d\n", create_outputs, timewarp_mode, fitm_out_fd);
+    FDBG(": fitm_ensure_initialized() create_outputs %d, timewarp_mode %d, fitm_out_fd %d, init_recv_skip %d\n", create_outputs, timewarp_mode, fitm_out_fd, init_recv_skip);
 }
 
 /* do_sendto() Must return target values and target errnos. */
@@ -2606,7 +2616,7 @@ fail:
 }
 
 static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
-
+    recv_ctr += 1;
     if (unlikely(fd != FITM_FD)) {
         printf("[FITM] BUG: fitm_read may only be called with FITM_FD\n");
         _exit(-1);
@@ -2619,63 +2629,67 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);
-        }
-        sent = false; // After restore, we'll await the next sent before criuin' again
+        } else if (timewarp_mode && recv_ctr <= init_recv_skip) {
+            FDBG("fitm_read: skipping recv by returning empty string\n");
+            return 0;
+        } else if (timewarp_mode && recv_ctr > init_recv_skip){
+            sent = false; // After restore, we'll await the next sent before criuin' again
 
-        create_pipes_file();
+            create_pipes_file();
 
-        if (fitm_out_fd != -1) {
-            FDBG("Create Outputs in Snapshot run (?)\n");
-            close(fitm_out_fd);
-        }
+            if (fitm_out_fd != -1) {
+                FDBG("Create Outputs in Snapshot run (?)\n");
+                close(fitm_out_fd);
+            }
 
-        if (fitm_in_file) {
-            // close the last in file, ready for the next round.
-            fclose(fitm_in_file);
-            // if we don't set this manually, checking fitm_in_file for NULL goes tuttikaputti
-            fitm_in_file = NULL;
-        }
+            if (fitm_in_file) {
+                // close the last in file, ready for the next round.
+                fclose(fitm_in_file);
+                // if we don't set this manually, checking fitm_in_file for NULL goes tuttikaputti
+                fitm_in_file = NULL;
+            }
 
 #ifdef INCLUDE_DOCRIU
-        // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
-        // This would break the fitm snapshot restore
-        close(2);
-        if(block_signals()) {
-            printf("[QEMU] Could not block signals for do_criu call\n");
-            fflush(stdout);
-            _exit(-1);
-        }
-        do_criu();
-        // Weird bug making criu restore crash - this solves it
-        sleep(0.2);
-        int stderr_fd = open("./stderr", O_WRONLY | O_APPEND);
-        if (stderr_fd == -1) {
-            printf("[QEMU] Could not reopen stderr\n");
-            fflush(stdout);
-            _exit(-1);
-        }
-        if (stderr_fd != 2) {
-            dup2(stderr_fd, 2);
-            close(stderr_fd);
-        }
-        fprintf(stderr, "\n=== CRIU RESTORED ===\n");
+            // We close stdout and err as QEMU Strace will write to the stream after the snapshot.
+            // This would break the fitm snapshot restore
+            close(2);
+            if(block_signals()) {
+                printf("[QEMU] Could not block signals for do_criu call\n");
+                fflush(stdout);
+                _exit(-1);
+            }
+            do_criu();
+            // Weird bug making criu restore crash - this solves it
+            sleep(0.2);
+            int stderr_fd = open("./stderr", O_WRONLY | O_APPEND);
+            if (stderr_fd == -1) {
+                printf("[QEMU] Could not reopen stderr\n");
+                fflush(stdout);
+                _exit(-1);
+            }
+            if (stderr_fd != 2) {
+                dup2(stderr_fd, 2);
+                close(stderr_fd);
+            }
+            fprintf(stderr, "\n=== CRIU RESTORED ===\n");
 #endif
-        // If we don't unset here fitm_output_fd is never set since env_init is set to true before the snapshot and never unset
-        env_init = false;
+            // If we don't unset here fitm_output_fd is never set since env_init is set to true before the snapshot and never unset
+            env_init = false;
 
-        char* input = getenv_from_file("INPUT_FILENAME");
+            char* input = getenv_from_file("INPUT_FILENAME");
 
-        fitm_ensure_initialized();
+            fitm_ensure_initialized();
 
-        spawn_forksrv(cpu, timewarp_mode);
+            spawn_forksrv(cpu, timewarp_mode);
 
-        if (unlikely(fitm_in_file != NULL)) {
-            printf("[FITM] BUG: fitm_open_input_file called twice in one run\n");
-            fflush(stdout);
-            _exit(-1);
+            if (unlikely(fitm_in_file != NULL)) {
+                printf("[FITM] BUG: fitm_open_input_file called twice in one run\n");
+                fflush(stdout);
+                _exit(-1);
+            }
+
+            fitm_in_file = fitm_open_input_file(input);
         }
-
-        fitm_in_file = fitm_open_input_file(input);
     }
 
     int ret = fread(msg, 1, len, fitm_in_file);
@@ -2691,7 +2705,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         fflush(stdout);
         _exit(0);
     };
-    FDBG("read: %d\n", ret);
+    FDBG("read: %d bytes with msg: %s\n", ret, msg);
     // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
     return ret;
 }
@@ -6701,6 +6715,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             _exit(43);
         }
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
+        arg1 = 0;
         _exit(arg1);
 
         if (block_signals()) {
@@ -6739,6 +6755,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             _exit(43);
         }
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
+        arg1 = 0;
         _exit(arg1);
         return 0; /* avoid warning */
     case TARGET_NR_read:
@@ -8783,6 +8801,8 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
                     "Reserved for criu-snapshots: \"qemu/qemu/linux-user/criu.h\"\n");
             return get_errno(exit_group(43));
         }
+        FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
+        arg1 = 0;
         return get_errno(exit_group(arg1));
 #endif
     case TARGET_NR_setdomainname:

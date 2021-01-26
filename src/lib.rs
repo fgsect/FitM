@@ -230,6 +230,7 @@ impl FITMSnapshot {
         create_outputs: bool,
         create_snapshot: bool,
         cli_args: &[&str],
+        extra_envs: &[(&str, &str)],
     ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
 
@@ -267,11 +268,12 @@ impl FITMSnapshot {
                     .stdin(Stdio::from(stdin))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
-                    // .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
                     .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
-                    .env("QEMU_STRACE", "1")
                     .env("AFL_NO_UI", "1");
 
+                for (k, v) in extra_envs {
+                    command.env(*k, *v);
+                }
                 if create_outputs {
                     command.env("FITM_CREATE_OUTPUTS", "1");
                 }
@@ -395,8 +397,8 @@ impl FITMSnapshot {
                 utils::current_millis() - start_millis
             );
         } /* else {
-            panic!("Snapshot creation failed");
-        }*/
+              panic!("Snapshot creation failed");
+          }*/
 
         Ok(success)
     }
@@ -575,10 +577,6 @@ impl FITMSnapshot {
             .expect("[!] Namespace wait failed")
             .code()
             .unwrap();
-
-        if self.state_path.contains("fitm-gen1") {
-            panic!("We are here.");
-        }
 
         if exit_status != 0 {
             let info =
@@ -854,7 +852,10 @@ pub fn process_stage(
 ) -> Result<Vec<FITMSnapshot>, io::Error> {
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
-    println!("     -> Processing stage with inputs: {:?}", &current_inputs);
+    println!(
+        "     -> Processing stage with inputs: {:?}",
+        &current_inputs
+    );
 
     for snap in pick_random(rand, current_snaps, 5) {
         let cmin_tmp_dir = format!("cmin-tmp");
@@ -1028,11 +1029,12 @@ fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     // should match above naming scheme
     // Look for the last and last -2 state's output to get the input.
     let gen_path = Regex::new(&format!(
-            "fitm-gen({}|{}|{})-state\\d+",
-            gen_id + 1,
-            gen_id - 1,
-            if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 }
-        )).unwrap();
+        "fitm-gen({}|{}|{})-state\\d+",
+        gen_id + 1,
+        gen_id - 1,
+        if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 }
+    ))
+    .unwrap();
 
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
     Ok(fs::read_dir("./saved-states/")?
@@ -1100,8 +1102,10 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 pub fn run(
     client_bin: &str,
     client_args: &[&str],
+    client_envs: &[(&str, &str)],
     server_bin: &str,
     server_args: &[&str],
+    server_envs: &[(&str, &str)],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
@@ -1126,7 +1130,7 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1141,7 +1145,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false, client_args)?;
+    tmp.init_run(true, false, client_args, client_envs)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1153,7 +1157,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true, server_args)?;
+    afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
@@ -1199,7 +1203,7 @@ pub fn run(
         }
 
         println!(
-            "     [*] Queue before process_stage contains: {:?}",
+            "==== [*] Queue before process_stage contains: {:?} ====",
             generation_snaps
                 .iter()
                 .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
