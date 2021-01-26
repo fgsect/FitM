@@ -36,7 +36,10 @@ where
         }
     }
     output_idx.sort();
-    output_idx.into_iter().map(|x| input_vec[x].clone()).collect()
+    output_idx
+        .into_iter()
+        .map(|x| input_vec[x].clone())
+        .collect()
 }
 
 pub fn clear_out() {
@@ -284,15 +287,22 @@ pub fn get_filesize(path: &PathBuf) -> u64 {
     metadata.len()
 }
 
-/// Has a Rand field, that can be used to get random values
-// #[cfg(feature = "std")]
-#[inline]
 /// Gets current nanoseconds since UNIX_EPOCH
+#[inline]
 pub fn current_nanos() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos() as u64
+}
+
+/// Gets current milliseconds since UNIX_EPOCH
+#[inline]
+pub fn current_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
 /// see https://arxiv.org/pdf/2002.11331.pdf

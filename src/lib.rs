@@ -328,6 +328,8 @@ impl FITMSnapshot {
             "==== [*] Running snapshot run on {} for input: \"{}\" ====",
             self.state_path, stdin_path
         );
+        let start_millis = utils::current_millis();
+
         let _ = io::stdout().flush();
 
         let exit_code = NamespaceContext::new()
@@ -390,7 +392,13 @@ impl FITMSnapshot {
             fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
                 .expect("Failed to reinitialize ./next_snapshot");
             utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
-        }
+            println!(
+                "         ^-> finished after {} millis",
+                utils::current_millis() - start_millis
+            );
+        } /* else {
+              panic!("Snapshot creation failed");
+          }*/
 
         Ok(success)
     }
@@ -465,7 +473,11 @@ impl FITMSnapshot {
                     // Give criu forkserver up to a minute to spawn
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
                     .env("FITM_CREATE_OUTPUTS", "1")
+                    // this will split up multi-byte compares.
+                    // The map gets denser, but we also not get stuck as easily
                     .env("AFL_COMPCOV_LEVEL", "2")
+                    // We don't want afl to shorten our inputs, ever.
+                    .env("AFL_NO_TRIM", "1")
                     .spawn()?
                     .wait()?;
 
@@ -500,7 +512,7 @@ impl FITMSnapshot {
                         || line.starts_with("unique_hangs")
                         || line.starts_with("cycles_done")
                     {
-                        println!("{}", line);
+                        println!("         -> {}", line);
                     }
                 }
             }
@@ -719,9 +731,12 @@ impl FITMSnapshot {
         let output_dir = build_create_absolute_path(output_dir)
             .expect("[!] Error while constructing absolute output_dir path");
 
-        // Make sure we always have at least dummy input (even if the other side finished)
-        let mut dummy_file = File::create(&format!("{}/dummy", &input_dir))?;
-        dummy_file.write_all(b"dummy")?;
+        // Make sure we always have at least a single input (even if the other side finished)
+        if fs::read_dir(&input_dir).unwrap().next().is_none() {
+            println!("     [!] We did not receive any input from prior runs. Placing nop.");
+            let mut dummy_file = File::create(&format!("{}/nop_input", &input_dir))?;
+            dummy_file.write_all(b"nop")?;
+        }
 
         // Spawn the afl run in a command. This run is relative to the state dir
         // meaning we already are inside the directory. This prevents us from
@@ -836,6 +851,11 @@ pub fn process_stage(
     run_time: &Duration,
 ) -> Result<Vec<FITMSnapshot>, io::Error> {
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
+
+    println!(
+        "     -> Processing stage with inputs: {:?}",
+        &current_inputs
+    );
 
     for snap in pick_random(rand, current_snaps, 5) {
         let cmin_tmp_dir = format!("cmin-tmp");
@@ -1007,8 +1027,15 @@ fn build_create_absolute_path(relative: &str) -> Result<String, io::Error> {
 /// @return: List of paths, one path per output per state
 fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     // should match above naming scheme
-    // Look for the last state's output to get the input.
-    let gen_path = Regex::new(&format!("fitm-gen{}-state\\d+", gen_id - 1)).unwrap();
+    // Look for the last and last -2 state's output to get the input.
+    let gen_path = Regex::new(&format!(
+        "fitm-gen({}|{}|{})-state\\d+",
+        gen_id + 1,
+        gen_id - 1,
+        if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 }
+    ))
+    .unwrap();
+
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
     Ok(fs::read_dir("./saved-states/")?
         .into_iter()
@@ -1075,10 +1102,8 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 pub fn run(
     client_bin: &str,
     client_args: &[&str],
-    client_envs: &[(&str, &str)],
     server_bin: &str,
     server_args: &[&str],
-    server_envs: &[(&str, &str)],
     run_time: &Duration,
 ) -> Result<(), io::Error> {
     // A lot of timeout for now
@@ -1103,7 +1128,7 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
+    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1118,7 +1143,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false, client_args, client_envs)?;
+    tmp.init_run(true, false, client_args)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1130,7 +1155,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
+    afl_server.pid = afl_server.init_run(false, true, server_args)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1)?.len(), 0);
@@ -1161,7 +1186,7 @@ pub fn run(
             println!("Restarting fuzzing from gen 1 because of randomness");
         }
 
-        println!("Fuzzing Gen {}", current_gen);
+        println!("---> Fuzzing Gen {}", current_gen);
 
         // outputs of current gen (i.e. client) --> inputs[current_gen+1] (i.e. server)
         let next_other_gen = current_gen + 1;
@@ -1176,7 +1201,7 @@ pub fn run(
         }
 
         println!(
-            "Queue before process_stage contains: {:?}",
+            "     [*] Queue before process_stage contains: {:?}",
             generation_snaps
                 .iter()
                 .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
