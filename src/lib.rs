@@ -854,6 +854,8 @@ pub fn process_stage(
 ) -> Result<Vec<FITMSnapshot>, io::Error> {
     let mut next_own_snaps: Vec<FITMSnapshot> = vec![];
 
+    println!("     -> Processing stage with inputs: {:?}", &current_inputs);
+
     for snap in pick_random(rand, current_snaps, 5) {
         let cmin_tmp_dir = format!("cmin-tmp");
 
