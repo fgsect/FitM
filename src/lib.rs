@@ -394,9 +394,9 @@ impl FITMSnapshot {
                 "         ^-> finished after {} millis",
                 utils::current_millis() - start_millis
             );
-        } else {
+        } /* else {
             panic!("Snapshot creation failed");
-        }
+        }*/
 
         Ok(success)
     }
@@ -1025,16 +1025,12 @@ fn build_create_absolute_path(relative: &str) -> Result<String, io::Error> {
 fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
     // should match above naming scheme
     // Look for the last and last -2 state's output to get the input.
-    let gen_path = if gen_id > 3 {
-        Regex::new(&format!(
-            "fitm-gen[{}{}]-state\\d+",
+    let gen_path = Regex::new(&format!(
+            "fitm-gen({}|{}|{})-state\\d+",
+            gen_id + 1,
             gen_id - 1,
-            gen_id - 3
-        ))
-        .unwrap()
-    } else {
-        Regex::new(&format!("fitm-gen{}-state\\d+", gen_id - 1)).unwrap()
-    };
+            if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 }
+        )).unwrap();
 
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
     Ok(fs::read_dir("./saved-states/")?
