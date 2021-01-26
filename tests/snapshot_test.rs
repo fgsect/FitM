@@ -2,8 +2,8 @@ use fitm::FITMSnapshot;
 mod common;
 
 use crate::common::teardown;
-use std::time::Duration;
 use fitm::utils;
+use std::time::Duration;
 
 static SERVER_BIN: &str = "./tests/targets/pseudoserver_simple";
 #[allow(dead_code)]

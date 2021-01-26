@@ -72,8 +72,7 @@ impl NamespaceContext {
     pub fn new() -> Self {
         NamespaceContext {
             init_fn: Box::new(|| {
-
-            // mount("none","/", None, libc::MS_REC | libc::MS_PRIVATE, None); // Make / private (meaning changes wont propagate to the default namespace)
+                // mount("none","/", None, libc::MS_REC | libc::MS_PRIVATE, None); // Make / private (meaning changes wont propagate to the default namespace)
                 mount("none", "/proc", None, libc::MS_REC | libc::MS_PRIVATE, None)
                     .expect("mounting proc private failed");
                 mount(
