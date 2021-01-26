@@ -8,6 +8,7 @@ use crate::namespacing::NamespaceContext;
 use crate::utils::RomuRand;
 use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
 use regex::Regex;
+use std::ffi::OsString;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
 use std::time::Duration;
@@ -22,6 +23,9 @@ pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 pub const SAVED_STATES: &str = "saved-states";
 pub const ABORT_THRESHOLD: f64 = 0.98;
+// 0 means exact match, 1 means no similarity
+// as we want to exclude "almost"-exact matches we need to exclude anything below this threshold
+pub const JARO_DISTANCE_THRESHOLD: f64 = 0.01;
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
@@ -578,6 +582,10 @@ impl FITMSnapshot {
             .code()
             .unwrap();
 
+        if self.state_path == "fitm-gen2-state0" {
+            sleep(Duration::from_millis(0));
+        }
+
         if exit_status != 0 {
             let info =
                 "[!] Error during create_outputs execution. Please check latest statefolder for output";
@@ -896,41 +904,48 @@ pub fn process_stage(
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
         // TODO: (Otto?) ignore inputs by output, according to jaro distance
-        /*
-        let mut other_outputs: Vec<String> = &[
-            // input_file_list_for_gen(snap.generation + 1);
-            input_file_list_for_gen(snap.generation - 1);
-            input_file_list_for_gen(snap.generation - 3);
-        ].flatten().map(|x| fs::read_to_string(x)).collect();
 
-        'file_loop: for entry in fs::read_dir(&outputs)? {
+        let mut other_outputs: Vec<String> =
+            input_file_list_for_gen((snap.generation - 3) as usize)?
+                .iter()
+                .map(|x| fs::read_to_string(x).expect("[!] Failed to map input_list"))
+                .collect();
+        let mut ignored_outputs: Vec<OsString> = vec![];
 
-            let own_output = fs::read_to_string(entry);
+        for entry in fs::read_dir(&outputs)? {
+            let entry = entry.unwrap();
+            let entry_path = entry.path();
+            let entry_file_name = entry.file_name();
+            let own_output = {
+                fs::read_to_string(entry_path)
+                    .expect("[!] Could not read own_output while calculating jaro distance")
+            };
 
             // read all outputs of gen, gen -2, gen -4
             // one man's input is the other man's output
             // So we read at +1, -1, -3
-            for other_output in other_outputs {
-                let sim = strsim::jaro_against_vec(own_output, other_outputs)
-                if sim > JARO_SIMILARITY_IGNORE {
-                    // compare this output to each,
-                    // if jaro > 0.9, don't copy
-                    other_outputs.append(own_output);
-                    continue 'file_loop
-                }
+            if other_outputs
+                .iter()
+                .any(|x| strsim::jaro(x, &own_output) < JARO_DISTANCE_THRESHOLD)
+            {
+                ignored_outputs.push(entry_file_name);
+            } else {
+                // The output path always starts with uuid`-`, then continues with the input filename
+                other_outputs.push(own_output);
             }
-            // The output path always starts with uuid`-`, then continues with the input filename
-            let input_filename = entry.pathname.os_string().to....split("-", 1);
-            other_outputs.append(own_output);
-            // else, copy
-            fs::copy(entry, snapshot_dir)
         }
-        */
 
         let absolut_cmin_post_exec = build_create_absolute_path(&cmin_post_exec)
             .expect("[!] Error while constructing absolute input_dir path");
         for entry in fs::read_dir(&absolut_cmin_post_exec)? {
             let entry = entry?;
+            if ignored_outputs.contains(&entry.file_name()) {
+                println!(
+                    "==== [*] Skipping output {:?} on snapshot creation ====",
+                    &entry.file_name()
+                );
+                continue;
+            }
             if entry.path().is_file() {
                 // get the next id: current start + amount of snapshots we created in the meantime
                 let state_id = next_gen_id_start + next_own_snaps.len();
