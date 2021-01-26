@@ -161,7 +161,7 @@ int fitm_out_fd = -1;
 FILE *fitm_in_file = NULL;
 // For some targets (e.g. live555) we want to discard the first n recv calls
 // This variable configures how many recvs are skipped
-int recv_ctr = 0;
+bool count_recvs = true;
 int init_recv_skip = 0;
 
 
@@ -2515,10 +2515,12 @@ static void fitm_ensure_initialized(void) {
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
-        // Ignore any possible error
-        char* init_recv_skip_tmp = getenv_from_file("INIT_RECV_SKIP");
-        if(init_recv_skip_tmp){
-            init_recv_skip = atoi(init_recv_skip_tmp);
+        if (count_recvs){
+            // Ignore any possible error
+            char* init_recv_skip_tmp = getenv_from_file("INIT_RECV_SKIP");
+            if(init_recv_skip_tmp){
+                init_recv_skip = atoi(init_recv_skip_tmp);
+            }
         }
 
         if (create_outputs) {
@@ -2603,7 +2605,6 @@ fail:
 }
 
 static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
-    recv_ctr += 1;
     if (unlikely(fd != FITM_FD)) {
         printf("[FITM] BUG: fitm_read may only be called with FITM_FD\n");
         _exit(-1);
@@ -2616,10 +2617,12 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);
-        } else if (timewarp_mode && recv_ctr <= init_recv_skip) {
+        } else if (timewarp_mode && init_recv_skip > 0) {
+            init_recv_skip -= 1;
             FDBG("fitm_read: skipping recv by returning empty string\n");
             return 0;
-        } else if (timewarp_mode && recv_ctr > init_recv_skip){
+        } else if (timewarp_mode && init_recv_skip == 0){
+            count_recvs = false;
             sent = false; // After restore, we'll await the next sent before criuin' again
 
             create_pipes_file();
@@ -2690,7 +2693,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         // We lose bugs in teardown code but fuzzing works
         printf("[QEMU] No more fuzzing input. Exiting now.\n");
         fflush(stdout);
-        _exit(0);
+        // FOR FTP USE THIS:
+         _exit(0);
     };
     FDBG("read: %d bytes with msg: %s\n", ret, msg);
     // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
