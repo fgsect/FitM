@@ -1164,6 +1164,13 @@ pub fn run(
             generation_snaps.push(vec![])
         }
 
+        println!(
+            "Queue before process_stage contains: {:?}",
+            generation_snaps
+                .iter()
+                .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>()
+        );
         // In each generation, IDs are simply numbered
         let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
@@ -1177,10 +1184,10 @@ pub fn run(
         generation_snaps[next_own_gen].append(&mut next_snaps);
         println!(
             "Queue after process_stage contains: {:?}",
-            generation_snaps[next_own_gen]
+            generation_snaps
                 .iter()
-                .map(|x| x.state_path.as_str())
-                .collect::<Vec<_>>()
+                .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>()
         );
     }
 }
