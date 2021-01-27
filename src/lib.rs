@@ -1216,7 +1216,7 @@ pub fn run(
         current_gen = current_gen + 1;
         if generation_snaps[current_gen].len() == 0 {
             println!(
-                "No snapshots (yet) for gen {}, restarting with gen 1 (initial server)",
+                "No snapshots (yet) for gen {}, restarting with gen 1 (initial request)",
                 current_gen
             );
             // Restart with gen 1 -> the client at gen 0 does not accept input.
