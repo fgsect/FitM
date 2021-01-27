@@ -21,7 +21,6 @@ debug:
 
 run: tests debug
 	sudo rm -rf ./active-state
-	sudo rm -rf ./saved-states
 	sudo rm -rf ./cmin-tmp
 	sudo ./target/debug/fitm
 	sudo chown -R $(USER) ./active_state
