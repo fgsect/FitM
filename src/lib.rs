@@ -232,6 +232,7 @@ impl FITMSnapshot {
     /// binaries
     pub fn init_run(
         &self,
+        rand: &mut RomuRand,
         create_outputs: bool,
         create_snapshot: bool,
         cli_args: &[&str],
@@ -256,7 +257,8 @@ impl FITMSnapshot {
                 fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
 
                 // Force the target PID to be in the Order of ~16k (high, but not hither than a normal pid_max)
-                advance_pid(1 << 14);
+                // Also use a small range of random PIDs to allow for running multiple FITM instances
+                advance_pid((1 << 14) + rand.below(9001));
 
                 // Open a file for stdout and stderr to log to
                 let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
@@ -1180,7 +1182,8 @@ pub fn run(
     );
 
     // first create a snapshot, without outputs
-    afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
+    afl_client_snap.pid =
+        afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
     // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
     // (to gen0-state0/outputs)
     // we just need tmp to create outputs
@@ -1195,7 +1198,7 @@ pub fn run(
         false,
         None,
     );
-    tmp.init_run(true, false, client_args, client_envs)?;
+    tmp.init_run(&mut rand, true, false, client_args, client_envs)?;
 
     let mut afl_server: FITMSnapshot = FITMSnapshot::new(
         1,
@@ -1207,7 +1210,7 @@ pub fn run(
         false,
         None,
     );
-    afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
+    afl_server.pid = afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
 
     // We need initial outputs from the client, else something went wrong
     assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
