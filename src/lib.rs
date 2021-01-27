@@ -8,13 +8,13 @@ use crate::namespacing::NamespaceContext;
 use crate::utils::RomuRand;
 use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::fs::remove_dir_all;
+use std::result::Result;
 use std::thread::sleep;
 use std::time::Duration;
-use std::result::Result;
 use termion::{color, style};
-use serde::{Serialize, Deserialize};
 
 pub mod namespacing;
 pub mod utils;
@@ -1146,7 +1146,9 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
 }
 
 /// We try to restore, let's see how it goes.
-pub fn save_restore_generation_state(generation_snaps: &Vec<Vec<FITMSnapshot>>) -> Result<(), io::Error> {
+pub fn save_restore_generation_state(
+    generation_snaps: &Vec<Vec<FITMSnapshot>>,
+) -> Result<(), io::Error> {
     let mut file = File::create("fitm-state.json")?;
     file.write_all(serde_json::to_string(generation_snaps)?.as_bytes())
 }
@@ -1189,29 +1191,31 @@ pub fn run(
     ensure_dir_exists(&generation_input_dir(1));
 
     // Try to restore the last state.
-    let restored_state: Option<Vec<Vec<FITMSnapshot>>> = match fs::read_to_string("fitm-state.json") {
-        Ok(fitm_json) => {
-            match serde_json::from_str(&fitm_json) {
-                Ok(state) => Some(state),
-                Err(e) => {
-                    println!("No fitm-state.json ({})", e);
-                    None
-                },
+    let restored_state: Option<Vec<Vec<FITMSnapshot>>> = match fs::read_to_string("fitm-state.json")
+    {
+        Ok(fitm_json) => match serde_json::from_str(&fitm_json) {
+            Ok(state) => Some(state),
+            Err(e) => {
+                println!("No fitm-state.json ({})", e);
+                None
             }
         },
         Err(e) => {
             println!("File fitm-state.json not found ({})", e);
             None
-        },
+        }
     };
 
     let mut generation_snaps: Vec<Vec<FITMSnapshot>> = match restored_state {
         Some(snaps) => {
-            println!("{}Resuming run with with {} generations{}",
-            color::Fg(color::Green), snaps.len() - 1, style::Reset);
+            println!(
+                "{}Resuming run with with {} generations{}",
+                color::Fg(color::Green),
+                snaps.len() - 1,
+                style::Reset
+            );
             snaps
-
-        },
+        }
         None => {
             println!("No valid state to resume. Starting fresh :)");
 
@@ -1228,7 +1232,8 @@ pub fn run(
             );
 
             // first create a snapshot, without outputs
-            afl_client_snap.pid = afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
+            afl_client_snap.pid =
+                afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
             // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
             // (to gen0-state0/outputs)
             // we just need tmp to create outputs
@@ -1255,7 +1260,8 @@ pub fn run(
                 false,
                 None,
             );
-            afl_server.pid = afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
+            afl_server.pid =
+                afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
 
             // We need initial outputs from the client, else something went wrong
             assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
@@ -1269,7 +1275,6 @@ pub fn run(
             generation_snaps.push(vec![afl_client_snap]);
 
             generation_snaps
-
         }
     };
 
@@ -1287,19 +1292,26 @@ pub fn run(
             current_gen = 1;
         }
 
-
         // occasionally, stop going deeper, and go back to 0
         if current_gen != 1 && (rand.below(1000) as f64 / 1000.0) > ABORT_THRESHOLD {
-            println!("Restarting fuzzing from gen 1 because of randomness (threshold {})", ABORT_THRESHOLD);
+            println!(
+                "Restarting fuzzing from gen 1 because of randomness (threshold {})",
+                ABORT_THRESHOLD
+            );
             current_gen = 1;
         }
 
         // We wrapped around (or started fresh) -> next round
-        if current_gen == 1 { round += 1; }
+        if current_gen == 1 {
+            round += 1;
+        }
 
         // occasionally, skip a step (unless we're in the first run)
-        if round != 1  && (rand.below(1000) as f64 / 1000.0) > SKIP_STEP_THRESHOLD {
-            println!("Skiping gen {} by random chance (threshold {})", current_gen, SKIP_STEP_THRESHOLD);
+        if round != 1 && (rand.below(1000) as f64 / 1000.0) > SKIP_STEP_THRESHOLD {
+            println!(
+                "Skiping gen {} by random chance (threshold {})",
+                current_gen, SKIP_STEP_THRESHOLD
+            );
             continue;
         }
 
@@ -1351,7 +1363,12 @@ pub fn run(
 
         match save_restore_generation_state(&generation_snaps) {
             Ok(()) => (),
-            Err(e) => println!("{}==== [!] Could not save state :( ({:?}){}", color::Fg(color::Red), e, style::Reset),
+            Err(e) => println!(
+                "{}==== [!] Could not save state :( ({:?}){}",
+                color::Fg(color::Red),
+                e,
+                style::Reset
+            ),
         };
     }
 }
