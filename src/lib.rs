@@ -22,7 +22,7 @@ pub mod utils;
 /// If randomness is higher than this theshold, we continue with the next round
 pub const ABORT_THRESHOLD: f64 = 0.98;
 /// If randomness is higher than this theshold, we skip a step
-pub const SKIP_STEP_THRESHOLD: f64 = 0.99;
+pub const SKIP_STEP_THRESHOLD: f64 = 0.93;
 /// Theshold, when an output should be considered too similar to all others for snapshot creation.
 /// 1.0 means exact match, 0.0 means no similarity
 /// as we want to exclude "almost"-exact matches we need to exclude anything above this threshold
@@ -239,6 +239,7 @@ impl FITMSnapshot {
     /// binaries
     pub fn init_run(
         &self,
+        rand: &mut RomuRand,
         create_outputs: bool,
         create_snapshot: bool,
         cli_args: &[&str],
@@ -263,7 +264,8 @@ impl FITMSnapshot {
                 fs::create_dir(&snapshot_dir).expect("[-] Could not create snapshot dir!");
 
                 // Force the target PID to be in the Order of ~16k (high, but not hither than a normal pid_max)
-                advance_pid(1 << 14);
+                // Also use a small range of random PIDs to allow for running multiple FITM instances
+                advance_pid((1 << 14) + rand.below(9001));
 
                 // Open a file for stdout and stderr to log to
                 let (stdout, stderr) = (fs::File::create("stdout")?, fs::File::create("stderr")?);
@@ -930,10 +932,9 @@ pub fn process_stage(
         let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
-        // TODO: (Otto?) ignore inputs by output, according to jaro distance
-
+        // we pass false for next gens for input_file list as we don't want to compare againt the current gen
         let mut other_outputs: Vec<Vec<u8>> =
-            input_file_list_for_gen((snap.generation - 1) as usize)?
+            input_file_list_for_gen((snap.generation - 1) as usize, false)?
                 .iter()
                 .map(|x| fs::read(x).expect("[!] Failed to map input_list"))
                 .collect();
@@ -1060,16 +1061,28 @@ fn build_create_absolute_path(relative: &str) -> Result<String, io::Error> {
 /// the snapshots of this generation. Starts with 0 for each X
 /// @param gen_id: The generation for which to get all inputs
 /// @return: List of paths, one path per output per state
-fn input_file_list_for_gen(gen_id: usize) -> Result<Vec<PathBuf>, io::Error> {
+fn input_file_list_for_gen(gen_id: usize, use_future_gen: bool) -> Result<Vec<PathBuf>, io::Error> {
     // should match above naming scheme
     // Look for the last and last -2 state's output to get the input.
-    let gen_path = Regex::new(&format!(
-        "fitm-gen({}|{}|{})-state\\d+",
-        gen_id + 1,
-        if gen_id >= 1 { gen_id - 1 } else { gen_id + 1 },
-        if gen_id >= 3 { gen_id - 3 } else { gen_id + 1 },
-    ))
-    .unwrap();
+    let gen_path = if use_future_gen {
+        Regex::new(&format!(
+            "fitm-gen({}|{}|{})-state\\d+",
+            gen_id + 1,
+            if gen_id >= 1 { gen_id - 1 } else { gen_id + 1 },
+            if gen_id >= 3 { gen_id - 3 } else { gen_id + 1 },
+        ))
+        .unwrap()
+    } else if gen_id == 0 {
+        // Without use_future_gen there is no input to get for gen 0
+        return Ok(vec![]);
+    } else {
+        Regex::new(&format!(
+            "fitm-gen({}|{})-state\\d+",
+            gen_id - 1,
+            if gen_id >= 3 { gen_id - 3 } else { gen_id - 1 },
+        ))
+        .unwrap()
+    };
 
     // Using shell like globs would make this much easier: https://docs.rs/globset/0.4.6/globset/
     Ok(fs::read_dir("./saved-states/")?
@@ -1215,7 +1228,7 @@ pub fn run(
             );
 
             // first create a snapshot, without outputs
-            afl_client_snap.pid = afl_client_snap.init_run(false, true, client_args, client_envs)?;
+            afl_client_snap.pid = afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
             // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
             // (to gen0-state0/outputs)
             // we just need tmp to create outputs
@@ -1230,7 +1243,7 @@ pub fn run(
                 false,
                 None,
             );
-            tmp.init_run(true, false, client_args, client_envs)?;
+            tmp.init_run(&mut rand, true, false, client_args, client_envs)?;
 
             let mut afl_server: FITMSnapshot = FITMSnapshot::new(
                 1,
@@ -1242,10 +1255,10 @@ pub fn run(
                 false,
                 None,
             );
-            afl_server.pid = afl_server.init_run(false, true, server_args, server_envs)?;
+            afl_server.pid = afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
 
             // We need initial outputs from the client, else something went wrong
-            assert_ne!(input_file_list_for_gen(1)?.len(), 0);
+            assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
 
             let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
             // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
@@ -1322,7 +1335,7 @@ pub fn run(
         let mut next_snaps = process_stage(
             &mut rand,
             &generation_snaps[current_gen],
-            &input_file_list_for_gen(current_gen)?,
+            &input_file_list_for_gen(current_gen, true)?,
             next_gen_id_start,
             &run_time,
         )?;
