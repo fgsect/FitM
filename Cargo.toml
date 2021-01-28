@@ -15,3 +15,4 @@ json = "0.12.4"
 termion = "1.5.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+chrono = "0.4.19"
