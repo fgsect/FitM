@@ -1179,7 +1179,11 @@ pub fn get_traces(gen_id: u32) -> io::Result<Option<Vec<String>>> {
     if traces_vec.len() > 0 {
         Ok(Some(traces_vec))
     } else {
-        println!("{}No other traces found!{}", color::Fg(color::Yellow), style::Reset);
+        println!(
+            "{}No other traces found!{}",
+            color::Fg(color::Yellow),
+            style::Reset
+        );
         Ok(None)
     }
 }
