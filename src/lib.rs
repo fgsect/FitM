@@ -829,7 +829,7 @@ impl FITMSnapshot {
                 let exit_status = child.wait()?;
                 Ok(exit_status.code().unwrap())
             })
-            .expect("[!] Namespace creation failed")
+            .expect("[!] Namespace creation failed - missing sudo or capabilities?")
             .wait()
             .expect("[!] Namespace wait failed")
             .code()
