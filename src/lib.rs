@@ -7,13 +7,14 @@ use std::{env, fmt};
 use crate::namespacing::NamespaceContext;
 use crate::utils::RomuRand;
 use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
+use chrono::Local;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::fs::remove_dir_all;
 use std::result::Result;
 use std::thread::sleep;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use termion::{color, style};
 
 pub mod namespacing;
@@ -954,7 +955,7 @@ pub fn process_stage(
         println!(
             "==== [*] Time start output_minimization {}: {:?} ====",
             snap.state_path,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
         for entry in fs::read_dir(&outputs)? {
             let entry = entry.unwrap();
@@ -981,7 +982,7 @@ pub fn process_stage(
         println!(
             "==== [*] Time end output_minimization {}: {:?} ====",
             snap.state_path,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
 
         let absolut_cmin_post_exec = build_create_absolute_path(&cmin_post_exec)
@@ -1034,7 +1035,7 @@ pub fn process_stage(
         println!(
             "==== [*] Time end snapshot creation (all) {}: {:?} ====",
             snap.state_path,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
 
         fs::remove_dir_all(format!("{}/.traces", &absolut_cmin_post_exec))
@@ -1262,7 +1263,10 @@ pub fn run(
         None => {
             println!("No valid state to resume. Starting fresh :)");
 
-            println!("==== [*] Time start init_run: {:?} ====", SystemTime::now());
+            println!(
+                "==== [*] Time start init_run: {} ====",
+                Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+            );
             // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
             let mut afl_client_snap: FITMSnapshot = FITMSnapshot::new(
                 2,
@@ -1307,7 +1311,10 @@ pub fn run(
             afl_server.pid =
                 afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
 
-            println!("==== [*] Time end init_run: {:?} ====", SystemTime::now());
+            println!(
+                "==== [*] Time end init_run: {:?} ====",
+                Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+            );
 
             // We need initial outputs from the client, else something went wrong
             assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
@@ -1392,7 +1399,7 @@ pub fn run(
         println!(
             "==== [*] Time start process_stage gen {}: {:?} ====",
             current_gen,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
         let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
@@ -1405,7 +1412,7 @@ pub fn run(
         println!(
             "==== [*] Time end process_stage gen {}: {:?} ====",
             current_gen,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
 
         generation_snaps[next_own_gen].append(&mut next_snaps);
