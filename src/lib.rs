@@ -13,7 +13,7 @@ use std::ffi::OsString;
 use std::fs::remove_dir_all;
 use std::result::Result;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use termion::{color, style};
 
 pub mod namespacing;
@@ -890,6 +890,12 @@ pub fn process_stage(
     );
 
     for snap in pick_random(rand, current_snaps, 5) {
+        println!(
+            "==== [*] Time start process_stage loop step {}: {:?} ====",
+            snap.state_path,
+            SystemTime::now()
+        );
+
         let cmin_tmp_dir = format!("cmin-tmp");
 
         // remove old tmp if it exists, then recreate
@@ -940,6 +946,11 @@ pub fn process_stage(
                 .collect();
         let mut ignored_outputs: Vec<OsString> = vec![];
 
+        println!(
+            "==== [*] Time start output_minimization {}: {:?} ====",
+            snap.state_path,
+            SystemTime::now()
+        );
         for entry in fs::read_dir(&outputs)? {
             let entry = entry.unwrap();
             let entry_path = entry.path();
@@ -962,6 +973,11 @@ pub fn process_stage(
                 other_outputs.push(own_output);
             }
         }
+        println!(
+            "==== [*] Time end output_minimization {}: {:?} ====",
+            snap.state_path,
+            SystemTime::now()
+        );
 
         let absolut_cmin_post_exec = build_create_absolute_path(&cmin_post_exec)
             .expect("[!] Error while constructing absolute input_dir path");
@@ -1009,6 +1025,12 @@ pub fn process_stage(
                 }
             }
         }
+
+        println!(
+            "==== [*] Time end snapshot creation (all) {}: {:?} ====",
+            snap.state_path,
+            SystemTime::now()
+        );
 
         fs::remove_dir_all(format!("{}/.traces", &absolut_cmin_post_exec))
             .expect("[!] Could not remove .traces after saving program maps");
@@ -1219,6 +1241,7 @@ pub fn run(
         None => {
             println!("No valid state to resume. Starting fresh :)");
 
+            println!("==== [*] Time start init_run: {:?} ====", SystemTime::now());
             // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
             let mut afl_client_snap: FITMSnapshot = FITMSnapshot::new(
                 2,
@@ -1262,6 +1285,8 @@ pub fn run(
             );
             afl_server.pid =
                 afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
+
+            println!("==== [*] Time end init_run: {:?} ====", SystemTime::now());
 
             // We need initial outputs from the client, else something went wrong
             assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
@@ -1343,6 +1368,11 @@ pub fn run(
                 .collect::<Vec<Vec<_>>>()
         );
         // In each generation, IDs are simply numbered
+        println!(
+            "==== [*] Time start process_stage gen {}: {:?} ====",
+            current_gen,
+            SystemTime::now()
+        );
         let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
             &mut rand,
@@ -1351,6 +1381,11 @@ pub fn run(
             next_gen_id_start,
             &run_time,
         )?;
+        println!(
+            "==== [*] Time end process_stage gen {}: {:?} ====",
+            current_gen,
+            SystemTime::now()
+        );
 
         generation_snaps[next_own_gen].append(&mut next_snaps);
         println!(
