@@ -899,7 +899,7 @@ pub fn process_stage(
         println!(
             "==== [*] Time start process_stage loop step {}: {:?} ====",
             snap.state_path,
-            SystemTime::now()
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
 
         let cmin_tmp_dir = format!("cmin-tmp");
