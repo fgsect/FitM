@@ -403,6 +403,11 @@ impl FITMSnapshot {
                 &format!("./{}/snapshot", ACTIVE_STATE),
             )
             .expect("Failed to move folder");
+            // We need to store the prev input, as it may get deleted from the prev generation through minimization.
+            fs::copy(&format!("./{}/prev_input", ACTIVE_STATE), stdin_path)
+                .expect("Could not copy file :(");
+            fs::write(&format!("./{}/prev_input_path", ACTIVE_STATE), stdin_path)
+                .expect("Could not store prev_input_path");
             fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
                 .expect("Failed to reinitialize ./next_snapshot");
             utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
@@ -954,7 +959,7 @@ pub fn process_stage(
             // So we read at +1, -1, -3
             if other_outputs
                 .iter()
-                .any(|x| utils::jaro(x, &own_output) > JARO_DISTANCE_THRESHOLD)
+                .any(|x| utils::output_similarity(x, &own_output) > JARO_DISTANCE_THRESHOLD)
             {
                 ignored_outputs.push(entry_file_name);
             } else {
