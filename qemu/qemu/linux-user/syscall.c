@@ -2524,7 +2524,7 @@ static void fitm_ensure_initialized(void) {
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
-        fitm_replay = getenv("FITM_REPLAY");
+        fitm_replay = getenv("FITM_REPLAY") && *getenv("FITM_REPLAY");
 
         if (count_recvs){
             // Ignore any possible error
@@ -2633,14 +2633,16 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
     size_t loc = AFL_MAP_READ;
     INC_AFL_AREA(loc);
 
-    if (init_recv_skip > 0) {
-        init_recv_skip -= 1;
-        FDBG("fitm_read: skipping recv by returning empty string\n");
-        return 0;
-    }
 
     // If we sent something, and hit the next recv, either snapshot, or exit.
-    if(sent) {
+    if(sent || unlikely(!fitm_in_file)) {
+
+        if (init_recv_skip > 0) {
+            init_recv_skip -= 1;
+            FDBG("fitm_read: skipping recv by returning empty string\n");
+            return 0;
+        }
+
         if (fitm_replay) {
             char* input = getenv_from_file("INPUT_FILENAME");
             fitm_in_file = fitm_open_input_file(input);
@@ -2714,10 +2716,6 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
             fitm_in_file = fitm_open_input_file(input);
         }
-    }
-
-    if (!fitm_in_file) {
-        return 0;
     }
 
     int ret = fread(msg, 1, len, fitm_in_file);
