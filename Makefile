@@ -1,16 +1,20 @@
-.PHONY: all afl qemu criu fitm debug tests
+.PHONY: all afl qemu criu fitm debug tests subinit
 
 CRIUPATH?=./criu
 
 all: criu symlink qemu afl
 
-afl:
+subinit:
+	git submodule init
+	git submodule update
+
+afl: subinit
 	make -C ./AFLplusplus
 
-qemu:
+qemu: criu subinit
 	cd ./qemu/qemu/ && ./build-for-afl.sh
 
-criu:
+criu: subinit
 	make -C ./criu
 
 fitm:
