@@ -497,7 +497,7 @@ impl FITMSnapshot {
                     // The map gets denser, but we also not get stuck as easily
                     .env("AFL_COMPCOV_LEVEL", "2")
                     // We don't want afl to shorten our inputs, ever.
-                    .env("AFL_NO_TRIM", "1")
+                    .env("AFL_DISABLE_TRIM", "1")
                     .spawn()?
                     .wait()?;
 
@@ -816,8 +816,8 @@ impl FITMSnapshot {
                     .env("AFL_NO_UI", "1")
                     // Give criu forkserver up to a minute to spawn
                     .env("AFL_FORKSRV_INIT_TMOUT", "60000")
-                    .env("AFL_DEBUG_CHILD_OUTPUT", "1")
-                    .env("AFL_DEBUG", "1")
+                    //.env("AFL_DEBUG_CHILD_OUTPUT", "1")
+                    //.env("AFL_DEBUG", "1")
                     .env("FITM_CREATE_OUTPUTS", "1");
 
                 // Don't keep traces BEFORE fuzzing, only afterwards.
