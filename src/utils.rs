@@ -363,6 +363,22 @@ impl RomuRand {
     }
 }
 
+/// The similarity of this output. 0 -> not similar, 1.0 -> very.
+/// As improvement to JARO, we ignore very different lengths.
+pub fn output_similarity(this_output: &[u8], other_output: &[u8]) -> f64 {
+    let this_len = this_output.len();
+    let other_len = other_output.len();
+
+    if this_len > other_len * 2
+        || this_len * 2 > other_len
+        || (this_len > 512 && this_len != other_len)
+    {
+        return 0.0;
+    }
+
+    jaro(this_output, other_output)
+}
+
 /// Calculates the Jaro similarity between two strings. The returned value
 /// is between 0.0 and 1.0 (higher value means more similar).
 ///
@@ -375,7 +391,10 @@ impl RomuRand {
 ///
 pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
     /*
-    This is largely copied from https://crates.io/crates/strsim
+    This is largely copied from
+    https://nicolasdp.github.io/git/src/strsim/lib.rs.html
+    Slightly patched to work on &[u8] instead of str.
+
     LICENSE:
 
     The MIT License (MIT)

@@ -157,6 +157,8 @@ bool create_outputs = true; //TODO: works? getenv_from_file("FITM_CREATE_OUTPUTS
 // If true, please do snapshot.
 // we are restored or snapshottet or something.
 bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
+// If fitm_replay is set, all snapshotting and early exits are disabled. It'll replay a whole input.
+bool fitm_replay = false;
 // live555 server tries to find it's own IP adr by sending & recveiving a multicast packet
 // this results in a recv before the recv that waits for client input
 // this variable should help identify the correct recv call to snapshot by indicating if the recv call
@@ -2522,6 +2524,8 @@ static void fitm_ensure_initialized(void) {
         create_outputs = getenv_from_file("FITM_CREATE_OUTPUTS");
         timewarp_mode = getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 
+        fitm_replay = getenv("FITM_REPLAY");
+
         if (count_recvs){
             // Ignore any possible error
             char* init_recv_skip_tmp = getenv_from_file("INIT_RECV_SKIP");
@@ -2625,18 +2629,31 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
     FDBG("fitm_read called from fitm fd %d for len %ld.\n", fd, len);
     fitm_ensure_initialized();
 
+    // Read is always nice to reach.
+    size_t loc = AFL_MAP_READ;
+    INC_AFL_AREA(loc);
+
+    if (init_recv_skip > 0) {
+        init_recv_skip -= 1;
+        FDBG("fitm_read: skipping recv by returning empty string\n");
+        return 0;
+    }
+
     // If we sent something, and hit the next recv, either snapshot, or exit.
     if(sent) {
-        if (!timewarp_mode) {
+        if (fitm_replay) {
+            char* input = getenv_from_file("INPUT_FILENAME");
+            fitm_in_file = fitm_open_input_file(input);
+        } else if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);
-        } else if (timewarp_mode && init_recv_skip > 0) {
-            init_recv_skip -= 1;
-            FDBG("fitm_read: skipping recv by returning empty string\n");
-            return 0;
-        } else if (timewarp_mode && init_recv_skip == 0){
+        } else if (timewarp_mode){
             count_recvs = false;
             sent = false; // After restore, we'll await the next sent before criuin' again
+
+            // We reached our goal! :)
+            loc = AFL_MAP_READ + 1;
+            INC_AFL_AREA(loc);
 
             create_pipes_file();
 
@@ -2685,6 +2702,10 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
             spawn_forksrv(cpu, timewarp_mode);
 
+            // Make sure all maps contain something, so cmin doesn't kill 'em
+            loc = AFL_MAP_READ + 2;
+            INC_AFL_AREA(loc);
+
             if (unlikely(fitm_in_file != NULL)) {
                 printf("[FITM] BUG: fitm_open_input_file called twice in one run\n");
                 fflush(stdout);
@@ -2693,6 +2714,10 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
             fitm_in_file = fitm_open_input_file(input);
         }
+    }
+
+    if (!fitm_in_file) {
+        return 0;
     }
 
     int ret = fread(msg, 1, len, fitm_in_file);
@@ -2731,8 +2756,6 @@ static abi_long do_recvfrom(CPUState *cpu, int fd, abi_ulong msg, size_t len, in
 
     if (fd == FITM_FD) {
         FDBG("recvfrom for %ld bytes", len);
-        size_t loc = AFL_MAP_READ;
-        INC_AFL_AREA(loc);
         ret = fitm_read(cpu, fd, (char *)host_msg, len);
         unlock_user(host_msg, msg, len);
         return ret;
@@ -6785,8 +6808,11 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
     case TARGET_NR_write:
         
         if (arg1 == FITM_FD) {
+      
             fitm_ensure_initialized();
+
             FDBG("setting sent = true\n");
+            // If we reached write, we're happy. Increase WRITE_ID.
             size_t loc = AFL_MAP_WRITE;
             INC_AFL_AREA(loc);
             sent = true;
