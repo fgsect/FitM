@@ -989,7 +989,7 @@ pub fn process_stage(
                     entry.file_name().into_string().unwrap()
                 );
 
-                match get_traces().unwrap() {
+                match get_traces(snap.generation).unwrap() {
                     // If we have seen the current trace before we don't want to create a new snapshot for this input
                     Some(traces) => {
                         let cur_trace = fs::read_to_string(&trace_file)
@@ -1073,7 +1073,7 @@ fn input_file_list_for_gen(gen_id: usize, use_future_gen: bool) -> Result<Vec<Pa
         Regex::new(&format!(
             "fitm-gen({}|{}|{})-state\\d+",
             gen_id + 1,
-            if gen_id >= 1 { gen_id - 1 } else { gen_id + 1 },
+            if gen_id >= 2 { gen_id - 1 } else { gen_id + 1 },
             if gen_id >= 3 { gen_id - 3 } else { gen_id + 1 },
         ))
         .unwrap()
@@ -1113,9 +1113,20 @@ fn input_file_list_for_gen(gen_id: usize, use_future_gen: bool) -> Result<Vec<Pa
 // We are currently not sure if checking only current gen or all gens for duplicate traces is better
 // Problem: Server & Client may indefinitely bounce "passwd" and "wrong passwd" back and forth
 // without realizing that no new path has been found.
-pub fn get_traces() -> io::Result<Option<Vec<String>>> {
+pub fn get_traces(gen_id: u32) -> io::Result<Option<Vec<String>>> {
     // should match naming scheme explained at `input_file_list_for_gen`
-    let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
+
+    // TODO: Cache this :)
+    // We look up to 3 into the past
+    let gen_path = Regex::new(&format!(
+        "fitm-gen({}|{}|{}|{})-state\\d+",
+        gen_id,
+        if gen_id >= 2 { gen_id - 2 } else { gen_id },
+        if gen_id >= 4 { gen_id - 4 } else { gen_id },
+        if gen_id >= 6 { gen_id - 6 } else { gen_id },
+    ));
+
+    let snapshot_regex = gen_path.unwrap();
     // Collect all snapshot folders in saved-states
     let states_iter = fs::read_dir(SAVED_STATES)
         .expect(&format!(
@@ -1146,6 +1157,7 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
     if traces_vec.len() > 0 {
         Ok(Some(traces_vec))
     } else {
+        println!("{}No other traces found!{}", color::Fg(color::Yellow), style::Reset);
         Ok(None)
     }
 }
