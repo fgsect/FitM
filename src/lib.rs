@@ -404,7 +404,7 @@ impl FITMSnapshot {
             )
             .expect("Failed to move folder");
             // We need to store the prev input, as it may get deleted from the prev generation through minimization.
-            fs::copy(&format!("./{}/prev_input", ACTIVE_STATE), stdin_path)
+            fs::copy(stdin_path, &format!("./{}/prev_input", ACTIVE_STATE))
                 .expect("Could not copy file :(");
             fs::write(&format!("./{}/prev_input_path", ACTIVE_STATE), stdin_path)
                 .expect("Could not store prev_input_path");
