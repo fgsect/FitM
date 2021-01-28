@@ -43,7 +43,7 @@ fn main() {
         "/usr/bin/ftp",
         &["127.0.0.1", "2200"],
         &[("QEMU_STRACE", "1")],
-        &Duration::from_secs(5),
+        &Duration::from_secs(5 * 60),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
