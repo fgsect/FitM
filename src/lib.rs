@@ -1073,7 +1073,7 @@ fn input_file_list_for_gen(gen_id: usize, use_future_gen: bool) -> Result<Vec<Pa
         Regex::new(&format!(
             "fitm-gen({}|{}|{})-state\\d+",
             gen_id + 1,
-            if gen_id >= 2 { gen_id - 1 } else { gen_id + 1 },
+            if gen_id >= 1 { gen_id - 1 } else { gen_id + 1 },
             if gen_id >= 3 { gen_id - 3 } else { gen_id + 1 },
         ))
         .unwrap()
