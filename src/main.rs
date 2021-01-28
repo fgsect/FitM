@@ -37,13 +37,13 @@ fn main() {
     // TODO: use argv to fill these
     // Paths are relative to ACTIVE_DIR
     match fitm::run(
-        "../tests/targets/LightFTP/Source/Release/fftp",
-        &["../tests/targets/LightFTP/fftp.conf"],
+        "../tests/targets/live555/testProgs/testRTSPClient",
+        &["rtsp://127.0.0.1:8554/wavAudioTest"],
         &[("QEMU_STRACE", "1")],
-        "/usr/bin/ftp",
-        &["127.0.0.1", "2200"],
-        &[("QEMU_STRACE", "1")],
-        &Duration::from_secs(5),
+        "../tests/targets/live555/testProgs/testOnDemandRTSPServer",
+        &[""],
+        &[("QEMU_STRACE", "1"), ("INIT_RECV_SKIP", "1")],
+        &Duration::from_secs(1),
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
