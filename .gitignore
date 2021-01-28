@@ -35,3 +35,4 @@ dump
 criu_stderr
 criu_stdout
 debug
+fitm-state.json

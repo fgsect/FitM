@@ -7,32 +7,40 @@ use std::{env, fmt};
 use crate::namespacing::NamespaceContext;
 use crate::utils::RomuRand;
 use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_criu};
+use chrono::Local;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::fs::remove_dir_all;
+use std::result::Result;
 use std::thread::sleep;
 use std::time::Duration;
 use termion::{color, style};
 
 pub mod namespacing;
 pub mod utils;
+
+/// If randomness is higher than this theshold, we continue with the next round
+pub const ABORT_THRESHOLD: f64 = 0.98;
+/// If randomness is higher than this theshold, we skip a step
+pub const SKIP_STEP_THRESHOLD: f64 = 0.93;
+/// Theshold, when an output should be considered too similar to all others for snapshot creation.
+/// 1.0 means exact match, 0.0 means no similarity
+/// as we want to exclude "almost"-exact matches we need to exclude anything above this threshold
+pub const JARO_DISTANCE_THRESHOLD: f64 = 0.98;
+
 // client_set: set of afl-showmap on client outputs that are relevant for us
 // server_set: set of afl-showmap on server outputs that are relevant for us
-
 pub const ORIGIN_STATE_CLIENT: &str = "fitm-gen2-state0";
 pub const ORIGIN_STATE_SERVER: &str = "fitm-gen1-state0";
 pub const ACTIVE_STATE: &str = "active-state";
 pub const SAVED_STATES: &str = "saved-states";
-pub const ABORT_THRESHOLD: f64 = 0.98;
-// 1.0 means no similarity, 0.0 means exact match | Think distance!
-// as we want to exclude "almost"-exact matches we need to exclude anything above this threshold
-pub const JARO_DISTANCE_THRESHOLD: f64 = 0.93;
 
 pub const CRIU_STDOUT: &str = "criu_stdout";
 pub const CRIU_STDERR: &str = "criu_stderr";
 
 /// FITMSnapshot contains all the information for one specific snapshot and fuzz run.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct FITMSnapshot {
     /// The fitm generation (starting with 0 for the initial client)
     pub generation: u32,
@@ -57,7 +65,7 @@ pub struct FITMSnapshot {
     /// Marks if this run is an initial state or not
     pub initial: bool,
     /// Name of the corresponding acitve dir
-    pub origin_state: &'static str,
+    pub origin_state: String,
     /// Pid of the snapshotted process
     pub pid: Option<i32>,
 }
@@ -103,7 +111,7 @@ impl FITMSnapshot {
         from_snapshot: bool,
         pid: Option<i32>,
     ) -> FITMSnapshot {
-        let origin_state = origin_state(server);
+        let origin_state = origin_state(server).to_string();
 
         let state_path = state_path_for(generation, state_id);
 
@@ -147,7 +155,7 @@ impl FITMSnapshot {
             server,
             base_state,
             initial: false,
-            origin_state: origin_state,
+            origin_state,
             pid,
         };
 
@@ -396,6 +404,11 @@ impl FITMSnapshot {
                 &format!("./{}/snapshot", ACTIVE_STATE),
             )
             .expect("Failed to move folder");
+            // We need to store the prev input, as it may get deleted from the prev generation through minimization.
+            fs::copy(stdin_path, &format!("./{}/prev_input", ACTIVE_STATE))
+                .expect("Could not copy file :(");
+            fs::write(&format!("./{}/prev_input_path", ACTIVE_STATE), stdin_path)
+                .expect("Could not store prev_input_path");
             fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
                 .expect("Failed to reinitialize ./next_snapshot");
             utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
@@ -817,7 +830,7 @@ impl FITMSnapshot {
                 let exit_status = child.wait()?;
                 Ok(exit_status.code().unwrap())
             })
-            .expect("[!] Namespace creation failed")
+            .expect("[!] Namespace creation failed - missing sudo or capabilities?")
             .wait()
             .expect("[!] Namespace wait failed")
             .code()
@@ -883,6 +896,12 @@ pub fn process_stage(
     );
 
     for snap in pick_random(rand, current_snaps, 5) {
+        println!(
+            "==== [*] Time start process_stage loop step {}: {:?} ====",
+            snap.state_path,
+            SystemTime::now()
+        );
+
         let cmin_tmp_dir = format!("cmin-tmp");
 
         // remove old tmp if it exists, then recreate
@@ -925,6 +944,7 @@ pub fn process_stage(
         let outputs = format!("saved-states/{}/outputs", snap.state_path);
         snap.create_outputs(&cmin_post_exec, &outputs)?;
 
+        // we pass false for next gens for input_file list as we don't want to compare againt the current gen
         let mut other_outputs: Vec<Vec<u8>> =
             input_file_list_for_gen((snap.generation - 1) as usize, false)?
                 .iter()
@@ -932,6 +952,11 @@ pub fn process_stage(
                 .collect();
         let mut ignored_outputs: Vec<OsString> = vec![];
 
+        println!(
+            "==== [*] Time start output_minimization {}: {:?} ====",
+            snap.state_path,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        );
         for entry in fs::read_dir(&outputs)? {
             let entry = entry.unwrap();
             let entry_path = entry.path();
@@ -946,7 +971,7 @@ pub fn process_stage(
             // So we read at +1, -1, -3
             if other_outputs
                 .iter()
-                .any(|x| utils::jaro(x, &own_output) > JARO_DISTANCE_THRESHOLD)
+                .any(|x| utils::output_similarity(x, &own_output) > JARO_DISTANCE_THRESHOLD)
             {
                 ignored_outputs.push(entry_file_name);
             } else {
@@ -954,6 +979,11 @@ pub fn process_stage(
                 other_outputs.push(own_output);
             }
         }
+        println!(
+            "==== [*] Time end output_minimization {}: {:?} ====",
+            snap.state_path,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        );
 
         let absolut_cmin_post_exec = build_create_absolute_path(&cmin_post_exec)
             .expect("[!] Error while constructing absolute input_dir path");
@@ -976,7 +1006,7 @@ pub fn process_stage(
                     entry.file_name().into_string().unwrap()
                 );
 
-                match get_traces().unwrap() {
+                match get_traces(snap.generation).unwrap() {
                     // If we have seen the current trace before we don't want to create a new snapshot for this input
                     Some(traces) => {
                         let cur_trace = fs::read_to_string(&trace_file)
@@ -1001,6 +1031,12 @@ pub fn process_stage(
                 }
             }
         }
+
+        println!(
+            "==== [*] Time end snapshot creation (all) {}: {:?} ====",
+            snap.state_path,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        );
 
         fs::remove_dir_all(format!("{}/.traces", &absolut_cmin_post_exec))
             .expect("[!] Could not remove .traces after saving program maps");
@@ -1100,9 +1136,20 @@ fn input_file_list_for_gen(gen_id: usize, use_future_gen: bool) -> Result<Vec<Pa
 // We are currently not sure if checking only current gen or all gens for duplicate traces is better
 // Problem: Server & Client may indefinitely bounce "passwd" and "wrong passwd" back and forth
 // without realizing that no new path has been found.
-pub fn get_traces() -> io::Result<Option<Vec<String>>> {
+pub fn get_traces(gen_id: u32) -> io::Result<Option<Vec<String>>> {
     // should match naming scheme explained at `input_file_list_for_gen`
-    let snapshot_regex = Regex::new("fitm-gen\\d+-state\\d+").unwrap();
+
+    // TODO: Cache this :)
+    // We look up to 3 into the past
+    let gen_path = Regex::new(&format!(
+        "fitm-gen({}|{}|{}|{})-state\\d+",
+        gen_id,
+        if gen_id >= 2 { gen_id - 2 } else { gen_id },
+        if gen_id >= 4 { gen_id - 4 } else { gen_id },
+        if gen_id >= 6 { gen_id - 6 } else { gen_id },
+    ));
+
+    let snapshot_regex = gen_path.unwrap();
     // Collect all snapshot folders in saved-states
     let states_iter = fs::read_dir(SAVED_STATES)
         .expect(&format!(
@@ -1133,8 +1180,21 @@ pub fn get_traces() -> io::Result<Option<Vec<String>>> {
     if traces_vec.len() > 0 {
         Ok(Some(traces_vec))
     } else {
+        println!(
+            "{}No other traces found!{}",
+            color::Fg(color::Yellow),
+            style::Reset
+        );
         Ok(None)
     }
+}
+
+/// We try to restore, let's see how it goes.
+pub fn save_restore_generation_state(
+    generation_snaps: &Vec<Vec<FITMSnapshot>>,
+) -> Result<(), io::Error> {
+    let mut file = File::create("fitm-state.json")?;
+    file.write_all(serde_json::to_string(generation_snaps)?.as_bytes())
 }
 
 /// Run fitm
@@ -1155,6 +1215,7 @@ pub fn run(
   / /_   / /  / / / /|_/ / 
  / __/ _/ /  / / / /  / /  
 /_/   /___/ /_/ /_/  /_/   
+
 {}",
         color::Fg(color::Cyan),
         style::Reset
@@ -1165,68 +1226,116 @@ pub fn run(
 
     let mut rand = RomuRand::preseeded();
 
+    // clean up last runs
+    let _ = remove_dir_all(ACTIVE_STATE);
+    let _ = remove_dir_all("cmin-tmp");
+
     // the folder contains inputs for each generation
     ensure_dir_exists(&generation_input_dir(0));
     ensure_dir_exists(&generation_input_dir(1));
 
-    // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
-    let mut afl_client_snap: FITMSnapshot = FITMSnapshot::new(
-        2,
-        0,
-        client_bin.to_string(),
-        run_timeout,
-        "".to_string(),
-        false,
-        false,
-        None,
-    );
+    // Try to restore the last state.
+    let restored_state: Option<Vec<Vec<FITMSnapshot>>> = match fs::read_to_string("fitm-state.json")
+    {
+        Ok(fitm_json) => match serde_json::from_str(&fitm_json) {
+            Ok(state) => Some(state),
+            Err(e) => {
+                println!("No fitm-state.json ({})", e);
+                None
+            }
+        },
+        Err(e) => {
+            println!("File fitm-state.json not found ({})", e);
+            None
+        }
+    };
 
-    // first create a snapshot, without outputs
-    afl_client_snap.pid =
-        afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
-    // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
-    // (to gen0-state0/outputs)
-    // we just need tmp to create outputs
-    // something fails if we don't use this tmp object
-    let tmp = FITMSnapshot::new(
-        2,
-        0,
-        client_bin.to_string(),
-        run_timeout,
-        "".to_string(),
-        false,
-        false,
-        None,
-    );
-    tmp.init_run(&mut rand, true, false, client_args, client_envs)?;
+    let mut generation_snaps: Vec<Vec<FITMSnapshot>> = match restored_state {
+        Some(snaps) => {
+            println!(
+                "{}Resuming run with with {} generations{}",
+                color::Fg(color::Green),
+                snaps.len() - 1,
+                style::Reset
+            );
+            snaps
+        }
+        None => {
+            println!("No valid state to resume. Starting fresh :)");
 
-    let mut afl_server: FITMSnapshot = FITMSnapshot::new(
-        1,
-        0,
-        server_bin.to_string(),
-        run_timeout,
-        "".to_string(),
-        true,
-        false,
-        None,
-    );
-    afl_server.pid = afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
+            println!(
+                "==== [*] Time start init_run: {} ====",
+                Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+            );
+            // Snapshot for gen2 (first client gen that's fuzzed) is created from this obj.
+            let mut afl_client_snap: FITMSnapshot = FITMSnapshot::new(
+                2,
+                0,
+                client_bin.to_string(),
+                run_timeout,
+                "".to_string(),
+                false,
+                false,
+                None,
+            );
 
-    // We need initial outputs from the client, else something went wrong
-    assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
+            // first create a snapshot, without outputs
+            afl_client_snap.pid =
+                afl_client_snap.init_run(&mut rand, false, true, client_args, client_envs)?;
+            // Move ./fd files (hopefully just one) to ./outputs folder for gen 0, state 0
+            // (to gen0-state0/outputs)
+            // we just need tmp to create outputs
+            // something fails if we don't use this tmp object
+            let tmp = FITMSnapshot::new(
+                2,
+                0,
+                client_bin.to_string(),
+                run_timeout,
+                "".to_string(),
+                false,
+                false,
+                None,
+            );
+            tmp.init_run(&mut rand, true, false, client_args, client_envs)?;
 
-    let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
-    // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
-    generation_snaps.push(vec![]);
-    // Gen 1 server is the initial server snapshot at recv, awaiting gen 0's output as input
-    generation_snaps.push(vec![afl_server]);
-    // Gen 2 client is the initial client snapshot, awaiting gen 1's output (server response) as input
-    generation_snaps.push(vec![afl_client_snap]);
+            let mut afl_server: FITMSnapshot = FITMSnapshot::new(
+                1,
+                0,
+                server_bin.to_string(),
+                run_timeout,
+                "".to_string(),
+                true,
+                false,
+                None,
+            );
+            afl_server.pid =
+                afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
+
+            println!(
+                "==== [*] Time end init_run: {:?} ====",
+                Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+            );
+
+            // We need initial outputs from the client, else something went wrong
+            assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
+
+            let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
+            // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
+            generation_snaps.push(vec![]);
+            // Gen 1 server is the initial server snapshot at recv, awaiting gen 0's output as input
+            generation_snaps.push(vec![afl_server]);
+            // Gen 2 client is the initial client snapshot, awaiting gen 1's output (server response) as input
+            generation_snaps.push(vec![afl_client_snap]);
+
+            generation_snaps
+        }
+    };
 
     let mut current_gen = 0;
+    let mut round = 0;
 
     loop {
-        current_gen = current_gen + 1;
+        current_gen += 1;
         if generation_snaps[current_gen].len() == 0 {
             println!(
                 "No snapshots (yet) for gen {}, restarting with gen 1 (initial request)",
@@ -1236,14 +1345,33 @@ pub fn run(
             current_gen = 1;
         }
 
-        let y = rand.below(1000) as f64 / 1000.0;
-        if current_gen != 1 && y > ABORT_THRESHOLD {
-            println!("Restarting fuzzing from gen 1 because of randomness");
+        // occasionally, stop going deeper, and go back to 0
+        if current_gen != 1 && (rand.below(1000) as f64 / 1000.0) > ABORT_THRESHOLD {
+            println!(
+                "Restarting fuzzing from gen 1 because of randomness (threshold {})",
+                ABORT_THRESHOLD
+            );
+            current_gen = 1;
+        }
+
+        // We wrapped around (or started fresh) -> next round
+        if current_gen == 1 {
+            round += 1;
+        }
+
+        // occasionally, skip a step (unless we're in the first run)
+        if round != 1 && (rand.below(1000) as f64 / 1000.0) > SKIP_STEP_THRESHOLD {
+            println!(
+                "Skiping gen {} by random chance (threshold {})",
+                current_gen, SKIP_STEP_THRESHOLD
+            );
+            continue;
         }
 
         println!(
-            "{}---> Fuzzing Gen {}{}",
+            "{}---> Round {}: Fuzzing Gen {}{}",
             color::Fg(color::Green),
+            round,
             current_gen,
             style::Reset
         );
@@ -1268,6 +1396,11 @@ pub fn run(
                 .collect::<Vec<Vec<_>>>()
         );
         // In each generation, IDs are simply numbered
+        println!(
+            "==== [*] Time start process_stage gen {}: {:?} ====",
+            current_gen,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        );
         let next_gen_id_start = generation_snaps[next_own_gen].len();
         let mut next_snaps = process_stage(
             &mut rand,
@@ -1276,6 +1409,11 @@ pub fn run(
             next_gen_id_start,
             &run_time,
         )?;
+        println!(
+            "==== [*] Time end process_stage gen {}: {:?} ====",
+            current_gen,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        );
 
         generation_snaps[next_own_gen].append(&mut next_snaps);
         println!(
@@ -1285,5 +1423,15 @@ pub fn run(
                 .map(|x| x.iter().map(|y| y.state_path.as_str()).collect::<Vec<_>>())
                 .collect::<Vec<Vec<_>>>()
         );
+
+        match save_restore_generation_state(&generation_snaps) {
+            Ok(()) => (),
+            Err(e) => println!(
+                "{}==== [!] Could not save state :( ({:?}){}",
+                color::Fg(color::Red),
+                e,
+                style::Reset
+            ),
+        };
     }
 }
