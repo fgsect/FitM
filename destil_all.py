@@ -11,7 +11,7 @@ def main(saved_states, out_dir):
 
     os.mkdir(out_dir)
 
-    if not saved_states.endswith("saved-states"):
+    if not saved_states.strip().replace("/", "").endswith("saved-states"):
         raise Exception("No valid a saved state folder given")
 
     p = ThreadPool()
