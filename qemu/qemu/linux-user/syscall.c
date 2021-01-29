@@ -2687,11 +2687,17 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             char input_path[PATH_MAX];
             int path_len = snprintf(input_path, sizeof(input_path), "%s/%d", input_dirname, fitm_replay_read_cnt);
             if (path_len < 0 || path_len >= 512) {
-                FDBG("[QEMU] REPLAY: input_path buffer is too small");
+                printf("[QEMU] REPLAY: input_path buffer is too small");
                 exit(1);
             }
 
             fitm_in_file = fopen(input_path, "r");
+            if (fitm_in_file < 0) {
+                printf("Input-File doesn't exist %s", input_path);
+                exit(0);
+            }
+            
+            FDBG("READING %d byten from %s", len, input_path);
             int ret = fread(msg, 1, len, fitm_in_file);
             if (ret == -1 && errno == EBADF) {
                 printf("[QEMU] bug: read on closed FITM_FD?\n");
