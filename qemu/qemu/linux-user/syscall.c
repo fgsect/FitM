@@ -2692,13 +2692,13 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             }
 
             fitm_in_file = fopen(input_path, "r");
-            if (fitm_in_file <= 0) {
+            if (fitm_in_file == 0) {
                 printf("Input-Filename: %s\n", path_len);
                 perror("Failed to open Input-File\n");
                 exit(0);
             }
 
-            FDBG("READING %d byten from %s\n", len, input_path);
+            FDBG("READING %d bytes from %s\n", len, input_path);
             int ret = fread(msg, 1, len, fitm_in_file);
             if (ret == -1 && errno == EBADF) {
                 printf("[QEMU] bug: read on closed FITM_FD?\n");
