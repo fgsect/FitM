@@ -146,6 +146,8 @@
 
 // If undefined, contines in the parent instead.
 #define FITM_FORK_FOLLOW_CHILD 1
+// If defined, will _exit(0) for an accept after fuzzing has started.
+//#define FITM_ACCEPT_ONCE 1
 
 // Randomly chosen offsets in the AFL Bitmp, to emphasize sent operations for afl.
 // >> Make sure we don't minimize it.
@@ -168,9 +170,9 @@ bool fitm_replay = false;
 // this results in a recv before the recv that waits for client input
 // this variable should help identify the correct recv call to snapshot by indicating if the recv call
 // happened after accept has been called at least once
-// We also send accepted_once to true if we sent on this port once (then it's open.)
+// We also send fitm_mode_started to true if we sent on this port once (then it's open.)
 // (Unless we have recv_skip still set, then it's a different port alltogether...)
-bool accepted_once = false;
+bool fitm_mode_started = false;
 // This holds the (potential) output file descriptor
 int fitm_out_fd = -1;
 // Instead of dup()ing to 1337, we just keep a shadow fd for input.
@@ -2175,7 +2177,7 @@ static abi_long do_connect(int sockfd, abi_ulong target_addr,
         FDBG("do_connect ignored for %d\n", sockfd);
         // Connecting to a remote adr. always works as we are only running locally
         // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275
-        accepted_once = true;
+        fitm_mode_started = true;
         return 0;
     }
     FDBG("do_connect called on non-fitm sockfd %d\n", sockfd);
@@ -2252,7 +2254,7 @@ static abi_long do_sendrecvmsg_locked(int fd, struct target_msghdr *msgp,
     msg.msg_iov = vec;
 
     if (send) {
-        if (accepted_once)  {
+        if (fitm_mode_started)  {
             // TODO
             printf("[FITM] TODO: implement send(m)msg");
             exit(1);
@@ -2278,7 +2280,7 @@ static abi_long do_sendrecvmsg_locked(int fd, struct target_msghdr *msgp,
             }
         }
     } else {
-        if (accepted_once)  {
+        if (fitm_mode_started)  {
             // TODO
             printf("[FITM] TODO: implement recv(m)msg");
             //ret = 0;
@@ -2396,13 +2398,15 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
     */
 
     // Exit once we accepted once because we can only provide one input per fuzz child
-    if (accepted_once) {
-        FDBG("Second accept. This may be a bug.");
+    if (fitm_mode_started) {
+        FDBG("Second accept after FITM started. Odd for some targets.");
+#ifdef FITM_ACCEPT_ONCE
+        _exit(0);
+#endif
         return FITM_FD;
-        //_exit(0);
     }
     
-    accepted_once = true;
+    fitm_mode_started = true;
     sent = true; // << Adding this as fix for the server - it won't send anything, but immediately
 
     return FITM_FD;
@@ -2429,8 +2433,8 @@ static abi_long do_getpeername(int fd, abi_ulong target_addr,
 
     addr = alloca(addrlen);
 
-    if (accepted_once) {
-        FDBG("getpeername(): accepted_once branch\n");
+    if (fitm_mode_started) {
+        FDBG("getpeername(): fitm_mode_started branch\n");
         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
         addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
@@ -2481,8 +2485,8 @@ static abi_long do_getsockname(int fd, abi_ulong target_addr,
             char          sa_data[]       socket address (variable-length data)
         };
      */
-    if (accepted_once) {
-        FDBG("getsockname(): accepted_once branch\n");
+    if (fitm_mode_started) {
+        FDBG("getsockname(): fitm_mode_started branch\n");
         struct sockaddr *addr_pointer = (struct sockaddr*) addr;
         addr_pointer->sa_family = AF_INET;
         // sa_data is 14 bytes long
@@ -2568,10 +2572,10 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
         fitm_ensure_initialized();
         sent = true;
 
-        if (init_recv_skip <= 0 && !accepted_once) {
+        if (init_recv_skip <= 0 && !fitm_mode_started) {
 
-            FDBG("We sent something, so let's set this to accepted_once.");
-            accepted_once = true;
+            FDBG("We sent something, so let's set this to fitm_mode_started.");
+            fitm_mode_started = true;
 
         }
 
@@ -5289,8 +5293,8 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
             tb_flush(cpu);
         }
 
-        if (accepted_once) {
-            FDBG("do_fork(): accepted_once. We don't clone anymore.\n");
+        if (fitm_mode_started) {
+            FDBG("do_fork(): fitm_mode_started. We don't clone anymore.\n");
             pthread_mutex_unlock(&info.mutex);
 //            pthread_cond_destroy(&info.cond);
             pthread_mutex_destroy(&info.mutex);
@@ -5339,8 +5343,8 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         }
 
         // Fake fork after we started the server
-        if (accepted_once) {
-            FDBG("do_fork(): accepted_once. We don't fork anymore.\n");
+        if (fitm_mode_started) {
+            FDBG("do_fork(): fitm_mode_started. We don't fork anymore.\n");
     #ifdef FITM_FORK_FOLLOW_CHILD
             FDBG("Returning from fork as child");
             return 1337;
@@ -5358,7 +5362,7 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
 
 
         fork_start();
-        if (accepted_once) {
+        if (fitm_mode_started) {
             ret = 0;
             fork_end(0);
         } else {
@@ -6846,7 +6850,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         
         if (arg1 == FITM_FD) {
       
+            // TODO: Remove code duplication to send_to write here.
             fitm_ensure_initialized();
+            if (init_recv_skip <= 0 && !fitm_mode_started) {
+
+                FDBG("We wrote something, so let's set this to fitm_mode_started.");
+                fitm_mode_started = true;
+
+            }
 
             FDBG("setting sent = true\n");
             // If we reached write, we're happy. Increase WRITE_ID.
