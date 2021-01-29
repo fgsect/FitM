@@ -38,6 +38,9 @@
 #include <dlfcn.h>
 #endif
 
+/// Just log each new block you translated
+#define FITM_YOLO_TRACE 1
+
 /***************************
  * VARIOUS AUXILIARY STUFF *
  ***************************/
