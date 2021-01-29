@@ -20,7 +20,7 @@ PREV_INPUT_FILE = "prev_input"
 PREV_INPUT_PATH = "prev_input_path"
 
 
-def destil(state_dir, out_dir):
+def destil(state_dir, out_dir, destilfile_dir=None):
 
     current_state = state_dir
     connection_files = []
@@ -29,6 +29,12 @@ def destil(state_dir, out_dir):
         os.mkdir(out_dir)
     except Exception as ex:
         print("Failed to create out_dir: {}", ex)
+
+    if destilfile_dir:
+        try:
+            os.mkdir(destilfile_dir)
+        except Exception as ex:
+            print("destilfile_dir already existed ({})", ex)
 
     # Walk backwards though the linked file list
     while current_state:
@@ -55,6 +61,12 @@ def destil(state_dir, out_dir):
     for (i, con_file) in enumerate(connection_files):
         print("Copying", con_file, i)
         copyfile(con_file, f"{out_dir}/{i}")
+
+    if destilfile_dir:
+        destil_out = os.path.join(destilfile_dir, os.path.split(state_dir)[-1])
+        print(f"Writing out dir {out_dir} to destil dir {destil_out}")
+        with open(destil_out, "w") as f:
+            f.write(os.path.abspath(out_dir))
 
 
 if __name__ == "__main__":
