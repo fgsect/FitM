@@ -135,7 +135,7 @@
 #define FITM_FD 999
 // Use this define to toggle debug prints in various places
 // Might be spammy
-// #define FITM_DEBUG 1
+#define FITM_DEBUG 1
 // Remove FITM_FAST_EXIT if you want an orderly exit of the target
 #define FITM_FAST_EXIT 1
 // Remove this define temporarily to ignore do_criu() calls
@@ -166,6 +166,7 @@ bool create_outputs = true; //TODO: works? getenv_from_file("FITM_CREATE_OUTPUTS
 bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP_AGAIN");
 // If fitm_replay is set, all snapshotting and early exits are disabled. It'll replay a whole input.
 bool fitm_replay = false;
+int fitm_replay_read_cnt = 0;
 // live555 server tries to find it's own IP adr by sending & recveiving a multicast packet
 // this results in a recv before the recv that waits for client input
 // this variable should help identify the correct recv call to snapshot by indicating if the recv call
@@ -2662,8 +2663,41 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
         if (fitm_replay) {
-            char* input = getenv_from_file("INPUT_FILENAME");
-            fitm_in_file = fitm_open_input_file(input);
+            FDBG("REPLAY: Next generation starting now\n");
+            char[512] input_path;
+            int res = snprintf(input_path, sizeof(input_path), "%s/%d", getenv_from_file("INPUT_FILENAME"), fitm_replay_read_cnt);
+            if (res < 0 || res >= 512) {
+                printf("[QEMU] REPLAY: input_path buffer is too small");
+                exit(1);
+            }
+
+            int fitm_in_file = fitm_open_input_file(input_path);
+            int ret = fread(msg, 1, len, fitm_in_file);
+            if (ret == -1 && errno == EBADF) {
+                printf("[QEMU] bug: read on closed FITM_FD?\n");
+                perror("FD 1337");
+                fflush(stdout);
+                _exit(-1);
+            } else if (ret == 0) {
+                // Some targets may sleep after the server disconnected.
+                // We lose bugs in teardown code but fuzzing works
+                printf("[QEMU] No more fuzzing input. Exiting now.\n");
+                fflush(stdout);
+                // FOR FTP USE THIS:
+                _exit(0);
+            };
+            FDBG("read: %d bytes with msg: %s\n", ret, msg);
+            // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
+
+            fitm_replay_read_cnt++;
+            return ret;
+        }
+
+	    if (!fitm_in_file) 
+		    char* input = getenv_from_file("INPUT_FILENAME");
+		    FDBG("Opening new input file: %s", input);
+		    fitm_in_file = fitm_open_input_file(input);
+	    }
         } else if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);
@@ -5303,14 +5337,14 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
 #ifdef FITM_FORK_FOLLOW_CHILD
 
             // should never return from this call
-            FDBG("Returning from clone as parent");
+            FDBG("Returning from clone as child\n");
             clone_func(&info);
 
             fprintf(stderr, "This should be dead code\n");
             fflush(stderr);
             _exit(-1);
 #else
-            FDBG("Returning from clone as parent");
+            FDBG("Returning from clone as parent\n");
             return 0;
 #endif
         }
@@ -5345,13 +5379,13 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         // Fake fork after we started the server
         if (fitm_mode_started) {
             FDBG("do_fork(): fitm_mode_started. We don't fork anymore.\n");
-    #ifdef FITM_FORK_FOLLOW_CHILD
-            FDBG("Returning from fork as child");
+#ifdef FITM_FORK_FOLLOW_CHILD
+            FDBG("Returning from fork as child\n");
             return 1337;
-    #else
-            FDBG("Returning from fork as parent");
+#else
+            FDBG("Returning from fork as parent\n");
             return 0;
-    #endif
+#endif
         }
 
 

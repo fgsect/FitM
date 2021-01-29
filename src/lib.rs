@@ -475,6 +475,11 @@ impl FITMSnapshot {
                         // Timeout per individual execution
                         "-t",
                         &format!("{}", self.timeout.as_millis()),
+                        "-b",
+                        "5",
+                        // Using the same dictionary as AFLNET (seems fair)
+                        "-x",
+                        "../ftp.dict",
                         "--",
                         "bash",
                         // Our restore script
