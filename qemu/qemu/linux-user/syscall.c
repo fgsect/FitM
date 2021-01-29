@@ -167,6 +167,7 @@ bool timewarp_mode = true; //TODO: works? getenv_from_file("LETS_DO_THE_TIMEWARP
 // If fitm_replay is set, all snapshotting and early exits are disabled. It'll replay a whole input.
 bool fitm_replay = false;
 int fitm_replay_read_cnt = 0;
+char* input_dirname = NULL;
 // live555 server tries to find it's own IP adr by sending & recveiving a multicast packet
 // this results in a recv before the recv that waits for client input
 // this variable should help identify the correct recv call to snapshot by indicating if the recv call
@@ -2664,14 +2665,29 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
         if (fitm_replay) {
             FDBG("REPLAY: Next generation starting now\n");
-            char input_path[512];
-            int path_len = snprintf(input_path, sizeof(input_path), "%s/%d", getenv_from_file("INPUT_FILENAME"), fitm_replay_read_cnt);
+            if (input_dirname == NULL) {
+                FILE* input_dirname_file = fopen(getenv_from_file("INPUT_DIRNAME_FILE"), "r");
+                if ( input_dirname_file < 0 ) {
+                    printf("[QEMU] Failed to open INPUT_DIRNAME_FILE");
+                    exit(1);
+                }
+                input_dirname = malloc(PATH_MAX);
+                if (!input_dirname) {
+                    printf("[QEMU] Failed to alloc mem for input_dirname")
+                    exit(1);
+                }
+                fgets(input_dirname, PATH_MAX, input_dirname_file);
+                fclose(input_dirname_file);
+            }
+
+            char input_path[PATH_MAX];
+            int path_len = snprintf(input_path, sizeof(input_path), "%s/%d", input_dirname, fitm_replay_read_cnt);
             if (path_len < 0 || path_len >= 512) {
                 printf("[QEMU] REPLAY: input_path buffer is too small");
                 exit(1);
             }
 
-            int fitm_in_file = fitm_open_input_file(input_path);
+            fitm_in_file = fitm_open_input_file(input_path);
             int ret = fread(msg, 1, len, fitm_in_file);
             if (ret == -1 && errno == EBADF) {
                 printf("[QEMU] bug: read on closed FITM_FD?\n");
