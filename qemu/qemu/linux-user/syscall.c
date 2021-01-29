@@ -2662,6 +2662,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
         if (fitm_replay) {
+            FDBG("REPLAY: Next generation starting now\n");
             char* input = getenv_from_file("INPUT_FILENAME");
             fitm_in_file = fitm_open_input_file(input);
         } else if (!timewarp_mode) {
