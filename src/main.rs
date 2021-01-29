@@ -39,12 +39,13 @@ fn main() {
     match fitm::run(
         "../tests/targets/LightFTP/Source/Release/fftp",
         &["../tests/targets/LightFTP/fftp.conf"],
-        &[("QEMU_STRACE", "1")],
-        "/usr/bin/ftp",
-        &["127.0.0.1", "2200"],
-        &[("QEMU_STRACE", "1")],
+        &[],
+        /// No output placed, ever. :(
+        "/bin/false",
+        &[],
+        &[],
         &Duration::from_secs(5 * 60),
-        false,
+        true,
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
