@@ -2664,9 +2664,9 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
         if (fitm_replay) {
             FDBG("REPLAY: Next generation starting now\n");
-            char[512] input_path;
-            int res = snprintf(input_path, sizeof(input_path), "%s/%d", getenv_from_file("INPUT_FILENAME"), fitm_replay_read_cnt);
-            if (res < 0 || res >= 512) {
+            char input_path[512];
+            int path_len = snprintf(input_path, sizeof(input_path), "%s/%d", getenv_from_file("INPUT_FILENAME"), fitm_replay_read_cnt);
+            if (path_len < 0 || path_len >= 512) {
                 printf("[QEMU] REPLAY: input_path buffer is too small");
                 exit(1);
             }
@@ -2688,16 +2688,13 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
             };
             FDBG("read: %d bytes with msg: %s\n", ret, msg);
             // TODO: We completely ignore changes in endianness (get_errno et al. could be used)
-
             fitm_replay_read_cnt++;
-            return ret;
-        }
 
-	    if (!fitm_in_file) 
-		    char* input = getenv_from_file("INPUT_FILENAME");
-		    FDBG("Opening new input file: %s", input);
-		    fitm_in_file = fitm_open_input_file(input);
-	    }
+            // Lets assume that one file is covered by each read;
+            fclose(fitm_in_file);
+            fitm_in_file = NULL;
+            return ret;
+
         } else if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);

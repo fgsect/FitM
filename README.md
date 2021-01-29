@@ -60,7 +60,7 @@ Build with: `cd qemu/qemu/ && ./build-for-afl.sh`
 ### Ubuntu
 
 To compile and run CRIU, these packages need to be installed:
-`sudo apt install protobuf-c-compiler libprotobuf-c-dev libnet-dev python3-protobuf python3-yaml`
+`sudo apt install libprotobuf-dev protobuf-c-compiler libprotobuf-c-dev libnet-dev python3-protobuf python3-yaml`
 
 ## Git Submodule
 
