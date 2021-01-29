@@ -404,6 +404,11 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     tb = tb_lookup__cpu_state(cpu, &pc, &cs_base, &flags, cf_mask);
     if (tb == NULL) {
         mmap_lock();
+
+#ifdef FITM_YOLO_TRACE
+        printf("[FITM] BLOCK: Translating new block at pc %p\n", pc);
+        fflush(stdout);
+#endif
         tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
         was_translated = true;
         mmap_unlock();
