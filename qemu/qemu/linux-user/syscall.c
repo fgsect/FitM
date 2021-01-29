@@ -135,12 +135,17 @@
 #define FITM_FD 999
 // Use this define to toggle debug prints in various places
 // Might be spammy
-#define FITM_DEBUG 0
+// #define FITM_DEBUG 1
+// Remove FITM_FAST_EXIT if you want an orderly exit of the target
+#define FITM_FAST_EXIT 1
 // Remove this define temporarily to ignore do_criu() calls
 // This might be useful when debugging targets where a specific behaviour is solicited after a snapshot
 #define INCLUDE_DOCRIU 1
 // The next receive after send should create a snapshot
 // Idea is: We're waiting for a return from the other side then
+
+// If undefined, contines in the parent instead.
+#define FITM_FORK_FOLLOW_CHILD 1
 
 // Randomly chosen offsets in the AFL Bitmp, to emphasize sent operations for afl.
 // >> Make sure we don't minimize it.
@@ -5208,6 +5213,7 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
                    abi_ulong parent_tidptr, target_ulong newtls,
                    abi_ulong child_tidptr)
 {
+
     CPUState *cpu = ENV_GET_CPU(env);
     int ret;
     TaskState *ts;
@@ -5284,17 +5290,25 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         }
 
         if (accepted_once) {
-            FDBG("do_fork(): accepted_once\n");
+            FDBG("do_fork(): accepted_once. We don't clone anymore.\n");
             pthread_mutex_unlock(&info.mutex);
 //            pthread_cond_destroy(&info.cond);
             pthread_mutex_destroy(&info.mutex);
             pthread_mutex_unlock(&clone_lock);
 
+#ifdef FITM_FORK_FOLLOW_CHILD
+
             // should never return from this call
+            FDBG("Returning from clone as parent");
             clone_func(&info);
 
-            perror("This should be dead code\n");
+            fprintf(stderr, "This should be dead code\n");
+            fflush(stderr);
             _exit(-1);
+#else
+            FDBG("Returning from clone as parent");
+            return 0;
+#endif
         }
         FDBG("do_fork(): pthread_create()\n");
         ret = pthread_create(&info.thread, &attr, clone_func, &info);
@@ -5323,6 +5337,20 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         if ((flags & CSIGNAL) != TARGET_SIGCHLD) {
             return -TARGET_EINVAL;
         }
+
+        // Fake fork after we started the server
+        if (accepted_once) {
+            FDBG("do_fork(): accepted_once. We don't fork anymore.\n");
+    #ifdef FITM_FORK_FOLLOW_CHILD
+            FDBG("Returning from fork as child");
+            return 1337;
+    #else
+            FDBG("Returning from fork as parent");
+            return 0;
+    #endif
+        }
+
+
 
         if (block_signals()) {
             return -TARGET_ERESTARTSYS;
@@ -6750,8 +6778,10 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
             _exit(43);
         }
         FDBG("exit: Target tried to exit with exitcode %ld\n", arg1);
+#ifdef FITM_FAST_EXIT
         arg1 = 0;
         _exit(arg1);
+#endif
 
         if (block_signals()) {
             return -TARGET_ERESTARTSYS;
