@@ -1207,6 +1207,9 @@ pub fn run(
     server_args: &[&str],
     server_envs: &[(&str, &str)],
     run_time: &Duration,
+    // Still needs an echo binary or a binary producing a short output, as client
+    // Just fuzzes the client for 100 millis.
+    server_only: bool,
 ) -> Result<(), io::Error> {
     println!(
         "{}
@@ -1223,6 +1226,7 @@ pub fn run(
 
     // A lot of timeout for now
     let run_timeout = Duration::from_secs(3);
+    let server_only_client_runtime = Duration::from_millis(100);
 
     let mut rand = RomuRand::preseeded();
 
@@ -1407,7 +1411,12 @@ pub fn run(
             &generation_snaps[current_gen],
             &input_file_list_for_gen(current_gen, true)?,
             next_gen_id_start,
-            &run_time,
+            if server_only && current_gen % 2 == 0 {
+                println!("==== [+] Fuzzing gen {} for 100 millis, we're not interested in this side (server_only mode set) ===", current_gen);
+                &server_only_client_runtime
+            } else {
+                &run_time
+            },
         )?;
         println!(
             "==== [*] Time end process_stage gen {}: {:?} ====",

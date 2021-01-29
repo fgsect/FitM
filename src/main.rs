@@ -44,6 +44,7 @@ fn main() {
         &["127.0.0.1", "2200"],
         &[("QEMU_STRACE", "1")],
         &Duration::from_secs(5 * 60),
+        false,
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}

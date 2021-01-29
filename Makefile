@@ -23,10 +23,10 @@ fitm:
 debug:
 	cargo build
 
-run: tests debug
+run: fitm #tests debug
 	sudo rm -rf ./active-state
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/debug/fitm
+	sudo ./target/release/fitm
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 
