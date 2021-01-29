@@ -2693,7 +2693,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
             fitm_in_file = fopen(input_path, "r");
             if (fitm_in_file <= 0) {
-                perror("Input-File doesn't exist %s\n", input_path);
+                printf("Input-Filename: %s\n", path_len);
+                perror("Failed to open Input-File\n");
                 exit(0);
             }
 
