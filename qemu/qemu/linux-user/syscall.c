@@ -135,7 +135,7 @@
 #define FITM_FD 999
 // Use this define to toggle debug prints in various places
 // Might be spammy
-// #define FITM_DEBUG 1
+#define FITM_DEBUG 1
 // Remove FITM_FAST_EXIT if you want an orderly exit of the target
 #define FITM_FAST_EXIT 1
 // Remove this define temporarily to ignore do_criu() calls
@@ -2663,8 +2663,11 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
 
         if (fitm_replay) {
             FDBG("REPLAY: Next generation starting now\n");
-            char* input = getenv_from_file("INPUT_FILENAME");
-            fitm_in_file = fitm_open_input_file(input);
+	    if (!fitm_in_file) {
+		    char* input = getenv_from_file("INPUT_FILENAME");
+		    FDBG("Opening new input file: %s", input);
+		    fitm_in_file = fitm_open_input_file(input);
+	    }
         } else if (!timewarp_mode) {
             FDBG("we are done here. Have a nice day.\n");
             _exit(0);
@@ -5304,14 +5307,14 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
 #ifdef FITM_FORK_FOLLOW_CHILD
 
             // should never return from this call
-            FDBG("Returning from clone as parent");
+            FDBG("Returning from clone as child\n");
             clone_func(&info);
 
             fprintf(stderr, "This should be dead code\n");
             fflush(stderr);
             _exit(-1);
 #else
-            FDBG("Returning from clone as parent");
+            FDBG("Returning from clone as parent\n");
             return 0;
 #endif
         }
@@ -5346,13 +5349,13 @@ static int do_fork(CPUArchState *env, unsigned int flags, abi_ulong newsp,
         // Fake fork after we started the server
         if (fitm_mode_started) {
             FDBG("do_fork(): fitm_mode_started. We don't fork anymore.\n");
-    #ifdef FITM_FORK_FOLLOW_CHILD
-            FDBG("Returning from fork as child");
+#ifdef FITM_FORK_FOLLOW_CHILD
+            FDBG("Returning from fork as child\n");
             return 1337;
-    #else
-            FDBG("Returning from fork as parent");
+#else
+            FDBG("Returning from fork as parent\n");
             return 0;
-    #endif
+#endif
         }
 
 
