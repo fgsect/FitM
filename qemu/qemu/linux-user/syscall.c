@@ -168,6 +168,8 @@ bool fitm_replay = false;
 // this results in a recv before the recv that waits for client input
 // this variable should help identify the correct recv call to snapshot by indicating if the recv call
 // happened after accept has been called at least once
+// We also send accepted_once to true if we sent on this port once (then it's open.)
+// (Unless we have recv_skip still set, then it's a different port alltogether...)
 bool accepted_once = false;
 // This holds the (potential) output file descriptor
 int fitm_out_fd = -1;
@@ -2565,6 +2567,13 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
 
         fitm_ensure_initialized();
         sent = true;
+
+        if (init_recv_skip <= 0 && !accepted_once) {
+
+            FDBG("We sent something, so let's set this to accepted_once.");
+            accepted_once = true;
+
+        }
 
         // If we reached send, we're happy. Increase SENT_ID
         size_t loc = AFL_MAP_SENDTO;
@@ -6837,7 +6846,14 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         
         if (arg1 == FITM_FD) {
       
+            // TODO: Remove code duplication to send_to write here.
             fitm_ensure_initialized();
+            if (init_recv_skip <= 0 && !accepted_once) {
+
+                FDBG("We wrote something, so let's set this to accepted_once.");
+                accepted_once = true;
+
+            }
 
             FDBG("setting sent = true\n");
             // If we reached write, we're happy. Increase WRITE_ID.
