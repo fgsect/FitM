@@ -14,18 +14,19 @@ import sys
 NEXT = (
     ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>NEXT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 )
-#ENVFILE = "envfile"
-#IF_TOK = "INPUT_FILENAME="
+# ENVFILE = "envfile"
+# IF_TOK = "INPUT_FILENAME="
 PREV_INPUT_FILE = "prev_input"
 PREV_INPUT_PATH = "prev_input_path"
-
 
 
 if len(sys.argv) < 2:
     raise Exception("Usage: [-v] ./path/to/fitm-genX-stateY")
 
+
 def faux_print(*args, **kwargs):
     pass
+
 
 # -r => raw message, don't print information.
 if len(sys.argv) > 2 and sys.argv[1] == "-v":
@@ -39,7 +40,9 @@ else:
 connection_files = []
 
 if not os.path.exists(current_state):
-    raise Exception(f"Could not open initial state {current_state}, make sure you have the proper access rights!")
+    raise Exception(
+        f"Could not open initial state {current_state}, make sure you have the proper access rights!"
+    )
 
 # Walk backwards though the linked file list
 while current_state:
@@ -50,7 +53,6 @@ while current_state:
             break
 
         connection_files.insert(0, os.path.join(current_state, PREV_INPUT_FILE))
-
 
         with open(prev_file) as f:
             prev = f.read()
