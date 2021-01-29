@@ -44,6 +44,7 @@ fn main() {
         &[""],
         &[("QEMU_STRACE", "1"), ("INIT_RECV_SKIP", "1")],
         &Duration::from_secs(1),
+        false,
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
