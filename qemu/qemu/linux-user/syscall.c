@@ -146,6 +146,8 @@
 
 // If undefined, contines in the parent instead.
 #define FITM_FORK_FOLLOW_CHILD 1
+// If defined, will _exit(0) for an accept after fuzzing has started.
+//#define FITM_ACCEPT_ONCE 1
 
 // Randomly chosen offsets in the AFL Bitmp, to emphasize sent operations for afl.
 // >> Make sure we don't minimize it.
@@ -2397,9 +2399,11 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 
     // Exit once we accepted once because we can only provide one input per fuzz child
     if (fitm_mode_started) {
-        FDBG("Second accept. This may be a bug.");
+        FDBG("Second accept after FITM started. Odd for some targets.");
+#ifdef FITM_ACCEPT_ONCE
+        _exit(0);
+#endif
         return FITM_FD;
-        //_exit(0);
     }
     
     fitm_mode_started = true;
