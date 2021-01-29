@@ -2,15 +2,17 @@ def afl_fuzz(snap, inputs, run_time):
     """
     Runs afl fuzz
     """
-    fuzz_result = some_magic(snap, inputs, run_time) 
+    fuzz_result = some_magic(snap, inputs, run_time)
     return fuzz_result
+
 
 def afl_cmin(snap, inputs):
     """
     Minimizes the inputs
     """
-    minimized_inputs = some_magic(snap, inputs) 
+    minimized_inputs = some_magic(snap, inputs)
     return minimized_inputs
+
 
 def process_stage(current_snaps, current_inputs, next_inputs, nextnext_snaps):
     """
@@ -51,6 +53,7 @@ def gen_is_client(gen_id):
     """
     return (gen_id % 2) == 1
 
+
 def main():
 
     client_binary = "testclient"
@@ -70,7 +73,9 @@ def main():
     # The initial server input is the initial client output, of all sends before the recv
     initial_input = client_binary.run_to_recv().output()
     if not initial_input:
-        raise Exception("Uh oh, client misbehaved! No initial input for server generated!")
+        raise Exception(
+            "Uh oh, client misbehaved! No initial input for server generated!"
+        )
     generation_inputs[0] = [initial_input]
 
     current_gen = 0
@@ -94,8 +99,12 @@ def main():
         if not hasattr(snapshots, nextnext_gen):
             generation_inputs[nextnext_gen] = []
 
-        process_stage(snapshots[current_gen], generation_inputs[current_gen],
-                        generation_inputs[next_gen], snapshots[nextnext_gen])
+        process_stage(
+            snapshots[current_gen],
+            generation_inputs[current_gen],
+            generation_inputs[next_gen],
+            snapshots[nextnext_gen],
+        )
 
         # Continue with the next gen (server->client or vice versa)
         current_gen += 1
@@ -104,4 +113,3 @@ def main():
         # In that case: restart fuzzin from gen 0. :)
         if len(generation_inputs[current_gen]) == 0:
             current_gen = 0
- 
