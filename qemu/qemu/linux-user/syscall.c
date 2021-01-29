@@ -2673,7 +2673,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
                 }
                 input_dirname = malloc(PATH_MAX);
                 if (!input_dirname) {
-                    printf("[QEMU] Failed to alloc mem for input_dirname")
+                    printf("[QEMU] Failed to alloc mem for input_dirname");
                     exit(1);
                 }
                 fgets(input_dirname, PATH_MAX, input_dirname_file);
