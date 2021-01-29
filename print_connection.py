@@ -47,7 +47,7 @@ if not os.path.exists(current_state):
 # Walk backwards though the linked file list
 while current_state:
     try:
-        prev_file = os.path.join(current_state, PREV_INPUT_FILE)
+        prev_file = os.path.join(current_state, PREV_INPUT_PATH)
         if not os.path.exists(prev_file):
             print(f"finished in gen {prev_file}")
             break
