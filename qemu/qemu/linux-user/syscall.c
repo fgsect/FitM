@@ -2666,7 +2666,8 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         if (fitm_replay) {
             FDBG("REPLAY: Next generation starting now\n");
             if (input_dirname == NULL) {
-                FILE* input_dirname_file = fopen(getenv_from_file("INPUT_DIRNAME_FILE"), "r");
+                spawn_forksrv(cpu, true);
+                FILE* input_dirname_file = fitm_open_input_file(getenv_from_file("INPUT_DIRNAME_FILE"));
                 if ( input_dirname_file < 0 ) {
                     printf("[QEMU] Failed to open INPUT_DIRNAME_FILE");
                     exit(1);
@@ -2687,7 +2688,7 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
                 exit(1);
             }
 
-            fitm_in_file = fitm_open_input_file(input_path);
+            fitm_in_file = fopen(input_path, "r");
             int ret = fread(msg, 1, len, fitm_in_file);
             if (ret == -1 && errno == EBADF) {
                 printf("[QEMU] bug: read on closed FITM_FD?\n");
