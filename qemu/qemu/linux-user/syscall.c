@@ -2664,27 +2664,30 @@ static abi_long fitm_read(CPUState *cpu, int fd, char *msg, size_t len) {
         }
 
         if (fitm_replay) {
-            FDBG("REPLAY: Next generation starting now\n");
+            if (sent) {
+                FDBG("REPLAY: Next generation starting now\n");
+                sent = false;
+            }
             if (input_dirname == NULL) {
-                spawn_forksrv(cpu, true);
-                FILE* input_dirname_file = fitm_open_input_file(getenv_from_file("INPUT_DIRNAME_FILE"));
-                if ( input_dirname_file < 0 ) {
-                    printf("[QEMU] Failed to open INPUT_DIRNAME_FILE");
-                    exit(1);
-                }
-                input_dirname = malloc(PATH_MAX);
+                // spawn_forksrv(cpu, true);
+                // FILE* input_dirname_file = fopen(getenv_from_file("INPUT_DIRNAME_FILE")));
+                // if ( input_dirname_file < 0 ) {
+                //     printf("[QEMU] Failed to open INPUT_DIRNAME_FILE");
+                //     exit(1);
+                // }
+                input_dirname = strdup(getenv_from_file("INPUT_DIRNAME_FILE"));
                 if (!input_dirname) {
-                    printf("[QEMU] Failed to alloc mem for input_dirname");
+                    FDBG("[QEMU] Failed to alloc mem for input_dirname");
                     exit(1);
                 }
-                fgets(input_dirname, PATH_MAX, input_dirname_file);
-                fclose(input_dirname_file);
+                // fgets(input_dirname, PATH_MAX, input_dirname_file);
+                // fclose(input_dirname_file);
             }
 
             char input_path[PATH_MAX];
             int path_len = snprintf(input_path, sizeof(input_path), "%s/%d", input_dirname, fitm_replay_read_cnt);
             if (path_len < 0 || path_len >= 512) {
-                printf("[QEMU] REPLAY: input_path buffer is too small");
+                FDBG("[QEMU] REPLAY: input_path buffer is too small");
                 exit(1);
             }
 
