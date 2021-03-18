@@ -49,7 +49,7 @@ AFL_DEBUG_CHILD_OUTPUT=1 LETS_DO_THE_TIMEWARP_AGAIN=1 ../AFLplusplus/afl-fuzz -i
 Because criu needs root privs and the restored process needs root privs to access the shared memory from AFL everything has to be run as root.
 So please execute everything with `sudo` or configure a proper runner for your platform.
 
-Once added a fitm-args.json may look like this:
+To configure targets and their env supply the path to a `fitm-args.json` file to fitm. A `fitm-args.json` may look like this:
 ```
 {
   "client": "../tests/targets/live555/testProgs/testRTSPClient",
