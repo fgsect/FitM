@@ -1,0 +1,4 @@
+# Wraps run/test/bench in the specified binary
+# https://doc.rust-lang.org/cargo/reference/config.html#targettriplerunner
+[target.x86_64-unknown-linux-gnu]
+runner = 'sudo -E'
