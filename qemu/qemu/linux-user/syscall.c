@@ -128,6 +128,8 @@
 #include <sys/stat.h>
 #include "fitm-criu.h"
 
+
+#define CONFIG_RTNETLINK 1
 // We originally used FD 0 to send input from afl into the target
 // However targets may use FD 0 to wait for an interrupt from the user or sth similar
 // Since using fitm_in_file we need to set FITM_FD to the current FD value
@@ -2086,10 +2088,10 @@ static int sock_flags_fixup(int fd, int target_type)
 static abi_long do_socket(int domain, int type, int protocol)
 {
     if (domain == AF_INET || domain == AF_INET6) {
-        FDBG("do_socket: returning FITM_FD\n");
+        FDBG("do_socket(): returning FITM_FD\n");
         return FITM_FD;
     }
-    FDBG("Socket() called for non-inet protocol\n");
+    FDBG("do_socket(): called for non-inet protocol\n");
     int target_type = type;
     int ret;
 
@@ -2151,7 +2153,7 @@ static abi_long do_bind(int sockfd, abi_ulong target_addr,
         // check: https://github.com/zardus/preeny/blob/master/src/desock.c#L259
         return 0;
     }
-    FDBG("do_bind called on non-fitm sockfd %d\n", sockfd);
+    FDBG("do_bind(): called on non-fitm sockfd %d\n", sockfd);
     
     void *addr;
     abi_long ret;
@@ -2174,7 +2176,7 @@ static abi_long do_connect(int sockfd, abi_ulong target_addr,
                            socklen_t addrlen)
 {
     if (sockfd == FITM_FD) {
-        FDBG("do_connect ignored for %d\n", sockfd);
+        FDBG("do_connect(): ignored for %d\n", sockfd);
         // Connecting to a remote adr. always works as we are only running locally
         // Check: https://github.com/zardus/preeny/blob/master/src/desock.c#L275
         fitm_mode_started = true;
@@ -2405,7 +2407,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 #endif
         return FITM_FD;
     }
-    
+    FDBG("do_accept4(): !fitm_mode_started branch, setting fitm_mode_started to true");
     fitm_mode_started = true;
     sent = true; // << Adding this as fix for the server - it won't send anything, but immediately
 
