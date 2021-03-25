@@ -6,6 +6,7 @@ Cargo.lock
 .idea
 *.out
 *.o
+*.so
 *.cmake
 qemu-x86_64
 *.d

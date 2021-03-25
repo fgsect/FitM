@@ -67,13 +67,13 @@ test -d FitM-qemu || { echo "[-] Not checked out, please checkout submodules usi
 echo "[+] Got FitM-qemu."
 
 cd "FitM-qemu" || exit 1
-if [ -n "$NO_CHECKOUT" ]; then
-  echo "[*] Skipping checkout to $QEMUAFL_VERSION"
-else
-  echo "[*] Checking out $QEMUAFL_VERSION"
-  sh -c 'git stash' 1>/dev/null 2>/dev/null
-  git checkout "$QEMUAFL_VERSION" || echo Warning: could not check out to commit $QEMUAFL_VERSION
-fi
+#if [ -n "$NO_CHECKOUT" ]; then
+#  echo "[*] Skipping checkout to $QEMUAFL_VERSION"
+#else
+#  echo "[*] Checking out $QEMUAFL_VERSION"
+#  sh -c 'git stash' 1>/dev/null 2>/dev/null
+#  git checkout "$QEMUAFL_VERSION" || echo Warning: could not check out to commit $QEMUAFL_VERSION
+#fi
 
 echo "[*] Making sure imported headers matches"
 cp "../../AFLplusplus/include/config.h" "./qemuafl/imported/" || exit 1
