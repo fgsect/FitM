@@ -12,7 +12,7 @@ afl: subinit
 	make -C ./AFLplusplus
 
 qemu: criu subinit
-	cd ./qemu/qemu/ && ./build-for-afl.sh
+	cd ./fitm-qemu && ./build_qemu_support.sh
 
 criu: subinit
 	make -C ./criu

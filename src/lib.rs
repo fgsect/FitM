@@ -284,7 +284,9 @@ impl FITMSnapshot {
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
                     .env("CRIU_SNAPSHOT_OUT_DIR", &snapshot_dir)
-                    .env("AFL_NO_UI", "1");
+                    .env("AFL_NO_UI", "1")
+                    // Let's just assume nothing tries to execute 0x16, so we never hit this entrypoint.
+                    .env("AFL_ENTRYPOINT", "0x16");
 
                 for (k, v) in extra_envs {
                     command.env(*k, *v);
