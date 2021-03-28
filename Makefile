@@ -26,7 +26,7 @@ debug:
 run: fitm #tests debug
 	sudo rm -rf ./active-state
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/release/fitm
+	sudo ./target/release/fitm ./fitm-args.json
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 
