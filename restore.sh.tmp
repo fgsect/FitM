@@ -38,8 +38,9 @@ fi
 if [[ -z "${__AFL_SHM_ID}" ]]; then
   exec 198< /dev/null
   exec 199> /dev/null
-  # We are in a snapshot run force PIDs out of the usual range
-  echo "$((1<<18))" > /proc/sys/kernel/ns_last_pid
+  # We are in a snapshot run force PIDs out of the usual range.
+  # 1<<15 is the largest that's legal on WSL2.
+  echo "$((1<<15))" > /proc/sys/kernel/ns_last_pid
 else
   echo "Running in AFL, no dummy FDs necessary"
 fi
