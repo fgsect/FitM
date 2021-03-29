@@ -35,5 +35,5 @@ tests:
 	$(MAKE) -C ./tests
 
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
-symlink:
+symlink: criu
 	ln -s $(CRIUPATH)/images/rpc.proto || true
