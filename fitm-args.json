@@ -1,9 +1,9 @@
 {
-  "client": "../tests/targets/pjproject/pjsip-apps/bin/pjsua-x86_64-unknown-linux-gnu",
-  "client_args": ["sip:0.0.0.0:5060", "--local-port=1234"],
-  "client_envs": [["QEMU_STRACE", "1"], ["INIT_SOCKET_SKIP", "1"], ["COMMENT", "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"]],
-  "server": "../tests/targets/pjproject/pjsip-apps/bin/pjsua-x86_64-unknown-linux-gnu",
-  "server_args": ["--use-cli", "--no-cli-console", "--auto-answer", "200"],
+  "client": "../tests/targets/tsclientlib/target/debug/examples/simple",
+  "client_args": [],
+  "client_envs": [["QEMU_STRACE", "1"], ["INIT_SOCKET_SKIP", "2"], ["COMMENT", "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"]],
+  "server": "../tests/targets/ts3_server/ts3server",
+  "server_args": [""],
   "server_envs": [["QEMU_STRACE", "1"]],
   "run_time": 1,
   "server_only": false
