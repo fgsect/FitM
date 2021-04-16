@@ -37,3 +37,6 @@ criu_stderr
 criu_stdout
 debug
 fitm-state.json
+
+teamspeak3-server_linux_amd64
+*.swp

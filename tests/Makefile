@@ -11,6 +11,18 @@ pjproject: ./targets/pjproject/pjsip-apps/bin/pjsua-x86_64-unknown-linux-gnu
 
 kamailio: ./targets/kamailio/src/kamailio
 
+./targets/tsclientlib/target/release/examples/simple-sync:
+	git submodule init && git submodule update targets/tsclientlib
+	cd targets/tsclientlib && git submodule init && git submodule update && cd ../../
+	cd targets/tsclientlib && cargo build --release --examples
+
+tsclientlib: ./targets/tsclientlib/target/release/examples/simple-sync
+
+./targets/teamspeak3-server_linux_amd64/ts3server:
+	./download_teamspeak.sh
+
+teamspeak: ./targets/teamspeak3-server_linux_amd64/ts3server
+
 lightftp:
 	$(MAKE) -C ./targets/LightFTP/Source/Release clean all
 
