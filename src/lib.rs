@@ -1244,7 +1244,16 @@ pub fn run(
     let restored_state: Option<Vec<Vec<FITMSnapshot>>> = match fs::read_to_string("fitm-state.json")
     {
         Ok(fitm_json) => match serde_json::from_str(&fitm_json) {
-            Ok(state) => Some(state),
+            Ok(state) => {
+                if (false) {
+                    todo!("Do");
+                    println!("Saved_state was not created for the current binary, restarting.");
+                    None
+                }
+                else {
+                    Some(state)
+                }
+            },
             Err(e) => {
                 println!("No fitm-state.json ({})", e);
                 None
