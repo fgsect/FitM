@@ -1247,14 +1247,17 @@ pub fn run(
             Ok(state) => {
                 let state: Vec<Vec<FITMSnapshot>> = state;
                 // some basic sanity checks for fitm-state.json.
-                if state.len() <= 2 || state[1].is_empty() || state[2].is_empty() ||
-                    state[1][0].target_bin != server_bin || state[2][0].target_bin != client_bin {
+                if state.len() <= 2
+                    || state[1].is_empty()
+                    || state[2].is_empty()
+                    || state[1][0].target_bin != server_bin
+                    || state[2][0].target_bin != client_bin
+                {
                     panic!("Saved_state was not created for the current binaries or is corrupt, please remove (or fix) `fitm-state.json` manually. Bailing out.");
-                }
-                else {
+                } else {
                     Some(state)
                 }
-            },
+            }
             Err(e) => {
                 println!("No fitm-state.json ({})", e);
                 None

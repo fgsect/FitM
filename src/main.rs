@@ -1,9 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::{env, time::Duration};
-use serde::{Deserialize, Serialize};
-
 
 #[derive(Serialize, Deserialize)]
 struct RunArgs {
@@ -28,10 +27,10 @@ fn is_root() {
         Ok(_) => {}
         Err(_) => {
             println!(
-            "{} {} {}",
-            "Please execute FitM as root as it is needed for criu.",
-            "For reference please visit",
-            "https://criu.org/Self_dump#Difficulties"
+                "{} {} {}",
+                "Please execute FitM as root as it is needed for criu.",
+                "For reference please visit",
+                "https://criu.org/Self_dump#Difficulties"
             );
             process::exit(1);
         }
@@ -54,10 +53,9 @@ fn load_args(path: PathBuf) -> RunArgs {
     match fs::read_to_string(path) {
         Ok(args_json) => match serde_json::from_str(&args_json) {
             Ok(run_args) => run_args,
-            Err(e) => panic!("[!] Error parsing fitm-args.json: {:?}", e)
+            Err(e) => panic!("[!] Error parsing fitm-args.json: {:?}", e),
         },
-        Err(e) =>
-            panic!("[!] Error reading fitm-args.json: {:?}", e)
+        Err(e) => panic!("[!] Error reading fitm-args.json: {:?}", e),
     }
 }
 
@@ -77,13 +75,24 @@ fn main() {
 
     println!("cwd: {:?}", std::env::current_dir().unwrap());
 
-    let config_path: PathBuf = std::env::args().nth(1).expect("No config path given").into();
+    let config_path: PathBuf = std::env::args()
+        .nth(1)
+        .expect("No config path given")
+        .into();
     let args = load_args(config_path);
 
     let client_args: Vec<&str> = args.client_args.iter().map(|x| x as &str).collect();
-    let client_envs: Vec<(&str, &str)> = args.client_envs.iter().map(|(x, y)| (x as &str, y as &str)).collect();
+    let client_envs: Vec<(&str, &str)> = args
+        .client_envs
+        .iter()
+        .map(|(x, y)| (x as &str, y as &str))
+        .collect();
     let server_args: Vec<&str> = args.server_args.iter().map(|x| x as &str).collect();
-    let server_envs: Vec<(&str, &str)> = args.server_envs.iter().map(|(x, y)| (x as &str, y as &str)).collect();
+    let server_envs: Vec<(&str, &str)> = args
+        .server_envs
+        .iter()
+        .map(|(x, y)| (x as &str, y as &str))
+        .collect();
 
     // TODO: use argv to fill these
     // Paths are relative to ACTIVE_DIR
