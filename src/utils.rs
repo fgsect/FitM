@@ -1,7 +1,6 @@
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use fs_extra::{self, dir::CopyOptions};
-use json;
 use std::{
     cmp::{max, min},
     fs::{self, create_dir_all},
@@ -36,7 +35,7 @@ where
             break;
         }
     }
-    output_idx.sort();
+    output_idx.sort_unstable();
     output_idx
         .into_iter()
         .map(|x| input_vec[x].clone())
@@ -64,7 +63,7 @@ pub fn parse_pid() -> io::Result<i32> {
     let pid = pstree_json["entries"][0]["pid"]
         .as_i32()
         .expect("[!] Could not transform json value into i32 in utils::parse_pid");
-    Ok(pid.into())
+    Ok(pid)
 }
 
 pub fn mv(from: &str, to: &str) {
@@ -117,9 +116,8 @@ pub fn copy_overwrite(from: &str, to: &str) {
 
 pub fn copy_ignore(from: &str, to: &str) {
     let options = CopyOptions::new();
-    match fs_extra::dir::copy(&from, &to, &options) {
-        Err(e) => println!("Ignored error in copy: {:?}", e),
-        _ => (),
+    if let Err(e) = fs_extra::dir::copy(&from, &to, &options) {
+        println!("Ignored error in copy: {:?}", e)
     }
 }
 
@@ -149,7 +147,7 @@ fn cp_stdfiles(base_state: &str) {
     .expect("[!] Could not copy old stdout file to active-state");
 }
 
-pub fn copy_snapshot_base(base_state: &str) -> () {
+pub fn copy_snapshot_base(base_state: &str) {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
     let new_snapshot = format!("{}", ACTIVE_STATE);
@@ -202,15 +200,15 @@ pub fn latest_snapshot_time(criu_stderr: &str) -> f64 {
     let mut timestamp_cleaned = "0";
     let server_log =
         fs::read_to_string(criu_stderr).expect("[!] Could not read criu_stderr in count_snapshots");
-    let lines: Vec<&str> = server_log.split("\n").collect();
+    let lines: Vec<&str> = server_log.split('\n').collect();
     for line in lines {
         // timestamp has constant length - remove it
-        let splits: Vec<&str> = line.split(" ").collect();
+        let splits: Vec<&str> = line.split(' ').collect();
         // Relevant lines look like this: "(00.055739) Worker(pid 43750) exited with 0"
         if splits.contains(&"Worker(pid") {
             if splits.last().unwrap() == &"0" {
                 let timestamp = splits.first().unwrap();
-                let timestamp_cleaned_new = timestamp.trim_start_matches("(").trim_end_matches(")");
+                let timestamp_cleaned_new = timestamp.trim_start_matches('(').trim_end_matches(')');
                 if timestamp_cleaned_new > timestamp_cleaned {
                     timestamp_cleaned = timestamp_cleaned_new;
                 }
@@ -228,11 +226,8 @@ pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
         .duration_since(*old)
         .expect("[!] duration_since failed to retrieve duration. System clock may have drifted");
     println!("time diff: {:?}", diff);
-    if diff > Duration::from_secs(0) {
-        true
-    } else {
-        false
-    }
+
+    diff > Duration::from_secs(0)
 }
 
 /// Sets the PID-counter to a specific target
@@ -245,7 +240,7 @@ pub fn advance_pid(target: u64) {
         .open("/proc/sys/kernel/ns_last_pid")
         .expect("Failed to open ns_last_pid");
 
-    file.write((target - 1).to_string().as_bytes())
+    file.write_all((target - 1).to_string().as_bytes())
         .expect("Writing failed (higher than /proc/sys/kernel/pid_max?)");
 }
 
@@ -427,9 +422,10 @@ pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
 
     let a_len = a.len();
     let b_len = b.len();
-    if a_len == 0 && b_len == 0 {
+    /* if a_len == 0 && b_len == 0 {
         return 0.0;
-    } else if a_len == 0 || b_len == 0 {
+    } else */
+    if a_len == 0 || b_len == 0 {
         return 0.0;
     } else if a_len == 1 && b_len == 1 && a[0] == b[0] {
         return 1.0;
@@ -474,17 +470,16 @@ pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
         }
     }
 
-    let ret = if matches == 0.0 {
+    if matches == 0.0 {
         0.0
     } else {
         (1.0 / 3.0)
             * ((matches / a_len as f64)
                 + (matches / b_len as f64)
                 + ((matches - transpositions) / matches))
-    };
+    }
 
     //println!("JARO was {} for ({:?} <-> {:?})", ret, &a, &b);
-    ret
 }
 
 #[cfg(test)]

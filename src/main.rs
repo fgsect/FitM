@@ -27,10 +27,9 @@ fn is_root() {
         Ok(_) => {}
         Err(_) => {
             println!(
-                "{} {} {}",
-                "Please execute FitM as root as it is needed for criu.",
-                "For reference please visit",
-                "https://criu.org/Self_dump#Difficulties"
+                "Please execute FitM as root as it is needed for criu. \
+                For reference please visit \
+                https://criu.org/Self_dump#Difficulties"
             );
             process::exit(1);
         }
@@ -96,7 +95,7 @@ fn main() {
 
     // TODO: use argv to fill these
     // Paths are relative to ACTIVE_DIR
-    match fitm::run(
+    if let Err(e) = fitm::run(
         &args.client,
         &client_args,
         &client_envs,
@@ -106,7 +105,6 @@ fn main() {
         &Duration::from_secs(args.run_time),
         args.server_only,
     ) {
-        Err(e) => println!("Error {:?}", e),
-        _ => {}
+        println!("Error {:?}", e);
     };
 }

@@ -136,12 +136,12 @@ impl FITMSnapshot {
             .expect("[-] Could not create out/maps dir!");
 
         let fd_path = format!("{}/fd", ACTIVE_STATE);
-        fs::create_dir(fd_path.clone()).expect("[-] Could not create fd dir!");
+        fs::create_dir(fd_path).expect("[-] Could not create fd dir!");
 
         if from_snapshot {
             // Grab old snapshot from which we want to create a new one here
 
-            if base_state != "".to_string() {
+            if base_state != *"" {
                 utils::copy_snapshot_base(&base_state);
             }
         };
@@ -163,7 +163,7 @@ impl FITMSnapshot {
         // and print a visualization of the state order
         let path = format!("{}/run-info", ACTIVE_STATE);
         let mut file = fs::File::create(path).expect("[!] Could not create FITMSnapshot file");
-        file.write(format!("{:?}", new_run).as_bytes())
+        file.write_all(format!("{:?}", new_run).as_bytes())
             .expect("[!] Could not write to FITMSnapshot file");
 
         new_run
@@ -430,11 +430,8 @@ impl FITMSnapshot {
             .expect("[!]")
             .map(|entry| entry.unwrap())
             .collect();
-        if iter.len() > 0 {
-            true
-        } else {
-            false
-        }
+
+        !iter.is_empty()
     }
 
     /// Start a single fuzz run in afl which gets restored from an earlier
@@ -525,7 +522,7 @@ impl FITMSnapshot {
         println!("         Fuzzer Stats:");
         match fs::read_to_string("./active-state/out/main/fuzzer_stats") {
             Ok(stats) => {
-                for line in stats.split("\n") {
+                for line in stats.split('\n') {
                     if line.starts_with("execs_done")
                         || line.starts_with("execs_per_sec")
                         || line.starts_with("paths_total")
@@ -885,8 +882,8 @@ fn cpy_trace(trace_file: &str, state_path: &str) -> Result<(), io::Error> {
 /// @return: upcoming snaps for the next generation based on current snaps (client->client, server->server)
 pub fn process_stage(
     rand: &mut RomuRand,
-    current_snaps: &Vec<FITMSnapshot>,
-    current_inputs: &Vec<PathBuf>,
+    current_snaps: &[FITMSnapshot],
+    current_inputs: &[PathBuf],
     next_gen_id_start: usize,
     run_time: &Duration,
 ) -> Result<Vec<FITMSnapshot>, io::Error> {
@@ -904,7 +901,7 @@ pub fn process_stage(
             Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
         );
 
-        let cmin_tmp_dir = format!("cmin-tmp");
+        let cmin_tmp_dir = "cmin-tmp";
 
         // remove old tmp if it exists, then recreate
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
@@ -1008,28 +1005,25 @@ pub fn process_stage(
                     entry.file_name().into_string().unwrap()
                 );
 
-                match get_traces(snap.generation).unwrap() {
+                if let Some(traces) = get_traces(snap.generation).unwrap() {
                     // If we have seen the current trace before we don't want to create a new snapshot for this input
-                    Some(traces) => {
-                        let cur_trace = fs::read_to_string(&trace_file)
-                            .expect("[!] Could not read current trace_file in process_stage");
-                        if traces.iter().any(|trace| trace == cur_trace.as_str()) {
-                            println!("==== [*] Skipping snapshot run for input (duplicate trace): {:?} ====", entry.path());
-                            continue;
-                        }
+                    let cur_trace = fs::read_to_string(&trace_file)
+                        .expect("[!] Could not read current trace_file in process_stage");
+                    if traces.iter().any(|trace| trace == cur_trace.as_str()) {
+                        println!(
+                            "==== [*] Skipping snapshot run for input (duplicate trace): {:?} ====",
+                            entry.path()
+                        );
+                        continue;
                     }
-                    _ => (),
                 }
                 let snap_option = snap
                     .create_next_snapshot(state_id, entry.path().as_os_str().to_str().unwrap())?;
-                match snap_option {
-                    Some(new_snap) => {
-                        cpy_trace(trace_file.as_str(), &new_snap.state_path)?;
+                if let Some(new_snap) = snap_option {
+                    cpy_trace(trace_file.as_str(), &new_snap.state_path)?;
 
-                        // Commit this fresly-baked snapshot to our vec.
-                        next_own_snaps.push(new_snap);
-                    }
-                    None => (),
+                    // Commit this fresly-baked snapshot to our vec.
+                    next_own_snaps.push(new_snap);
                 }
             }
         }
@@ -1179,21 +1173,21 @@ pub fn get_traces(gen_id: u32) -> io::Result<Option<Vec<String>>> {
                 .expect("[!] Error while reading snapshot_map files in get_traces")
         })
         .collect();
-    if traces_vec.len() > 0 {
-        Ok(Some(traces_vec))
-    } else {
+    if traces_vec.is_empty() {
         println!(
             "{}No other traces found!{}",
             color::Fg(color::Yellow),
             style::Reset
         );
         Ok(None)
+    } else {
+        Ok(Some(traces_vec))
     }
 }
 
 /// We try to restore, let's see how it goes.
 pub fn save_restore_generation_state(
-    generation_snaps: &Vec<Vec<FITMSnapshot>>,
+    generation_snaps: &[Vec<FITMSnapshot>],
 ) -> Result<(), io::Error> {
     let mut file = File::create("fitm-state.json")?;
     file.write_all(serde_json::to_string(generation_snaps)?.as_bytes())
@@ -1355,7 +1349,7 @@ pub fn run(
 
     loop {
         current_gen += 1;
-        if generation_snaps[current_gen].len() == 0 {
+        if generation_snaps[current_gen].is_empty() {
             println!(
                 "No snapshots (yet) for gen {}, restarting with gen 1 (initial request)",
                 current_gen
