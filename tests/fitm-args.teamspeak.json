@@ -1,5 +1,5 @@
 {
-  "client": "../tests/targets/tsclientlib/release/examples/client",
+  "client": "../tests/targets/tsclientlib/target/release/examples/client",
   "client_args": [],
   "client_envs": [["QEMU_STRACE", "1"], ["INIT_SOCKET_SKIP", "0"], ["COMMENT", "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"]],
   "server": "../tests/targets/teamspeak3-server_linux_amd64/ts3server",
