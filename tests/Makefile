@@ -1,4 +1,4 @@
-all: lightftp live555 pseudotest_simple kamailio pjproject
+all: lightftp live555 pseudotest_simple kamailio pjproject teamspeak tsclientlib
 
 ./targets/pjproject/pjsip-apps/bin/pjsua-x86_64-unknown-linux-gnu:
 	cd ./targets/pjproject && ./configure && $(MAKE) dep && $(MAKE) clean && $(MAKE) && cd ../../
