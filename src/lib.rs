@@ -1245,10 +1245,11 @@ pub fn run(
     {
         Ok(fitm_json) => match serde_json::from_str(&fitm_json) {
             Ok(state) => {
-                if (false) {
-                    todo!("Do");
-                    println!("Saved_state was not created for the current binary, restarting.");
-                    None
+                let state: Vec<Vec<FITMSnapshot>> = state;
+                // some basic sanity checks for fitm-state.json.
+                if state.len() <= 2 || state[1].is_empty() || state[2].is_empty() ||
+                    state[1][0].target_bin != server_bin || state[2][0].target_bin != client_bin {
+                    panic!("Saved_state was not created for the current binaries or is corrupt, please remove (or fix) `fitm-state.json` manually. Bailing out.");
                 }
                 else {
                     Some(state)
