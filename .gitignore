@@ -40,3 +40,7 @@ fitm-state.json
 
 teamspeak3-server_linux_amd64
 *.swp
+logs
+ts3server.sqlitedb
+ts3server.sqlitedb-shm
+ts3server.sqlitedb-wal
