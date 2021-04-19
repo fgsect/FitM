@@ -744,7 +744,7 @@ impl FITMSnapshot {
             Ok(Some(afl))
         } else {
             println!(
-                "{}==== [x] Snapshot not created (traget exited): {} with input {} ===={}",
+                "{}==== [x] Snapshot not created (target exited): {} with input {} ===={}",
                 color::Fg(color::Yellow),
                 afl.state_path,
                 input_path,
