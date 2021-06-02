@@ -2,7 +2,7 @@
 
 CRIUPATH?=./criu
 
-all: criu symlink qemu afl
+all: criu symlink qemu afl tests
 
 subinit:
 	git submodule init || true

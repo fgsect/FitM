@@ -1257,8 +1257,8 @@ pub fn run(
                 None
             }
         },
-        Err(e) => {
-            println!("File fitm-state.json not found ({})", e);
+        Err(_) => {
+            println!("File fitm-state.json not found. Restarting from scratch.");
             None
         }
     };
