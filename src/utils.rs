@@ -5,7 +5,7 @@ use std::{
     cmp::{max, min},
     fs::{self, create_dir_all},
     io::{self, ErrorKind, Write},
-    path::PathBuf,
+    path::Path,
     process::{Child, Command, ExitStatus, Stdio},
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -69,7 +69,7 @@ pub fn parse_pid() -> io::Result<i32> {
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::move_dir(&from, &to, &options)
-        .expect(format!("utils::mv failed to move '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::mv failed to move '{}' to '{}'", from, to));
 }
 
 pub fn mv_rename(from: &str, to: &str) {
@@ -92,7 +92,7 @@ pub fn mv_rename(from: &str, to: &str) {
 pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::copy(&from, &to, &options)
-        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::copy failed to copy '{}' to '{}'", from, to));
 }
 
 pub fn cp_recursive(from: &str, to: &str) {
@@ -111,7 +111,7 @@ pub fn copy_overwrite(from: &str, to: &str) {
     let mut options = CopyOptions::new();
     options.overwrite = true;
     fs_extra::dir::copy(&from, &to, &options)
-        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::copy failed to copy '{}' to '{}'", from, to));
 }
 
 pub fn copy_ignore(from: &str, to: &str) {
@@ -128,7 +128,7 @@ pub fn rm(dir: &str) {
         .spawn()
         .expect("[!] Could not start removing dir/file")
         .wait()
-        .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
+        .unwrap_or_else(|_| panic!("[!] Removing dir/file {} failed.", dir));
 }
 
 fn cp_stdfiles(base_state: &str) {
@@ -150,7 +150,7 @@ fn cp_stdfiles(base_state: &str) {
 pub fn copy_snapshot_base(base_state: &str) {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
-    let new_snapshot = format!("{}", ACTIVE_STATE);
+    let new_snapshot = ACTIVE_STATE.to_string();
 
     cp_recursive(old_snapshot.as_str(), new_snapshot.as_str());
 
@@ -161,7 +161,7 @@ pub fn copy_snapshot_base(base_state: &str) {
 
     // copy old fd folder for new state
     let from = format!("./saved-states/{}/fd", base_state);
-    let to = format!("{}", ACTIVE_STATE);
+    let to = ACTIVE_STATE.to_string();
     copy(&from, &to);
 
     // copy old stdout/err since they are part of the process' state
@@ -245,7 +245,7 @@ pub fn advance_pid(target: u64) {
 }
 
 pub fn waitpid(snapshot_pid: libc::pid_t) -> io::Result<ExitStatus> {
-    let mut status = 0 as libc::c_int;
+    let mut status = 0_i32;
     loop {
         let result = unsafe { libc::waitpid(snapshot_pid, &mut status, 0) };
         if result == -1 {
@@ -266,18 +266,18 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
     let criu_stderr = fs::File::create(CRIU_STDERR).expect("[!] Could not create criu_stderr");
     Command::new(criu_path)
         .args(&[
-            format!("service"),
-            format!("-v4"),
-            format!("--address"),
-            format!("{}", socket_path),
-            format!("--display-stats"),
+            "service",
+            "-v4",
+            "--display-stats",
+            "--address",
+            socket_path,
         ])
         .stdout(Stdio::from(criu_stdout))
         .stderr(Stdio::from(criu_stderr))
         .spawn()
 }
 
-pub fn get_filesize(path: &PathBuf) -> u64 {
+pub fn get_filesize(path: &Path) -> u64 {
     let metadata = fs::metadata(path)
         .expect("[!] Could not grab metadata for cur_file in utils::get_filesize");
     metadata.len()

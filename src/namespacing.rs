@@ -139,6 +139,12 @@ impl NamespaceContext {
     }
 }
 
+impl Default for NamespaceContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Namespace {
     pub init_pid: pid_t,
     pub status: Option<ExitStatus>,
@@ -150,7 +156,7 @@ impl Namespace {
             return Ok(status);
         }
 
-        let mut status = 0 as libc::c_int;
+        let mut status = 0_i32;
         loop {
             let result = unsafe { libc::waitpid(self.init_pid, &mut status, 0) };
             if result == -1 {

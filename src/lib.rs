@@ -101,6 +101,7 @@ fn state_path_for(gen: u32, state_id: usize) -> String {
 /// Createing a new FITMSnapshot will create the necessary directory in active-state
 impl FITMSnapshot {
     /// Create a new afl run instance
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         generation: u32,
         state_id: usize,
@@ -184,14 +185,13 @@ impl FITMSnapshot {
                 .path();
             if path.is_file() {
                 let to = &format!("./saved-states/{}/outputs/initial{}", &state_path, i);
-                std::fs::copy(&path, &to).expect(
-                    format!(
+                std::fs::copy(&path, &to).unwrap_or_else(|_| {
+                    panic!(
                         "[!] Could not copy {:?} to {} in copy_fds_to_output_for",
                         path,
                         to.as_str()
                     )
-                    .as_str(),
-                );
+                });
             }
         }
     }
@@ -303,7 +303,7 @@ impl FITMSnapshot {
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
-                    .expect(&format!("[!] Snapshot run failed for {}", &self.target_bin));
+                    .unwrap_or_else(|_| panic!("[!] Snapshot run failed for {}", &self.target_bin));
 
                 Ok(exit_status.code().unwrap())
             })
@@ -363,12 +363,7 @@ impl FITMSnapshot {
                 fs::create_dir(&next_snapshot_dir).expect("[-] Could not create snapshot dir!");
 
                 let _restore = Command::new("setsid")
-                    .args(&[
-                        format!("stdbuf"),
-                        format!("-oL"),
-                        format!("./restore.sh"),
-                        stdin_path.to_string(),
-                    ])
+                    .args(&["stdbuf", "-oL", "./restore.sh", stdin_path])
                     .stdin(Stdio::from(stdin_file))
                     .stdout(Stdio::from(stdout))
                     .stderr(Stdio::from(stderr))
@@ -663,10 +658,7 @@ impl FITMSnapshot {
 
         // Iterate through all entries of given folder and create output for each
         for (_, entry) in fs::read_dir(input_path)
-            .expect(&format!(
-                "[!] Could not read queue of state: {}",
-                self.state_path
-            ))
+            .unwrap_or_else(|_| panic!("[!] Could not read queue of state: {}", self.state_path))
             .enumerate()
         {
             let entry_unwrapped = entry.unwrap();
@@ -864,14 +856,13 @@ fn cpy_trace(trace_file: &str, state_path: &str) -> Result<(), io::Error> {
     // Copy the .trace to the new snapshot dir
     let to = format!("./saved-states/{}/snapshot_map", state_path);
     println!("saving trace_file: {} to: {}", &trace_file, &to);
-    fs::copy(&trace_file, &to).expect(
-        format!(
+    fs::copy(&trace_file, &to).unwrap_or_else(|_| {
+        panic!(
             "[!] cpy_trace failed to copy trace_file: {} to: {}",
             trace_file,
             to.as_str()
         )
-        .as_str(),
-    );
+    });
 
     Ok(())
 }
@@ -929,7 +920,7 @@ pub fn process_stage(
         // current output to cmin-tmp
         let _ = std::fs::remove_dir_all(&cmin_tmp_dir);
         snap.copy_queue_to(&Path::new(&cmin_tmp_dir), true)
-            .expect(format!("[!] copy_queue_to failed for snap: {}", snap.state_path).as_str());
+            .unwrap_or_else(|_| panic!("[!] copy_queue_to failed for snap: {}", snap.state_path));
 
         // Replace the old stored queue with the new, cminned queue
         let cmin_post_exec = format!("saved-states/{}/out/main/queue", snap.state_path);
@@ -1148,10 +1139,7 @@ pub fn get_traces(gen_id: u32) -> io::Result<Option<Vec<String>>> {
     let snapshot_regex = gen_path.unwrap();
     // Collect all snapshot folders in saved-states
     let states_iter = fs::read_dir(SAVED_STATES)
-        .expect(&format!(
-            "[!] Could not read_dir {} in get_traces.",
-            SAVED_STATES
-        ))
+        .unwrap_or_else(|_| panic!("[!] Could not read_dir {} in get_traces.", SAVED_STATES))
         .into_iter()
         .filter_map(|dir| dir.ok())
         .filter(|dir_entry| {
@@ -1195,6 +1183,7 @@ pub fn save_restore_generation_state(
 
 /// Run fitm
 /// runtime indicates the time, after which the fuzzer switches to the next entry
+#[allow(clippy::clippy::too_many_arguments)]
 pub fn run(
     client_bin: &str,
     client_args: &[&str],
@@ -1332,15 +1321,15 @@ pub fn run(
             // We need initial outputs from the client, else something went wrong
             assert_ne!(input_file_list_for_gen(1, true)?.len(), 0);
 
-            let mut generation_snaps: Vec<Vec<FITMSnapshot>> = vec![];
-            // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
-            generation_snaps.push(vec![]);
-            // Gen 1 server is the initial server snapshot at recv, awaiting gen 0's output as input
-            generation_snaps.push(vec![afl_server]);
-            // Gen 2 client is the initial client snapshot, awaiting gen 1's output (server response) as input
-            generation_snaps.push(vec![afl_client_snap]);
-
-            generation_snaps
+            // Create the generation snaps vec
+            vec![
+                // Gen 0 client doesn't need a snapshot (it's the run from binary start to initial recv)
+                vec![],
+                // Gen 1 server is the initial server snapshot at recv, awaiting gen 0's output as input
+                vec![afl_server],
+                // Gen 2 client is the initial client snapshot, awaiting gen 1's output (server response) as input
+                vec![afl_client_snap],
+            ]
         }
     };
 
