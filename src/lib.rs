@@ -1,7 +1,11 @@
-use std::fs::{self, DirEntry, File};
+use std::collections::HashMap;
+use std::ffi::OsString;
+use std::fs::{self, remove_dir_all, DirEntry, File};
 use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread::sleep;
+use std::time::Duration;
 use std::{env, fmt};
 
 use crate::namespacing::NamespaceContext;
@@ -10,11 +14,7 @@ use crate::utils::{advance_pid, cp_recursive, get_filesize, pick_random, spawn_c
 use chrono::Local;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::ffi::OsString;
-use std::fs::remove_dir_all;
-use std::result::Result;
-use std::thread::sleep;
-use std::time::Duration;
+
 use termion::{color, style};
 
 pub mod namespacing;
@@ -68,6 +68,8 @@ pub struct FITMSnapshot {
     pub origin_state: String,
     /// Pid of the snapshotted process
     pub pid: Option<i32>,
+    /// A list of files related to the process-snapshot
+    pub files: Vec<String>,
 }
 
 impl fmt::Debug for FITMSnapshot {
@@ -158,6 +160,7 @@ impl FITMSnapshot {
             initial: false,
             origin_state,
             pid,
+            files: Vec::new(),
         };
 
         // We can write a tool in the future to parse this info
@@ -168,6 +171,11 @@ impl FITMSnapshot {
             .expect("[!] Could not write to FITMSnapshot file");
 
         new_run
+    }
+
+    pub fn attach_files(mut self, file_list: &[String]) -> Self {
+        self.files.extend_from_slice(file_list);
+        self
     }
 
     /// Copies everything in ./fd to ./outputs/ of a specified state path.
@@ -243,10 +251,16 @@ impl FITMSnapshot {
         rand: &mut RomuRand,
         create_outputs: bool,
         create_snapshot: bool,
-        cli_args: &[&str],
-        extra_envs: &[(&str, &str)],
+        cli_args: &[String],
+        extra_envs: &HashMap<String, String>,
     ) -> Result<Option<i32>, io::Error> {
         ensure_dir_exists(ACTIVE_STATE);
+
+        for file in &self.files {
+            if !cp_recursive(file, ACTIVE_STATE).success() {
+                panic!("Could not copy {}", file);
+            }
+        }
 
         // Start the initial snapshot run. We use our patched qemu to emulate
         // until the first recv of the target is hit. We have to use setsid to
@@ -289,7 +303,7 @@ impl FITMSnapshot {
                     .env("AFL_ENTRYPOINT", "0x16");
 
                 for (k, v) in extra_envs {
-                    command.env(*k, *v);
+                    command.env(k, v);
                 }
                 if create_outputs {
                     command.env("FITM_CREATE_OUTPUTS", "1");
@@ -1186,11 +1200,13 @@ pub fn save_restore_generation_state(
 #[allow(clippy::clippy::too_many_arguments)]
 pub fn run(
     client_bin: &str,
-    client_args: &[&str],
-    client_envs: &[(&str, &str)],
+    client_args: &[String],
+    client_envs: &HashMap<String, String>,
+    client_files: &[String],
     server_bin: &str,
-    server_args: &[&str],
-    server_envs: &[(&str, &str)],
+    server_args: &[String],
+    server_envs: &HashMap<String, String>,
+    server_files: &[String],
     run_time: &Duration,
     // Still needs an echo binary or a binary producing a short output, as client
     // Just fuzzes the client for 100 millis.
@@ -1279,7 +1295,8 @@ pub fn run(
                 false,
                 false,
                 None,
-            );
+            )
+            .attach_files(client_files);
 
             // first create a snapshot, without outputs
             afl_client_snap.pid =
@@ -1297,7 +1314,8 @@ pub fn run(
                 false,
                 false,
                 None,
-            );
+            )
+            .attach_files(client_files);
             tmp.init_run(&mut rand, true, false, client_args, client_envs)?;
 
             let mut afl_server: FITMSnapshot = FITMSnapshot::new(
@@ -1309,7 +1327,8 @@ pub fn run(
                 true,
                 false,
                 None,
-            );
+            )
+            .attach_files(server_files);
             afl_server.pid =
                 afl_server.init_run(&mut rand, false, true, server_args, server_envs)?;
 

@@ -95,16 +95,15 @@ pub fn copy(from: &str, to: &str) {
         .unwrap_or_else(|_| panic!("utils::copy failed to copy '{}' to '{}'", from, to));
 }
 
-pub fn cp_recursive(from: &str, to: &str) {
+pub fn cp_recursive(from: &str, to: &str) -> ExitStatus {
     // preserve is needed because otherwise file permissions change through copying
-    Command::new("cp")
+    let ret = Command::new("cp")
         .args(&["--preserve", "-r", from, to])
-        .spawn()
-        .expect("[!] Could not spawn cp cmd")
-        .wait()
+        .status()
         .expect("[!] Failed to wait for cp");
 
     Command::new("sync").status().unwrap();
+    ret
 }
 
 pub fn copy_overwrite(from: &str, to: &str) {
