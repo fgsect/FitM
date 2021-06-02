@@ -5,8 +5,8 @@ CRIUPATH?=./criu
 all: criu symlink qemu afl
 
 subinit:
-	git submodule init
-	git submodule update
+	git submodule init || true
+	git submodule update || true
 
 afl: subinit
 	make -C ./AFLplusplus

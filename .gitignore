@@ -44,3 +44,6 @@ logs
 ts3server.sqlitedb
 ts3server.sqlitedb-shm
 ts3server.sqlitedb-wal
+
+.vagrant
+tmp

@@ -1,0 +1,3 @@
+chown -Rv _apt:root /var/cache/apt/archives/partial/
+chmod -Rv 700 /var/cache/apt/archives/partial/
+apt-get -y install python-ipaddress make protobuf-compiler protobuf-c-compiler protobuf-compiler libprotobuf-c-dev libprotobuf-dev libnet-dev python3-protobuf python3-yaml protobuf-c-compiler gcc binutils pkg-config libbsd-dev libprotobuf-dev libprotobuf-c-dev protobuf-c-compiler protobuf-compiler python-protobuf libnl-3-dev libcap-dev
