@@ -7,4 +7,4 @@ apt-get -y install build-essential binutils pkg-config python-ipaddress make pro
 sudo -u vagrant -- sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 
 # target deps
-apt-get -y install libgnutls28-dev bison flex libssl-dev autoconf libtool || true
+apt-get -y install libgnutls28-dev bison flex libssl-dev autoconf libtool libsdl2-dev || true
