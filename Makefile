@@ -2,17 +2,17 @@
 
 CRIUPATH?=./criu
 
-all: criu symlink qemu afl
+all: criu symlink qemu afl tests
 
 subinit:
-	git submodule init
-	git submodule update
+	git submodule init || true
+	git submodule update || true
 
 afl: subinit
 	make -C ./AFLplusplus
 
 qemu: criu subinit
-	cd ./qemu/qemu/ && ./build-for-afl.sh
+	cd ./fitm-qemu && ./build_incremental.sh
 
 criu: subinit
 	make -C ./criu
@@ -26,7 +26,7 @@ debug:
 run: fitm #tests debug
 	sudo rm -rf ./active-state
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/release/fitm
+	sudo ./target/release/fitm ./fitm-args.json
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 
@@ -35,5 +35,5 @@ tests:
 	$(MAKE) -C ./tests
 
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
-symlink:
+symlink: criu
 	ln -s $(CRIUPATH)/images/rpc.proto || true

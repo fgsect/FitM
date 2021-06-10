@@ -19,3 +19,9 @@
 [submodule "tests/targets/pjproject"]
 	path = tests/targets/pjproject
 	url = git@github.com:derpsteb/pjproject.git
+[submodule "fitm-qemu/FitM-qemu"]
+	path = fitm-qemu/FitM-qemu
+	url = git@github.com:fgsect/FitM-qemu.git
+[submodule "tests/targets/tsclientlib"]
+	path = tests/targets/tsclientlib
+	url = git@github.com:ReSpeak/tsclientlib.git

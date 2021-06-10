@@ -1,12 +1,11 @@
 use crate::{FITMSnapshot, ACTIVE_STATE, CRIU_STDERR, CRIU_STDOUT};
 
 use fs_extra::{self, dir::CopyOptions};
-use json;
 use std::{
     cmp::{max, min},
     fs::{self, create_dir_all},
     io::{self, ErrorKind, Write},
-    path::PathBuf,
+    path::Path,
     process::{Child, Command, ExitStatus, Stdio},
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -36,7 +35,7 @@ where
             break;
         }
     }
-    output_idx.sort();
+    output_idx.sort_unstable();
     output_idx
         .into_iter()
         .map(|x| input_vec[x].clone())
@@ -64,13 +63,13 @@ pub fn parse_pid() -> io::Result<i32> {
     let pid = pstree_json["entries"][0]["pid"]
         .as_i32()
         .expect("[!] Could not transform json value into i32 in utils::parse_pid");
-    Ok(pid.into())
+    Ok(pid)
 }
 
 pub fn mv(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::move_dir(&from, &to, &options)
-        .expect(format!("utils::mv failed to move '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::mv failed to move '{}' to '{}'", from, to));
 }
 
 pub fn mv_rename(from: &str, to: &str) {
@@ -93,33 +92,31 @@ pub fn mv_rename(from: &str, to: &str) {
 pub fn copy(from: &str, to: &str) {
     let options = CopyOptions::new();
     fs_extra::dir::copy(&from, &to, &options)
-        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::copy failed to copy '{}' to '{}'", from, to));
 }
 
-pub fn cp_recursive(from: &str, to: &str) {
+pub fn cp_recursive(from: &str, to: &str) -> ExitStatus {
     // preserve is needed because otherwise file permissions change through copying
-    Command::new("cp")
+    let ret = Command::new("cp")
         .args(&["--preserve", "-r", from, to])
-        .spawn()
-        .expect("[!] Could not spawn cp cmd")
-        .wait()
+        .status()
         .expect("[!] Failed to wait for cp");
 
     Command::new("sync").status().unwrap();
+    ret
 }
 
 pub fn copy_overwrite(from: &str, to: &str) {
     let mut options = CopyOptions::new();
     options.overwrite = true;
     fs_extra::dir::copy(&from, &to, &options)
-        .expect(format!("utils::copy failed to copy '{}' to '{}'", from, to).as_str());
+        .unwrap_or_else(|_| panic!("utils::copy failed to copy '{}' to '{}'", from, to));
 }
 
 pub fn copy_ignore(from: &str, to: &str) {
     let options = CopyOptions::new();
-    match fs_extra::dir::copy(&from, &to, &options) {
-        Err(e) => println!("Ignored error in copy: {:?}", e),
-        _ => (),
+    if let Err(e) = fs_extra::dir::copy(&from, &to, &options) {
+        println!("Ignored error in copy: {:?}", e)
     }
 }
 
@@ -130,7 +127,7 @@ pub fn rm(dir: &str) {
         .spawn()
         .expect("[!] Could not start removing dir/file")
         .wait()
-        .expect(format!("[!] Removing dir/file {} failed.", dir).as_str());
+        .unwrap_or_else(|_| panic!("[!] Removing dir/file {} failed.", dir));
 }
 
 fn cp_stdfiles(base_state: &str) {
@@ -149,10 +146,10 @@ fn cp_stdfiles(base_state: &str) {
     .expect("[!] Could not copy old stdout file to active-state");
 }
 
-pub fn copy_snapshot_base(base_state: &str) -> () {
+pub fn copy_snapshot_base(base_state: &str) {
     // copy old snapshot folder for criu
     let old_snapshot = format!("./saved-states/{}/snapshot", base_state);
-    let new_snapshot = format!("{}", ACTIVE_STATE);
+    let new_snapshot = ACTIVE_STATE.to_string();
 
     cp_recursive(old_snapshot.as_str(), new_snapshot.as_str());
 
@@ -163,7 +160,7 @@ pub fn copy_snapshot_base(base_state: &str) -> () {
 
     // copy old fd folder for new state
     let from = format!("./saved-states/{}/fd", base_state);
-    let to = format!("{}", ACTIVE_STATE);
+    let to = ACTIVE_STATE.to_string();
     copy(&from, &to);
 
     // copy old stdout/err since they are part of the process' state
@@ -202,15 +199,15 @@ pub fn latest_snapshot_time(criu_stderr: &str) -> f64 {
     let mut timestamp_cleaned = "0";
     let server_log =
         fs::read_to_string(criu_stderr).expect("[!] Could not read criu_stderr in count_snapshots");
-    let lines: Vec<&str> = server_log.split("\n").collect();
+    let lines: Vec<&str> = server_log.split('\n').collect();
     for line in lines {
         // timestamp has constant length - remove it
-        let splits: Vec<&str> = line.split(" ").collect();
+        let splits: Vec<&str> = line.split(' ').collect();
         // Relevant lines look like this: "(00.055739) Worker(pid 43750) exited with 0"
         if splits.contains(&"Worker(pid") {
             if splits.last().unwrap() == &"0" {
                 let timestamp = splits.first().unwrap();
-                let timestamp_cleaned_new = timestamp.trim_start_matches("(").trim_end_matches(")");
+                let timestamp_cleaned_new = timestamp.trim_start_matches('(').trim_end_matches(')');
                 if timestamp_cleaned_new > timestamp_cleaned {
                     timestamp_cleaned = timestamp_cleaned_new;
                 }
@@ -228,11 +225,8 @@ pub fn positive_time_diff(old: &SystemTime, new: &SystemTime) -> bool {
         .duration_since(*old)
         .expect("[!] duration_since failed to retrieve duration. System clock may have drifted");
     println!("time diff: {:?}", diff);
-    if diff > Duration::from_secs(0) {
-        true
-    } else {
-        false
-    }
+
+    diff > Duration::from_secs(0)
 }
 
 /// Sets the PID-counter to a specific target
@@ -245,12 +239,12 @@ pub fn advance_pid(target: u64) {
         .open("/proc/sys/kernel/ns_last_pid")
         .expect("Failed to open ns_last_pid");
 
-    file.write((target - 1).to_string().as_bytes())
+    file.write_all((target - 1).to_string().as_bytes())
         .expect("Writing failed (higher than /proc/sys/kernel/pid_max?)");
 }
 
 pub fn waitpid(snapshot_pid: libc::pid_t) -> io::Result<ExitStatus> {
-    let mut status = 0 as libc::c_int;
+    let mut status = 0_i32;
     loop {
         let result = unsafe { libc::waitpid(snapshot_pid, &mut status, 0) };
         if result == -1 {
@@ -271,18 +265,18 @@ pub fn spawn_criu(criu_path: &str, socket_path: &str) -> io::Result<Child> {
     let criu_stderr = fs::File::create(CRIU_STDERR).expect("[!] Could not create criu_stderr");
     Command::new(criu_path)
         .args(&[
-            format!("service"),
-            format!("-v4"),
-            format!("--address"),
-            format!("{}", socket_path),
-            format!("--display-stats"),
+            "service",
+            "-v4",
+            "--display-stats",
+            "--address",
+            socket_path,
         ])
         .stdout(Stdio::from(criu_stdout))
         .stderr(Stdio::from(criu_stderr))
         .spawn()
 }
 
-pub fn get_filesize(path: &PathBuf) -> u64 {
+pub fn get_filesize(path: &Path) -> u64 {
     let metadata = fs::metadata(path)
         .expect("[!] Could not grab metadata for cur_file in utils::get_filesize");
     metadata.len()
@@ -427,9 +421,10 @@ pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
 
     let a_len = a.len();
     let b_len = b.len();
-    if a_len == 0 && b_len == 0 {
+    /* if a_len == 0 && b_len == 0 {
         return 0.0;
-    } else if a_len == 0 || b_len == 0 {
+    } else */
+    if a_len == 0 || b_len == 0 {
         return 0.0;
     } else if a_len == 1 && b_len == 1 && a[0] == b[0] {
         return 1.0;
@@ -474,17 +469,16 @@ pub fn jaro(a: &[u8], b: &[u8]) -> f64 {
         }
     }
 
-    let ret = if matches == 0.0 {
+    if matches == 0.0 {
         0.0
     } else {
         (1.0 / 3.0)
             * ((matches / a_len as f64)
                 + (matches / b_len as f64)
                 + ((matches - transpositions) / matches))
-    };
+    }
 
     //println!("JARO was {} for ({:?} <-> {:?})", ret, &a, &b);
-    ret
 }
 
 #[cfg(test)]

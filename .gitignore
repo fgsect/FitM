@@ -6,6 +6,7 @@ Cargo.lock
 .idea
 *.out
 *.o
+*.so
 *.cmake
 qemu-x86_64
 *.d
@@ -36,3 +37,13 @@ criu_stderr
 criu_stdout
 debug
 fitm-state.json
+
+teamspeak3-server_linux_amd64
+*.swp
+logs
+ts3server.sqlitedb
+ts3server.sqlitedb-shm
+ts3server.sqlitedb-wal
+
+.vagrant
+tmp

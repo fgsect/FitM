@@ -1,0 +1,26 @@
+{
+  "server": "../tests/targets/tsclientlib/target/release/examples/simple",
+  "server_args": [],
+  "server_envs": {
+    "QEMU_STRACE": "1", 
+    "INIT_SOCKET_SKIP": "2",
+    "COMMENT": "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"
+  },
+  "server_files": [],
+  "client": "./ts3server",
+  "client_args": ["license_accepted=1"],
+  "client_envs": {
+    "QEMU_STRACE": "1"
+  },
+  "client_files": [
+    "tests/targets/teamspeak3-server_linux_amd64/ts3server",
+    "tests/targets/teamspeak3-server_linux_amd64/ts3server.sqlitedb",
+    "tests/targets/teamspeak3-server_linux_amd64/sql",
+    "tests/targets/teamspeak3-server_linux_amd64/redist",
+    "tests/targets/teamspeak3-server_linux_amd64/tsdns",
+    "tests/targets/teamspeak3-server_linux_amd64/libts3_ssh.so",
+    "tests/targets/teamspeak3-server_linux_amd64/libts3db_sqlite3.so"
+  ],
+  "run_time": 1,
+  "server_only": false
+}

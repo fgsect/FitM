@@ -139,6 +139,12 @@ impl NamespaceContext {
     }
 }
 
+impl Default for NamespaceContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Namespace {
     pub init_pid: pid_t,
     pub status: Option<ExitStatus>,
@@ -150,7 +156,7 @@ impl Namespace {
             return Ok(status);
         }
 
-        let mut status = 0 as libc::c_int;
+        let mut status = 0_i32;
         loop {
             let result = unsafe { libc::waitpid(self.init_pid, &mut status, 0) };
             if result == -1 {
@@ -379,7 +385,9 @@ mod tests {
             None,
         );
 
-        afl_server_snap.init_run(false, true, &[], &[], &[]).unwrap();
+        afl_server_snap
+            .init_run(false, true, &[], &[], &[])
+            .unwrap();
 
         std::fs::write("./saved-states/fitm-gen1-state0/in/testinp", "ulullulul")
             .expect("failed to create test-input");
