@@ -9,6 +9,8 @@
   "server": "./ts3server",
   "server_args": ["license_accepted=1"],
   "server_envs": {
+    "QEMU_STRACE": "1",
+    "AFL_DEBUG": "1"
   },
   "server_files": [
     "tests/targets/teamspeak3-server_linux_amd64/ts3server",
