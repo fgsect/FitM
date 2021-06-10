@@ -1,16 +1,20 @@
-.PHONY: all afl qemu criu fitm debug tests
+.PHONY: all afl qemu criu fitm debug tests subinit
 
 CRIUPATH?=./criu
 
 all: criu symlink qemu afl
 
-afl:
+subinit:
+	git submodule init
+	git submodule update
+
+afl: subinit
 	make -C ./AFLplusplus
 
-qemu:
+qemu: criu subinit
 	cd ./qemu/qemu/ && ./build-for-afl.sh
 
-criu:
+criu: subinit
 	make -C ./criu
 
 fitm:
@@ -19,10 +23,10 @@ fitm:
 debug:
 	cargo build
 
-run: tests debug
+run: fitm #tests debug
 	sudo rm -rf ./active-state
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/debug/fitm
+	sudo ./target/release/fitm
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 

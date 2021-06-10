@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-This script outputs a whole connection, from beginning to end, with the delimeters
+This script outputs a whole connection, from beginning to end,
+If you want, you can add `-v` to get delimeters, like
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>NEXt>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 """
 # fitm-gen22-state0/envfile | grep INPUT_FILENAME
@@ -10,34 +11,59 @@ This script outputs a whole connection, from beginning to end, with the delimete
 import os
 import sys
 
-if len(sys.argv) < 2:
-    raise Exception("Usage: ./path/to/fitm-genX-stateY")
-
-current_state = sys.argv[1]
-
-connection_files = []
-
 NEXT = (
     ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>NEXT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 )
-ENVFILE = "envfile"
-IF_TOK = "INPUT_FILENAME="
+# ENVFILE = "envfile"
+# IF_TOK = "INPUT_FILENAME="
+PREV_INPUT_FILE = "prev_input"
+PREV_INPUT_PATH = "prev_input_path"
+
+
+if len(sys.argv) < 2:
+    raise Exception("Usage: [-v] ./path/to/fitm-genX-stateY")
+
+
+def faux_print(*args, **kwargs):
+    pass
+
+
+# -r => raw message, don't print information.
+if len(sys.argv) > 2 and sys.argv[1] == "-v":
+    current_state = sys.argv[2]
+    # to silence the linter
+    print = print
+else:
+    current_state = sys.argv[1]
+    print = faux_print
+
+connection_files = []
+
+if not os.path.exists(current_state):
+    raise Exception(
+        f"Could not open initial state {current_state}, make sure you have the proper access rights!"
+    )
 
 # Walk backwards though the linked file list
 while current_state:
     try:
-        with open(os.path.join(current_state, ENVFILE)) as f:
-            for line in f:
-                if line.startswith(IF_TOK):
-                    prev = line[len(IF_TOK) :].strip()
-                    connection_files.insert(0, prev)
-                    current_state = os.path.dirname(prev)
-                    for i in range(3):
-                        # get out ouf /out/main
-                        current_state = os.path.dirname(current_state)
+        prev_file = os.path.join(current_state, PREV_INPUT_PATH)
+        if not os.path.exists(prev_file):
+            print(f"finished in gen {prev_file}")
+            break
+
+        connection_files.insert(0, os.path.join(current_state, PREV_INPUT_FILE))
+
+        with open(prev_file) as f:
+            prev = f.read()
+
+        # "cd" out ouf /out/main/filename
+        current_state = os.path.dirname(prev)
+        for i in range(3):
+            current_state = os.path.dirname(current_state)
 
     except Exception as ex:
-        # print(f"Initial handling finished: {ex}")
+        print(f"Initial handling finished: {ex} ({current_state})")
         current_state = None
 
 stdout = os.fdopen(sys.stdout.fileno(), "wb")

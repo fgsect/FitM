@@ -19,12 +19,12 @@ fn main() {
 
     let idc = "AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES";
     let cpu = "AFL_SKIP_CPUFREQ";
-    let debug = "AFL_DEBUG_CHILD_OUTPUT";
-    // let debug = "AFL_QUIET";
+    // let debug = "AFL_DEBUG_CHILD_OUTPUT";
+    let debug = "AFL_QUIET";
+    env::set_var(debug, "1");
 
     env::set_var(idc, "1");
     env::set_var(cpu, "1");
-    env::set_var(debug, "1");
 
     if !Path::new("saved-states").exists() && fs::create_dir("saved-states").is_err() {
         println!("Could not create saved-states dir, aborting!");
@@ -39,11 +39,12 @@ fn main() {
     match fitm::run(
         "../tests/targets/LightFTP/Source/Release/fftp",
         &["../tests/targets/LightFTP/fftp.conf"],
-        &[("QEMU_STRACE", "1")],
+        &[],//("QEMU_STRACE", "1")],
         "/usr/bin/ftp",
         &["127.0.0.1", "2200"],
         &[("QEMU_STRACE", "1")],
         &Duration::from_secs(5 * 60),
+        false,
     ) {
         Err(e) => println!("Error {:?}", e),
         _ => {}
