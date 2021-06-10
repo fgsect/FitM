@@ -32,6 +32,8 @@ fitm-qemu-trace
 cmin-tmp/
 tests/targets/pseudoclient_simple
 tests/targets/pseudoserver_simple
+tests/targets/custom/pseudoclient_simple
+tests/targets/custom/pseudoserver_simple
 tests/targets/custom/echo_loop
 dump
 criu_stderr
