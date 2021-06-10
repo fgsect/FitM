@@ -12,7 +12,6 @@
   },
   "server_files": [
     "tests/targets/teamspeak3-server_linux_amd64/ts3server",
-    "tests/targets/teamspeak3-server_linux_amd64/ts3server.sqlitedb",
     "tests/targets/teamspeak3-server_linux_amd64/sql",
     "tests/targets/teamspeak3-server_linux_amd64/redist",
     "tests/targets/teamspeak3-server_linux_amd64/tsdns",
