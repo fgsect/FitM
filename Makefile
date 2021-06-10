@@ -2,7 +2,7 @@
 
 CRIUPATH?=./criu
 
-all: criu symlink qemu afl tests
+all: criu symlink qemu afl tests fitm
 
 subinit:
 	git submodule init || true
@@ -11,7 +11,8 @@ subinit:
 afl: subinit
 	make -C ./AFLplusplus
 
-fitm-qemu-trace: criu subinit
+fitm-qemu-trace:
+	$(MAKE) criu
 	cd ./fitm-qemu && ./build_qemu_support.sh
 
 qemu: fitm-qemu-trace criu subinit
