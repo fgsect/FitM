@@ -11,7 +11,11 @@ subinit:
 afl: subinit
 	make -C ./AFLplusplus
 
-qemu: criu subinit
+fitm-qemu-trace: criu subinit
+	cd ./fitm-qemu && ./build_qemu_support.sh
+
+qemu: fitm-qemu-trace criu subinit
+	# rebuild each time, lightly
 	cd ./fitm-qemu && ./build_incremental.sh
 
 criu: subinit
