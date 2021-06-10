@@ -319,7 +319,12 @@ impl FITMSnapshot {
                     .wait()
                     .unwrap_or_else(|_| panic!("[!] Snapshot run failed for {}", &self.target_bin));
 
-                Ok(exit_status.code().unwrap())
+                println!(
+                    "[*] Init run finished with exit code {:?}",
+                    exit_status.code()
+                );
+                // TODO: Handle errors properly.
+                Ok(42)
             })
             .expect("[!] Namespace creation failed")
             .wait()
@@ -350,88 +355,6 @@ impl FITMSnapshot {
         }
 
         Ok(pid)
-    }
-
-    /// Create a new snapshot based on a given snapshot
-    /// @return: boolean indicating whether a new snapshot was create or not (true == new snapshot created)
-    pub fn snapshot_run(&self, stdin_path: &str) -> Result<bool, io::Error> {
-        println!(
-            "==== [*] Running snapshot run on {} for input: \"{}\" ====",
-            self.state_path, stdin_path
-        );
-        let start_millis = utils::current_millis();
-
-        let _ = io::stdout().flush();
-
-        let exit_code = NamespaceContext::new()
-            .execute(|| -> io::Result<i32> {
-                spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
-                    .expect("[!] Could not spawn criuserver");
-
-                let (stdout, stderr) = self.create_environment()?;
-                let stdin_file = fs::File::open(stdin_path).unwrap();
-                let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
-
-                let next_snapshot_dir =
-                    format!("{}/next_snapshot", env::current_dir().unwrap().display());
-                fs::create_dir(&next_snapshot_dir).expect("[-] Could not create snapshot dir!");
-
-                let _restore = Command::new("setsid")
-                    .args(&["stdbuf", "-oL", "./restore.sh", stdin_path])
-                    .stdin(Stdio::from(stdin_file))
-                    .stdout(Stdio::from(stdout))
-                    .stderr(Stdio::from(stderr))
-                    .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
-                    .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
-                    .env("CRIU_SNAPSHOT_OUT_DIR", &next_snapshot_dir)
-                    .env("AFL_NO_UI", "1")
-                    .spawn()
-                    .expect("[!] Could not spawn snapshot run")
-                    .wait()
-                    .expect("[!] Snapshot restore failed");
-
-                let exit_status =
-                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
-                Ok(exit_status.code().unwrap())
-            })
-            .expect("[!] Namespace creation failed")
-            .wait()
-            .expect("[!] Namespace wait failed")
-            .code()
-            .unwrap();
-
-        let _next_snapshot_path = format!(
-            "{}/{}/next_snapshot",
-            env::current_dir().unwrap().display(),
-            ACTIVE_STATE
-        );
-
-        let success = exit_code == 42;
-        if success {
-            fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
-                .expect("Failed to remove old snapshot");
-            fs::rename(
-                &format!("./{}/next_snapshot", ACTIVE_STATE),
-                &format!("./{}/snapshot", ACTIVE_STATE),
-            )
-            .expect("Failed to move folder");
-            // We need to store the prev input, as it may get deleted from the prev generation through minimization.
-            fs::copy(stdin_path, &format!("./{}/prev_input", ACTIVE_STATE))
-                .expect("Could not copy file :(");
-            fs::write(&format!("./{}/prev_input_path", ACTIVE_STATE), stdin_path)
-                .expect("Could not store prev_input_path");
-            fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
-                .expect("Failed to reinitialize ./next_snapshot");
-            utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
-            println!(
-                "         ^-> finished after {} millis",
-                utils::current_millis() - start_millis
-            );
-        } /* else {
-              panic!("Snapshot creation failed");
-          }*/
-
-        Ok(success)
     }
 
     fn found_crashes(&self) -> bool {
@@ -728,7 +651,7 @@ impl FITMSnapshot {
         state_id: usize,
         input_path: &str,
     ) -> Result<Option<FITMSnapshot>, io::Error> {
-        let afl = FITMSnapshot::new(
+        let next_snapshot = FITMSnapshot::new(
             self.generation + 2,
             state_id,
             self.target_bin.to_string(),
@@ -739,20 +662,101 @@ impl FITMSnapshot {
             self.pid,
         );
 
-        if afl.snapshot_run(input_path)? {
+        println!(
+            "==== [*] Running snapshot run on {} for input: \"{}\" ====",
+            self.state_path, input_path
+        );
+        let start_millis = utils::current_millis();
+
+        let _ = io::stdout().flush();
+
+        let exit_code = NamespaceContext::new()
+            .execute(|| -> io::Result<i32> {
+                spawn_criu("./criu/criu/criu", "/tmp/criu_service.socket")
+                    .expect("[!] Could not spawn criuserver");
+
+                let (stdout, stderr) = self.to_active()?;
+
+                // let (stdout, stderr) = self.create_environment()?;
+                let stdin_file = fs::File::open(input_path).unwrap();
+                let snapshot_dir = format!("{}/snapshot", env::current_dir().unwrap().display());
+
+                let next_snapshot_dir =
+                    format!("{}/next_snapshot", env::current_dir().unwrap().display());
+
+                let _ = fs::remove_dir_all(&next_snapshot_dir);
+                fs::create_dir(&next_snapshot_dir).expect("[-] Could not create snapshot dir!");
+
+                let _restore = Command::new("setsid")
+                    .args(&["stdbuf", "-oL", "./restore.sh", input_path])
+                    .stdin(Stdio::from(stdin_file))
+                    .stdout(Stdio::from(stdout))
+                    .stderr(Stdio::from(stderr))
+                    .env("LETS_DO_THE_TIMEWARP_AGAIN", "1")
+                    .env("CRIU_SNAPSHOT_DIR", &snapshot_dir)
+                    .env("CRIU_SNAPSHOT_OUT_DIR", &next_snapshot_dir)
+                    .env("AFL_NO_UI", "1")
+                    .spawn()
+                    .expect("[!] Could not spawn snapshot run")
+                    .wait()
+                    .expect("[!] Snapshot restore failed");
+
+                let exit_status =
+                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
+                println!("[*] Snapshot run exited with code {:?}", exit_status.code());
+                // TODO: Handle errors properly
+                Ok(42)
+            })
+            .expect("[!] Namespace creation failed")
+            .wait()
+            .expect("[!] Namespace wait failed")
+            .code()
+            .unwrap();
+
+        let _next_snapshot_path = format!(
+            "{}/{}/next_snapshot",
+            env::current_dir().unwrap().display(),
+            ACTIVE_STATE
+        );
+
+        let success = exit_code == 42;
+        if success {
+            fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
+                .expect("Failed to remove old snapshot");
+            fs::rename(
+                &format!("./{}/next_snapshot", ACTIVE_STATE),
+                &format!("./{}/snapshot", ACTIVE_STATE),
+            )
+            .expect("Failed to move folder");
+            // We need to store the prev input, as it may get deleted from the prev generation through minimization.
+            fs::copy(input_path, &format!("./{}/prev_input", ACTIVE_STATE))
+                .expect("Could not copy file :(");
+            fs::write(&format!("./{}/prev_input_path", ACTIVE_STATE), input_path)
+                .expect("Could not store prev_input_path");
+            fs::create_dir(&format!("./{}/next_snapshot", ACTIVE_STATE))
+                .expect("Failed to reinitialize ./next_snapshot");
+            utils::mv_rename(
+                ACTIVE_STATE,
+                &format!("./saved-states/{}", next_snapshot.state_path),
+            );
+            println!(
+                "         ^-> finished after {} millis",
+                utils::current_millis() - start_millis
+            );
+
             println!(
                 "{}==== [*] New snapshot: {} with input {} ===={}",
                 color::Fg(color::Blue),
-                afl.state_path,
+                next_snapshot.state_path,
                 input_path,
                 style::Reset,
             );
-            Ok(Some(afl))
+            Ok(Some(next_snapshot))
         } else {
             println!(
                 "{}==== [x] Snapshot not created (target exited): {} with input {} ===={}",
                 color::Fg(color::Yellow),
-                afl.state_path,
+                next_snapshot.state_path,
                 input_path,
                 style::Reset,
             );

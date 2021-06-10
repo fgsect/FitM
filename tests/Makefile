@@ -85,3 +85,8 @@ pseudoclient_complex: clean
 # Invoke with: make symlink CRIUPATH=/home/hirnheiner/repos/criu
 symlink:
 	ln -s $(CRIUPATH)/images/rpc.proto || true
+
+./targets/custom/echo_loop: ./targets/custom/echo_loop.c
+	gcc -O3 -o targets/custom/echo_loop $<
+
+echo_loop: ./targets/custom/echo_loop

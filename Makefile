@@ -24,9 +24,11 @@ debug:
 	cargo build
 
 run: fitm #tests debug
+	sudo rm fitm-state.json || true
 	sudo rm -rf ./active-state
+	sudo rm -rf ./saved-states
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/release/fitm ./fitm-args.json
+	sudo ./target/release/fitm ./ts3.fitm-args.json
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 

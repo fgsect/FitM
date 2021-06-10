@@ -15,9 +15,6 @@ def main():
         base_state_saved = f"{getcwd()}/saved-states/{argv[1]}"[1:]
         base_state_active = f"{getcwd()}/active-state"[1:]
 
-        lines.append(f'    --inherit-fd "fd[1]:{base_state_active}/stdout" \\')
-        lines.append(f'    --inherit-fd "fd[2]:{base_state_active}/stderr" \\')
-
         call(
             f"./criu/crit/crit-python3 decode -i /{base_state_saved}/snapshot/files.img --pretty -o ./file".split()
         )
@@ -40,8 +37,14 @@ def main():
             fd = list(filter(lambda x: x["id"] == f[0], fd_info["entries"]))[0]
             mapping.append((fd["fd"], f[1]))
 
+        lines.append(f'    --inherit-fd "fd[1]:{base_state_active}/stdout" \\')
+        lines.append(f'    --inherit-fd "fd[2]:{base_state_active}/stderr" \\')
+
         open_fds += f"exec 1>> /{cur_state}/stdout\n"
         open_fds += f"exec 2>> /{cur_state}/stderr\n"
+
+        # open_fds += f"exec 1<> /{cur_state}/stdout\n"
+        # open_fds += f"exec 2<> /{cur_state}/stderr\n"
 
         for m in mapping:
             open_fds += (
