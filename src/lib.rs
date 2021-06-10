@@ -475,6 +475,12 @@ impl FITMSnapshot {
                         // Timeout per individual execution
                         "-t",
                         &format!("{}", self.timeout.as_millis()),
+                        // Bind to core id
+                        "-b",
+                        "5",
+			// use aflnet dict
+			"-x",
+			"../ftp.dict",
                         "--",
                         "bash",
                         // Our restore script
