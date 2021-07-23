@@ -25,3 +25,6 @@
 [submodule "tests/targets/tsclientlib"]
 	path = tests/targets/tsclientlib
 	url = git@github.com:ReSpeak/tsclientlib.git
+[submodule "tests/targets/msmtp-mirror"]
+	path = tests/targets/msmtp-mirror
+	url = https://github.com/MMunier/msmtp-mirror
