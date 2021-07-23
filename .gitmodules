@@ -28,3 +28,6 @@
 [submodule "tests/targets/msmtp-mirror"]
 	path = tests/targets/msmtp-mirror
 	url = https://github.com/MMunier/msmtp-mirror
+[submodule "tests/targets/exim"]
+	path = tests/targets/exim
+	url = https://github.com/MMunier/exim
