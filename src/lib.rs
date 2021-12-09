@@ -547,10 +547,12 @@ impl FITMSnapshot {
         }
 
         if exit_status != 0 {
-            let info =
-                "[!] Error during create_outputs execution. Please check latest statefolder for output";
-            println!("{}", info);
-            std::process::exit(1);
+            println!(
+                "[*] create_outputs run exited with exit code: {}\n",
+                exit_status
+            )
+            // println!("[!] Error during create_outputs execution. Please check latest statefolder for output. Exit_status: {} ", exit_status);
+            // std::process::exit(1);
         }
 
         env::set_current_dir(ACTIVE_STATE)?;
@@ -705,6 +707,7 @@ impl FITMSnapshot {
                     utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
                 println!("[*] Snapshot run exited with code {:?}", exit_status.code());
                 // TODO: Handle errors properly
+
                 Ok(42)
             })
             .expect("[!] Namespace creation failed")
@@ -719,7 +722,14 @@ impl FITMSnapshot {
             ACTIVE_STATE
         );
 
-        let success = exit_code == 42;
+        // let success = exit_code == 42;
+        let next_snapshot_dir = fs::read_dir(&_next_snapshot_path).unwrap_or_else(|err| {
+            panic!(
+                "failed to read directory: {} ({})",
+                &_next_snapshot_path, err
+            )
+        });
+        let success = next_snapshot_dir.count() >= 3;
         if success {
             fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
                 .expect("Failed to remove old snapshot");
@@ -834,6 +844,8 @@ impl FITMSnapshot {
                     // afl-cmin will keep the showmap traces in `.traces` after each run
                     command.env("AFL_KEEP_TRACES", "1");
                 }
+                
+                println!("[.] afl-cmin command: {:?}", &command);
 
                 let mut child = command.spawn()?;
                 let exit_status = child.wait()?;

@@ -1,10 +1,17 @@
 {
   "client": "../tests/targets/live555/testProgs/testRTSPClient",
   "client_args": ["rtsp://127.0.0.1:8554/wavAudioTest"],
-  "client_envs": [["QEMU_STRACE", "1"]],
+  "client_envs": {
+    "QEMU_STRACE": "1"
+  },
+  "client_files": [],
   "server": "../tests/targets/live555/testProgs/testOnDemandRTSPServer",
   "server_args": [""],
-  "server_envs": [["QEMU_STRACE", "1"], ["INIT_RECV_SKIP", "1"]],
+  "server_envs": {
+    "s_QEMU_STRACE": "1", 
+    "INIT_RECV_SKIP": "1"
+  },
+  "server_files": [],
   "run_time": 1,
   "server_only": false
 }
