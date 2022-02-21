@@ -26,7 +26,7 @@ struct RunArgs {
 }
 
 fn is_root() {
-    match env::var("USER") {
+    match env::var("SUDO_USER") {
         Ok(_) => {}
         Err(_) => {
             println!(
