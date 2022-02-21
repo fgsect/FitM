@@ -37,7 +37,7 @@ reset:
 run: fitm #tests debug
 	sudo rm -rf ./active-state
 	sudo rm -rf ./cmin-tmp
-	sudo ./target/release/fitm ./ts3.fitm-args.json
+	sudo ./target/release/fitm $(FITM_ARGS)
 	sudo chown -R $(USER) ./active_state
 	sudo chown -R $(USER) ./saved_states
 

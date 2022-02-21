@@ -1,0 +1,12 @@
+{
+  "client": "/usr/bin/ftp",
+  "client_args": ["127.0.0.1", "2200"],
+  "client_envs": {"QEMU_STRACE": "1"},
+  "client_files": [],
+  "server": "../tests/targets/LightFTP/Source/Release/fftp",
+  "server_args": ["../tests/targets/LightFTP/fftp.conf"],
+  "server_envs": {"QEMU_STRACE": "1"},
+  "server_files": [],
+  "run_time": 1,
+  "server_only": false
+}
