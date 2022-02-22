@@ -4,7 +4,7 @@ use fs_extra::{self, dir::CopyOptions};
 use std::{
     cmp::{max, min},
     fs::{self, create_dir_all},
-    io::{self, ErrorKind, Write},
+    io::{self, Error, ErrorKind, Write},
     path::Path,
     process::{Child, Command, ExitStatus, Stdio},
     str::FromStr,
@@ -49,14 +49,20 @@ pub fn clear_out() {
 }
 
 pub fn parse_pid() -> io::Result<i32> {
+    let pstree_path = format!("{}/snapshot/pstree.img", ACTIVE_STATE);
+    if !Path::new(&pstree_path).exists() {
+        return Err(Error::new(ErrorKind::NotFound, "pstree.img does not exist"));
+    }
+
     let pstree = Command::new("./criu/crit/crit-python3")
         .args(&[
             "decode".to_string(),
             "-i".to_string(),
-            format!("{}/snapshot/pstree.img", ACTIVE_STATE),
+            pstree_path,
         ])
         .output()
         .expect("[!] crit decode failed during utils::parse_pid");
+    println!("ACTIVE_STATE: {}", ACTIVE_STATE);
     let pstree_string = String::from_utf8(pstree.stdout)
         .expect("[!] Failed to grab output from crit in utils::parse_pid");
     let pstree_json = json::parse(pstree_string.as_str()).expect("[!] parse_pid failed to parse JSON in utils::parse_pid");

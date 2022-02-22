@@ -313,20 +313,34 @@ impl FITMSnapshot {
                     command.env("LETS_DO_THE_TIMEWARP_AGAIN", "1");
                 }
 
+                // Once exit_ok() is not nightly anymore we should use it here. It reports any possible exit error a process might have.
+                // wait() only reports the exit status and panics if the process stop by other means than calling exit().
+                // ref: https://doc.rust-lang.org/std/process/struct.ExitStatus.html#method.exit_ok
                 let exit_status = command
                     .spawn()
                     .expect("[!] Could not spawn snapshot run")
                     .wait()
-                    .unwrap_or_else(|_| panic!("[!] Snapshot run failed for {}", &self.target_bin));
+                    .unwrap_or_else(|_| panic!("[!] Snapshot run did not end with call to exit(): {}", &self.target_bin));
 
                 println!(
                     "[*] Init run finished with exit code {:?}",
                     exit_status.code()
                 );
+
                 // TODO: Handle errors properly.
-                Ok(42)
+                match exit_status.code() {
+                    Some(0) => Ok(42),
+                    Some(n) => {
+                        println!("[!] Unexpected exit status '{}' from snapshot creation.", n);
+                        Ok(43)
+                    },
+                    None => {
+                        println!("[!] No exit status from snapshot creation.");
+                        Ok(44)
+                    }
+                }
             })
-            .expect("[!] Namespace creation failed")
+            .expect("[!] Namespace creation failed") // This panic is never triggered as no branch returns Err()
             .wait()
             .expect("[!] Namespace wait failed")
             .code()
@@ -338,6 +352,7 @@ impl FITMSnapshot {
                 // With snapshot_run we move the state folder instead of copying it,
                 // but in this initial case we need to use
                 // the state folder shortly after running this function
+                // TODO: don't call unwrap on Err. It's alright for now as this cases is unrecoverable.
                 pid = Some(utils::parse_pid().unwrap());
                 utils::mv_rename(ACTIVE_STATE, &format!("./saved-states/{}", self.state_path));
             } else {
