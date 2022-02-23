@@ -59,7 +59,10 @@ pub fn parse_pid() -> io::Result<i32> {
         .expect("[!] crit decode failed during utils::parse_pid");
     let pstree_string = String::from_utf8(pstree.stdout)
         .expect("[!] Failed to grab output from crit in utils::parse_pid");
-    let pstree_json = json::parse(pstree_string.as_str()).unwrap();
+    let pstree_json = json::parse(pstree_string.as_str()).unwrap_or_else(
+        |e| panic!("[!] crit failed to print the pid of the dumped process: {:?}\n
+    Crit output: {}", &e, pstree_string)
+    );
     let pid = pstree_json["entries"][0]["pid"]
         .as_i32()
         .expect("[!] Could not transform json value into i32 in utils::parse_pid");

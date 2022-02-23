@@ -18,7 +18,8 @@
     "--cli-telnet-port=34254"
   ],
   "client_envs": {
-    "INIT_SOCKET_SKIP": "0",
+    "QEMU_STRACE": "1",
+    "INIT_SOCKET_SKIP": "2",
     "COMMENT": "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"
   },
   "client_files": [],
@@ -32,6 +33,7 @@
     "-E"
   ],
   "server_envs": {
+    "c_INIT_SOCKET_SKIP": "1",
     "QEMU_STRACE": "1",
     "AFL_DEBUG": "1"
   },
@@ -40,6 +42,6 @@
     "tests/targets/kamailio/src/modules",
     "tests/targets/kamailio/runtime_dir"
   ],
-  "run_time": 300,
-  "server_only": true
+  "run_time": 30,
+  "server_only": false
 }

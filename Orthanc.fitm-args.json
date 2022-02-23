@@ -1,0 +1,20 @@
+{
+  "client": "/usr/bin/dcmsend",
+  "client_args": ["localhost", "4242", "/home/pleb/FitM/0002.DCM"],
+  "client_envs": {
+    "QEMU_STRACE": "1",
+    "_INIT_SOCKET_SKIP": "0",
+    "COMMENT": "INIT_SOCKET_SKIP is needed for getifaddr to create a valid udp sock"
+  },
+  "client_files": [],
+  "server": "/usr/sbin/Orthanc",
+  "server_args": [],
+  "server_envs": {
+    "_INIT_SOCKET_SKIP": "1",
+    "QEMU_STRACE": "1",
+    "AFL_DEBUG": "1"
+  },
+  "server_files": [],
+  "run_time": 30,
+  "server_only": false
+}
