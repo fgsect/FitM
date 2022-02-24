@@ -329,15 +329,16 @@ impl FITMSnapshot {
 
                 // TODO: Handle errors properly.
                 match exit_status.code() {
-                    Some(0) => Ok(42),
+                    None => {
+                        // https://doc.rust-lang.org/std/process/struct.ExitStatus.html#method.code, grep "on unix"
+                        // This is expected for a snapshot.
+                        println!("[*] Target was killed by signal --> Dump success?");
+                        Ok(0)
+                    }
                     Some(n) => {
                         println!("[!] Unexpected exit status '{}' from snapshot creation.", n);
-                        Ok(43)
+                        Err(io::Error::new(ErrorKind::Other, "[!] criu dump failed, check active-state dir."))
                     },
-                    None => {
-                        println!("[!] No exit status from snapshot creation.");
-                        Ok(44)
-                    }
                 }
             })
             .expect("[!] Namespace creation failed") // This panic is never triggered as no branch returns Err()
@@ -348,7 +349,7 @@ impl FITMSnapshot {
 
         let mut pid = None;
         if create_snapshot {
-            if closure_exit == 42 {
+            if closure_exit == 0 {
                 // With snapshot_run we move the state folder instead of copying it,
                 // but in this initial case we need to use
                 // the state folder shortly after running this function
