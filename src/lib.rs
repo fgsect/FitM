@@ -332,7 +332,7 @@ impl FITMSnapshot {
                     None => {
                         // https://doc.rust-lang.org/std/process/struct.ExitStatus.html#method.code, grep "on unix"
                         // This is expected for a snapshot.
-                        println!("[*] Target was killed by signal --> Dump success?");
+                        println!("[*] Target was killed by signal. Assuming dump success.");
                         Ok(0)
                     }
                     Some(n) => {
@@ -549,7 +549,7 @@ impl FITMSnapshot {
                     .expect("[!] Snapshot restore failed");
 
                 let exit_status =
-                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
+                    utils::waitpid(self.pid.unwrap()).expect("[!] create_outputs_file(): Snapshot run failed");
                 Ok(exit_status.code().unwrap())
             })
             .expect("[!] Namespace creation failed")
@@ -718,10 +718,22 @@ impl FITMSnapshot {
                     .expect("[!] Snapshot restore failed");
 
                 let exit_status =
-                    utils::waitpid(self.pid.unwrap()).expect("[!] Snapshot run failed");
+                    utils::waitpid(self.pid.unwrap()).expect("[!] create_next_snapshot(): Snapshot run failed");
                 println!("[*] Snapshot run exited with code {:?}", exit_status.code());
+                
                 // TODO: Handle errors properly
-                Ok(42)
+                match exit_status.code() {
+                    None => {
+                        // https://doc.rust-lang.org/std/process/struct.ExitStatus.html#method.code, grep "on unix"
+                        // This is expected for a snapshot.
+                        println!("[*] Target was killed by signal. Assuming dump success.");
+                        Ok(0)
+                    }
+                    Some(n) => {
+                        println!("[!] Unexpected exit status '{}' from snapshot creation.", n);
+                        Err(io::Error::new(ErrorKind::Other, "[!] criu dump failed. Target exited early or something is broken. Check active-state dir."))
+                    },
+                }
             })
             .expect("[!] Namespace creation failed")
             .wait()
@@ -735,7 +747,7 @@ impl FITMSnapshot {
             ACTIVE_STATE
         );
 
-        let success = exit_code == 42;
+        let success = exit_code == 0;
         if success {
             fs::remove_dir_all(&format!("./{}/snapshot", ACTIVE_STATE))
                 .expect("Failed to remove old snapshot");
@@ -937,7 +949,7 @@ pub fn process_stage(
             std::fs::copy(&input, &format!("{}/imported{}", &cmin_tmp_dir, i))?;
         }
 
-        // Copy all queue items to cmin dir (doesn't necessary exist yet)
+        // Copy all queue items to cmin dir (doesn't necessarily exist yet)
         let _ = snap.copy_queue_to(&Path::new(&cmin_tmp_dir), false);
 
         // cmin all files to the in dir
