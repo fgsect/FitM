@@ -1,3 +1,9 @@
+# Fuzzer in the Middle
+<p align="center">
+  <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
+</p>
+
+
 # Getting It
 
 This repo uses submodules :(.  
