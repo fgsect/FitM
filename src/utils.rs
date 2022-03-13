@@ -62,7 +62,6 @@ pub fn parse_pid() -> io::Result<i32> {
         ])
         .output()
         .expect("[!] crit decode failed during utils::parse_pid");
-    println!("ACTIVE_STATE: {}", ACTIVE_STATE);
     let pstree_string = String::from_utf8(pstree.stdout)
         .expect("[!] Failed to grab output from crit in utils::parse_pid");
     let pstree_json = json::parse(pstree_string.as_str()).expect("[!] parse_pid failed to parse JSON in utils::parse_pid");
