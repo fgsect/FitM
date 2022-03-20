@@ -1,18 +1,29 @@
-# Fuzzer in the Middle
 
-
-<a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
-  
-<br/>
-
-  
-TODO: Explain the benefits and functioning of FitM
-  
-  
 <p align="center">
   <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
 </p>
 
+# Fuzzer in the Middle
+
+FitM, the Fuzzer-in-the-Middle, is a AFL++-based coverage-guided fuzzer for stateful, binary-only client-server applications. 
+It can be used in situations where you would normally turn to grammar-based fuzzers or start patching your target. With FitM you can explore the communication between client and server by fuzzing them at the same time.
+It builds on top of [qemuafl](https://github.com/AFLplusplus/qemuafl) for emulation and [CRIU](https://criu.org/Main_Page) for userspace snapshots. No source code needed!
+
+# How it works
+
+The FitM tool uses [FitM-qemu](https://github.com/fgsect/FitM-qemu) for instrumentation.
+FitM-qemu extends qemuafl with a network emulation layer on the syscall level.
+With it, we can fuzz two targets (binary A & B) at the same time, usually a server and a client and schedule different snapshots of these processes ("generations") we collect while exploring the protocol.
+Each generation represents a stage in the protocol's communication levels that the client-server pair speaks.
+The fuzzer starts in generation 0 with binary A. This binary should produce some output without needing any input. 
+Using the initial output of binary A as seed, FitM will fuzz binary B for a while.
+Afterwards, FitM creates a set of new snapshots of B, generation 3, for later.
+Next, the snapshot of generation 0 (binary A) is restored, seeded with generation 1's output and fuzzed (generation 2).
+A snapshot is always created during a receive call that followed a send call until we fully explore the client-server interaction.
+The below figure depicts this cycle.
+
+See our paper at the bottom for technical explanations, benchmarks, and further details.
+  
 # Getting It
 
 This module uses submodules. Clone with `--recurse-submodules`.
@@ -105,5 +116,6 @@ By diffing the syscall traces of the target with and without FITM enabled you sh
 # Cite / More Information
 
 We wrote a paper about this tool. You can get a first idea of how the fuzzer works there.
-[link](...).
+
+<a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
 
