@@ -26,7 +26,7 @@ The below figure depicts this cycle.
 <img width="400" alt="Overview over the different stages of FitM, see paper" src="https://user-images.githubusercontent.com/297744/159170739-f8d8d551-e42f-4c76-ae62-902d44b86026.svg" align="center">
 </p>
 
-See our paper at the bottom for technical explanations, benchmarks, and further details.
+See [our paper](fitm.pdf) for technical explanations, benchmarks, and further details.
   
 ## Getting Started
 
@@ -121,7 +121,7 @@ By diffing the syscall traces of the target with and without FITM enabled you sh
 
 <a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right"> </a>
 
-For further details, see our paper at BAR 2022.
+For further details, see [our paper](fitm.pdf) at BAR 2022.
   
 To cite, use:
 ```bib
