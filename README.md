@@ -22,6 +22,8 @@ Next, the snapshot of generation 0 (binary A) is restored, seeded with generatio
 A snapshot is always created during a receive call that followed a send call until we fully explore the client-server interaction.
 The below figure depicts this cycle.
 
+<img width="400" alt="Overview over the different stages of FitM, see paper" src="https://user-images.githubusercontent.com/297744/159170739-f8d8d551-e42f-4c76-ae62-902d44b86026.svg">
+
 See our paper at the bottom for technical explanations, benchmarks, and further details.
   
 # Getting It
@@ -118,7 +120,3 @@ By diffing the syscall traces of the target with and without FITM enabled you sh
 We wrote a paper about this tool. You can get a first idea of how the fuzzer works there.
 
 <a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
-
-  
-<img width="400" alt="Overview over the different stages of FitM, see paper" src="https://user-images.githubusercontent.com/297744/159170739-f8d8d551-e42f-4c76-ae62-902d44b86026.svg" align="left">
-
