@@ -119,3 +119,5 @@ We wrote a paper about this tool. You can get a first idea of how the fuzzer wor
 
 <a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
 
+  
+<img width="400" alt="FitM overview over the different stages, see paper" src="https://user-images.githubusercontent.com/297744/159170451-9f6c0793-a79d-4423-9083-02c0ba9fbbce.svg" align="left">
