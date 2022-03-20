@@ -1,13 +1,12 @@
-# Fuzzer in the Middle
-  
-FitM, the Fuzzer-in-the-Middle, is a AFL++-based coverage-guided fuzzer for stateful, binary-only client-server applications. 
-It can be used in situations where you would normally turn to grammar-based fuzzers or start patching your target. With FitM you can explore the communication between client and server by fuzzing them at the same time.
-It builds on top of [qemuafl](https://github.com/AFLplusplus/qemuafl) for emulation and [CRIU](https://criu.org/Main_Page) for userspace snapshots. No source code needed!
+# FitM, the Fuzzer in the Middle
 
 <p align="center">
   <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
 </p>
-
+  
+FitM, the Fuzzer-in-the-Middle, is a AFL++-based coverage-guided fuzzer for stateful, binary-only client-server applications. 
+It can be used in situations where you would normally turn to grammar-based fuzzers or start patching your target. With FitM you can explore the communication between client and server by fuzzing them at the same time.
+It builds on top of [qemuafl](https://github.com/AFLplusplus/qemuafl) for emulation and [CRIU](https://criu.org/Main_Page) for userspace snapshots. No source code needed!
 
 ## How it works
 
