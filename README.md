@@ -3,11 +3,13 @@
   <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
 </p>
 
-# Fuzzer in the Middle
-
+ # Fuzzer in the Middle
+  
 FitM, the Fuzzer-in-the-Middle, is a AFL++-based coverage-guided fuzzer for stateful, binary-only client-server applications. 
 It can be used in situations where you would normally turn to grammar-based fuzzers or start patching your target. With FitM you can explore the communication between client and server by fuzzing them at the same time.
 It builds on top of [qemuafl](https://github.com/AFLplusplus/qemuafl) for emulation and [CRIU](https://criu.org/Main_Page) for userspace snapshots. No source code needed!
+
+
 
 # How it works
 
@@ -22,7 +24,10 @@ Next, the snapshot of generation 0 (binary A) is restored, seeded with generatio
 A snapshot is always created during a receive call that followed a send call until we fully explore the client-server interaction.
 The below figure depicts this cycle.
 
-<img width="400" alt="Overview over the different stages of FitM, see paper" src="https://user-images.githubusercontent.com/297744/159170739-f8d8d551-e42f-4c76-ae62-902d44b86026.svg">
+
+<p align="center">
+<img width="400" alt="Overview over the different stages of FitM, see paper" src="https://user-images.githubusercontent.com/297744/159170739-f8d8d551-e42f-4c76-ae62-902d44b86026.svg" align="center">
+</p>
 
 See our paper at the bottom for technical explanations, benchmarks, and further details.
   
