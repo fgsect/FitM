@@ -1,17 +1,15 @@
-
-<p align="center">
-  <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
-</p>
-
- # Fuzzer in the Middle
+# Fuzzer in the Middle
   
 FitM, the Fuzzer-in-the-Middle, is a AFL++-based coverage-guided fuzzer for stateful, binary-only client-server applications. 
 It can be used in situations where you would normally turn to grammar-based fuzzers or start patching your target. With FitM you can explore the communication between client and server by fuzzing them at the same time.
 It builds on top of [qemuafl](https://github.com/AFLplusplus/qemuafl) for emulation and [CRIU](https://criu.org/Main_Page) for userspace snapshots. No source code needed!
 
+<p align="center">
+  <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
+</p>
 
 
-# How it works
+## How it works
 
 The FitM tool uses [FitM-qemu](https://github.com/fgsect/FitM-qemu) for instrumentation.
 FitM-qemu extends qemuafl with a network emulation layer on the syscall level.
@@ -31,7 +29,7 @@ The below figure depicts this cycle.
 
 See our paper at the bottom for technical explanations, benchmarks, and further details.
   
-# Getting It
+## Getting Started
 
 This module uses submodules. Clone with `--recurse-submodules`.
   
@@ -41,7 +39,7 @@ git submodule init
 git submodule update
 ```
 
-# Building
+## Building
 
 ```
 vagrant up
@@ -52,7 +50,7 @@ make
 
 If you don't want to use the provided Vagrantfile you can read the provided `provision.sh` script to understand the necessary dependencies. In general you will need packages to build [QEMU](https://github.com/AFLplusplus/qemuafl/blob/master/README.rst) and [Criu](https://criu.org/Installation#Installing_build_dependencies). Additionally, you will need a stable [rust toolchain](https://www.rust-lang.org/tools/install).
 
-# Running 
+## Running 
 Run this: `FITM_ARGS=config/fitm-args.ftp.json make run`
 
 The fuzzer will create the folders `active-state`, `saved-states` and `cmin-tmp`. 
@@ -83,8 +81,8 @@ Apart from the above three folder you will find the following temporary files in
 - `criu_stdout`/`criu_stderr`: stdout/err of the criu server process. To create snapshots each target process communicates with a separate criu process, the criu server. 
 - `fdinfo`, `file`: Criu has a tool called "crit" that can be used to parse the binary files that are part of a snapshot folder. We use crit to parse the open files in the target process and attach them accordingly. The parsing code can be found in `create_restore.py`. This script create a bash script `restore.sh` based on the `restore.sh.tmp` template for each state. The `restore.sh` script is the target given to AFL when starting another fuzz run. The script will call `criu restore` and by using the [--restore-detached](https://criu.org/Tree_after_restore#Detached) flag we make sure that the target process ends up as a child of AFL after criu has exited.
 
-# Special Files
-## fitm-args.json
+## Special Files
+### fitm-args.json
 
 This file is used to configure FitM. The meaning of each key is as follows:
 
@@ -99,11 +97,11 @@ This file is used to configure FitM. The meaning of each key is as follows:
 - `run_time`: time spent fuzzing each generation in seconds.
 - `server_only`: boolean to indicate that we only want to fuzz the server. The client is only fuzzed for 100ms and it's output is disregarded. 
 
-## fitm-state.json
+### fitm-state.json
 
 A JSON file used to save state information from previous runs. This allows us to abort fuzzing at any point, introduce changes and then reuse the accumulated states in `./saved-states`. The file holds a serialized form of the `generation_snaps` variable. This variable holds a list of generations that need to be fuzzed, each generation being another list of `FITMSnapshot` objects (`[[gen0_snap0, gen0_snap1, .., gen0_snapN], [gen1_snap0, .. gen1_snapN], .., [genN_snap0, .., genN_snapN]]`).
 
-# Debugging
+## Debugging
 
 When using FitM with a new target you will probably investigate weird behaviour sooner or later. 
 You will generally want to check `./active-state/restore.log` and see the log end with a message similar to this one:
@@ -120,8 +118,7 @@ Next, you can add `QEMU_STRACE` with a value of 1 to the `client_envs`/`server_e
 You will see the strace output in `./active-state/stderr`. These are the syscalls that the emulated target sends to emulation layer. 
 By diffing the syscall traces of the target with and without FITM enabled you should be able to learn where things break (see `FITM_DISABLED` in `./fitm-qemu/FitM-qemu/linux-user/syscall.c`).
 
-# Cite / More Information
-
+## Paper / Citing / More Information
 
 <a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
 
