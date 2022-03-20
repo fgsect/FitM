@@ -120,7 +120,7 @@ By diffing the syscall traces of the target with and without FITM enabled you sh
 
 ## Paper / Citing / More Information
 
-<a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
+<a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right" />
 
 For further details, see our paper at BAR 2022.
   
