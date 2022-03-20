@@ -124,4 +124,13 @@ By diffing the syscall traces of the target with and without FITM enabled you sh
 
 We wrote a paper about this tool. You can get a first idea of how the fuzzer works there.
 
+To cite, use:
+```bib
+@InProceedings{fitm,
+  author    = {Maier, Dominik and Bittner, Otto and Munier, Marc and Beier, Julian},
+  booktitle = {Workshop on Binary Analysis Research (BAR), 2022},
+  year     = 2022,
+}
+```
+
 <a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png" align="right">
