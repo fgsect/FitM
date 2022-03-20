@@ -1,8 +1,17 @@
 # Fuzzer in the Middle
+
+
+<a href="fitm.pdf"> <img width="200" alt="The FitM paper" src="https://user-images.githubusercontent.com/297744/159168821-993d1f88-cc7d-48b0-a0e8-2522b035f789.png">
+  
+<br/>
+
+  
+TODO: Explain the benefits and functioning of FitM
+  
+  
 <p align="center">
   <img width="460" height="300" src="https://user-images.githubusercontent.com/22647728/158073817-5ed845b2-46ea-4ce9-8ae3-4103b30653f6.gif">
 </p>
-
 
 # Getting It
 
